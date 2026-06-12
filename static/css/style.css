@@ -498,6 +498,272 @@ body {
     margin-top: 2px;
 }
 
+/* Filter Bar Setup */
+.filter-bar {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px 24px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
+    animation: fadeIn var(--transition-normal);
+}
+
+.filter-form {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.select-input {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-family: var(--font-primary);
+    font-size: 13.5px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.select-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    background-color: var(--bg-card);
+}
+
+/* Pipeline Status Matrix */
+.matrix-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 30px;
+}
+
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13px;
+    min-width: 900px;
+}
+
+.matrix-table th, .matrix-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.matrix-table th {
+    background-color: var(--bg-main);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+
+.matrix-table tr:last-child td {
+    border-bottom: none;
+}
+
+.matrix-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.file-name-cell {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 160px;
+}
+
+/* Status Badges */
+.status-pill {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    width: 100%;
+    min-width: 90px;
+    transition: all var(--transition-fast);
+}
+
+.status-pending {
+    background-color: #f1f5f9;
+    color: var(--text-muted);
+}
+
+.status-open {
+    background-color: var(--color-blue-light);
+    color: var(--color-blue);
+    border: 1px solid rgba(29, 78, 216, 0.15);
+}
+
+.status-progress {
+    background-color: #fffbeb;
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.15);
+}
+
+.status-done {
+    background-color: var(--color-green-light);
+    color: var(--color-green);
+    border: 1px solid rgba(22, 163, 74, 0.15);
+}
+
+.artist-badge-name {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Queue and Task Panels */
+.queue-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.queue-stage-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.queue-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.task-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+.task-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: #cbd5e1;
+}
+
+.task-card-header {
+    margin-bottom: 12px;
+}
+
+.task-card-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.task-card-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.task-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-card-actions {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+.assign-form-inline {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+}
+
+.assign-form-inline select {
+    flex-grow: 1;
+}
+
+/* Modals and Inline Forms */
+.form-card-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12.5px;
+    border-radius: var(--radius-sm);
+}
+
+.btn-success {
+    background-color: var(--color-green);
+    color: #ffffff;
+}
+
+.btn-success:hover {
+    background-color: #15803d;
+}
+
+.btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.btn-outline:hover {
+    background-color: var(--bg-input);
+    color: var(--text-primary);
+}
+
 /* Responsive Overrides */
 @media (max-width: 768px) {
     .dashboard-layout {
@@ -516,4 +782,19 @@ body {
         margin-left: 0;
         padding: 24px;
     }
+    
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        justify-content: space-between;
+    }
 }
+

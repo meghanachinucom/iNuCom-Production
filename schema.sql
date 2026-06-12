@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS files (
     description TEXT,
     status TEXT DEFAULT 'Pending',
     assigned_to INTEGER,
+    content_released_at TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
