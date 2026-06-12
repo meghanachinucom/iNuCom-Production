@@ -1415,6 +1415,411 @@ def attendance_view_user(employee_id):
         
     return redirect(url_for('attendance_page', employee_id=employee_id))
 
+# LAYER 5: LEAVES & REUSABLE APPROVAL ENGINE
+
+def get_approval_chain(db, user_id, role, reports_to_username):
+    cursor = db.cursor()
+    # Find Admin's user ID
+    cursor.execute("SELECT id FROM users WHERE role = 'Admin' LIMIT 1")
+    admin_row = cursor.fetchone()
+    admin_id = admin_row['id'] if admin_row else 1
+    
+    if role == 'Admin':
+        return []
+        
+    chain = []
+    
+    # If the user is an Artist, they need their Lead first, then the Admin
+    if role == 'Artist':
+        lead_id = None
+        if reports_to_username:
+            cursor.execute("SELECT id FROM users WHERE username = ?", (reports_to_username,))
+            lead_row = cursor.fetchone()
+            if lead_row:
+                lead_id = lead_row['id']
+        if lead_id:
+            chain.append(lead_id)
+        chain.append(admin_id)
+        
+    # If the user is a Lead or HR, they only need Admin approval
+    elif role in ['Lead', 'HR']:
+        chain.append(admin_id)
+        
+    else:
+        # Default fallback
+        chain.append(admin_id)
+        
+    return chain
+
+@app.route('/leaves', methods=['GET', 'POST'])
+def leaves_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    # 1. HANDLE POST (APPLY LEAVE)
+    if request.method == 'POST':
+        start_date_str = request.form.get('start_date', '').strip()
+        end_date_str = request.form.get('end_date', '').strip()
+        reason = request.form.get('reason', '').strip()
+        
+        if not start_date_str or not end_date_str or not reason:
+            flash("All fields are required to apply for leave.", "error")
+            return redirect(url_for('leaves_page'))
+            
+        try:
+            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash("Invalid date format. Use YYYY-MM-DD.", "error")
+            return redirect(url_for('leaves_page'))
+            
+        if start_date > end_date:
+            flash("Start date cannot be after end date.", "error")
+            return redirect(url_for('leaves_page'))
+            
+        # Calculate requested days
+        requested_days = (end_date - start_date).days + 1
+        
+        # Get user profile for limits check
+        cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+        user_info = cursor.fetchone()
+        
+        # Calculate Approved Used Days in the current year
+        current_year = start_date.year
+        year_start = f"{current_year}-01-01"
+        year_end = f"{current_year}-12-31"
+        
+        cursor.execute("""
+            SELECT start_date, end_date FROM leaves
+            WHERE user_id = ? AND status = 'Approved'
+              AND NOT (end_date < ? OR start_date > ?)
+        """, (session['user_id'], year_start, year_end))
+        approved_leaves = cursor.fetchall()
+        
+        approved_used = 0
+        for lv in approved_leaves:
+            lv_start = datetime.datetime.strptime(lv['start_date'], '%Y-%m-%d').date()
+            lv_end = datetime.datetime.strptime(lv['end_date'], '%Y-%m-%d').date()
+            intersect_start = max(lv_start, datetime.date(current_year, 1, 1))
+            intersect_end = min(lv_end, datetime.date(current_year, 12, 31))
+            approved_used += (intersect_end - intersect_start).days + 1
+            
+        allowed_leaves = 18.0 + float(user_info['carry_forward'] or 0.0)
+        remaining_balance = allowed_leaves - approved_used
+        
+        if requested_days > remaining_balance:
+            flash(f"Insufficient leave balance. Requested: {requested_days} days, Remaining: {remaining_balance:.1f} days.", "error")
+            return redirect(url_for('leaves_page'))
+            
+        # Monthly limit check: max 2 leaves per month (spanned months count)
+        spanned_months = {}
+        curr_day = start_date
+        while curr_day <= end_date:
+            month_key = curr_day.strftime('%Y-%m')
+            spanned_months[month_key] = spanned_months.get(month_key, 0) + 1
+            curr_day += datetime.timedelta(days=1)
+            
+        # Check limit for each month in spanned_months
+        for m_key, days_in_req_month in spanned_months.items():
+            month_start_str = f"{m_key}-01"
+            y, m = map(int, m_key.split('-'))
+            last_day = calendar.monthrange(y, m)[1]
+            month_end_str = f"{m_key}-{last_day:02d}"
+            
+            cursor.execute("""
+                SELECT start_date, end_date FROM leaves
+                WHERE user_id = ? AND status = 'Approved'
+                  AND NOT (end_date < ? OR start_date > ?)
+            """, (session['user_id'], month_start_str, month_end_str))
+            month_approved_leaves = cursor.fetchall()
+            
+            month_approved_days = 0
+            for lv in month_approved_leaves:
+                lv_start = datetime.datetime.strptime(lv['start_date'], '%Y-%m-%d').date()
+                lv_end = datetime.datetime.strptime(lv['end_date'], '%Y-%m-%d').date()
+                intersect_start = max(lv_start, datetime.date(y, m, 1))
+                intersect_end = min(lv_end, datetime.date(y, m, last_day))
+                month_approved_days += (intersect_end - intersect_start).days + 1
+                
+            if month_approved_days + days_in_req_month > 2:
+                flash(f"Leave policy violation: Leaves in {y}-{m:02d} exceed the monthly limit of 2 days. (Approved in month: {month_approved_days} days, Requested in month: {days_in_req_month} days)", "error")
+                return redirect(url_for('leaves_page'))
+                
+        # If all checks pass, insert leave request and approval chain
+        try:
+            cursor.execute("""
+                INSERT INTO leaves (user_id, start_date, end_date, leave_type, reason, status)
+                VALUES (?, ?, ?, 'General', ?, 'Pending')
+            """, (session['user_id'], start_date_str, end_date_str, reason))
+            leave_id = cursor.lastrowid
+            
+            chain = get_approval_chain(db, session['user_id'], user_info['role'], user_info['reports_to'])
+            
+            if not chain:
+                cursor.execute("UPDATE leaves SET status = 'Approved' WHERE id = ?", (leave_id,))
+                cursor.execute("""
+                    INSERT INTO activity_log (user_id, action, details)
+                    VALUES (?, 'Leave Request', ?)
+                """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} (Auto-Approved)."))
+                db.commit()
+                flash("Leave request submitted and auto-approved successfully!", "success")
+            else:
+                import json
+                chain_json = json.dumps(chain)
+                details_str = f"Leave Request from {start_date_str} to {end_date_str} ({requested_days} days). Reason: {reason}"
+                
+                cursor.execute("""
+                    INSERT INTO approvals (requester_id, type, reference_id, approval_chain, current_index, details, status)
+                    VALUES (?, 'Leave', ?, ?, 0, ?, 'Pending')
+                """, (session['user_id'], leave_id, chain_json, details_str))
+                
+                cursor.execute("""
+                    INSERT INTO activity_log (user_id, action, details)
+                    VALUES (?, 'Leave Request', ?)
+                """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} ({requested_days} days) - Pending approval chain {chain_json}"))
+                db.commit()
+                flash("Leave request submitted successfully, pending approval chain.", "success")
+                
+        except Exception as e:
+            db.rollback()
+            flash(f"Error submitting leave request: {e}", "error")
+            
+        return redirect(url_for('leaves_page'))
+        
+    # 2. HANDLE GET
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+    
+    current_year = datetime.date.today().year
+    year_start = f"{current_year}-01-01"
+    year_end = f"{current_year}-12-31"
+    
+    cursor.execute("""
+        SELECT start_date, end_date FROM leaves
+        WHERE user_id = ? AND status = 'Approved'
+          AND NOT (end_date < ? OR start_date > ?)
+    """, (session['user_id'], year_start, year_end))
+    approved_leaves = cursor.fetchall()
+    
+    approved_used = 0
+    for lv in approved_leaves:
+        lv_start = datetime.datetime.strptime(lv['start_date'], '%Y-%m-%d').date()
+        lv_end = datetime.datetime.strptime(lv['end_date'], '%Y-%m-%d').date()
+        intersect_start = max(lv_start, datetime.date(current_year, 1, 1))
+        intersect_end = min(lv_end, datetime.date(current_year, 12, 31))
+        approved_used += (intersect_end - intersect_start).days + 1
+        
+    allowed_leaves = 18.0 + float(user_info['carry_forward'] or 0.0)
+    remaining_balance = allowed_leaves - approved_used
+    
+    cursor.execute("""
+        SELECT l.*, a.id as approval_id, a.approval_chain, a.current_index, a.status as approval_status
+        FROM leaves l
+        LEFT JOIN approvals a ON (l.id = a.reference_id AND a.type = 'Leave')
+        WHERE l.user_id = ?
+        ORDER BY l.start_date DESC
+    """, (session['user_id'],))
+    my_leaves_raw = cursor.fetchall()
+    
+    my_leaves = []
+    import json
+    for row in my_leaves_raw:
+        step_info = ""
+        total_days = (datetime.datetime.strptime(row['end_date'], '%Y-%m-%d').date() - datetime.datetime.strptime(row['start_date'], '%Y-%m-%d').date()).days + 1
+        
+        if row['status'] == 'Pending' and row['approval_chain']:
+            try:
+                chain = json.loads(row['approval_chain'])
+                curr_idx = row['current_index']
+                if curr_idx < len(chain):
+                    cursor.execute("SELECT name, role FROM users WHERE id = ?", (chain[curr_idx],))
+                    active_approver = cursor.fetchone()
+                    if active_approver:
+                        step_info = f"Pending: {active_approver['name']} ({active_approver['role']}) - Step {curr_idx + 1} of {len(chain)}"
+            except Exception as e:
+                step_info = "Pending in chain"
+        elif row['status'] == 'Approved':
+            step_info = "Approved"
+        elif row['status'] == 'Rejected':
+            step_info = "Rejected"
+            
+        my_leaves.append({
+            'id': row['id'],
+            'start_date': row['start_date'],
+            'end_date': row['end_date'],
+            'reason': row['reason'],
+            'status': row['status'],
+            'total_days': total_days,
+            'step_info': step_info
+        })
+        
+    cursor.execute("""
+        SELECT a.id as approval_id, a.requester_id, a.type, a.reference_id, a.approval_chain, a.current_index, a.details, a.status as approval_status,
+               u.name as requester_name, u.role as requester_role, u.team as requester_team
+        FROM approvals a
+        JOIN users u ON a.requester_id = u.id
+        WHERE a.status = 'Pending'
+        ORDER BY a.id ASC
+    """)
+    all_pending_approvals = cursor.fetchall()
+    
+    my_pending_approvals = []
+    for app_row in all_pending_approvals:
+        try:
+            chain = json.loads(app_row['approval_chain'])
+            curr_idx = app_row['current_index']
+            if curr_idx < len(chain) and chain[curr_idx] == session['user_id']:
+                my_pending_approvals.append({
+                    'id': app_row['approval_id'],
+                    'requester_name': app_row['requester_name'],
+                    'requester_role': app_row['requester_role'],
+                    'requester_team': app_row['requester_team'],
+                    'type': app_row['type'],
+                    'details': app_row['details'],
+                    'step_info': f"Step {curr_idx + 1} of {len(chain)}"
+                })
+        except Exception as e:
+            pass
+            
+    return render_template(
+        'leaves.html',
+        user=user_info,
+        allowed_leaves=allowed_leaves,
+        approved_used=approved_used,
+        remaining_balance=remaining_balance,
+        my_leaves=my_leaves,
+        my_pending_approvals=my_pending_approvals,
+        today_str=datetime.date.today().strftime('%Y-%m-%d')
+    )
+
+@app.route('/leaves/approve/<int:approval_id>', methods=['POST'])
+def approve_leave(approval_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    cursor.execute("SELECT * FROM approvals WHERE id = ? AND status = 'Pending'", (approval_id,))
+    approval = cursor.fetchone()
+    
+    if not approval:
+        flash("Approval request not found or already actioned.", "error")
+        return redirect(url_for('leaves_page'))
+        
+    import json
+    try:
+        chain = json.loads(approval['approval_chain'])
+        curr_idx = approval['current_index']
+    except Exception as e:
+        flash("Invalid approval request data.", "error")
+        return redirect(url_for('leaves_page'))
+        
+    if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
+        flash("Unauthorized to approve this step.", "error")
+        return redirect(url_for('leaves_page'))
+        
+    next_idx = curr_idx + 1
+    
+    try:
+        if next_idx >= len(chain):
+            cursor.execute("""
+                UPDATE approvals 
+                SET status = 'Approved', current_index = ?, actioned_by = ?, actioned_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (next_idx, session['user_id'], approval_id))
+            
+            if approval['type'] == 'Leave':
+                cursor.execute("""
+                    UPDATE leaves
+                    SET status = 'Approved', approved_by = ?
+                    WHERE id = ?
+                """, (session['user_id'], approval['reference_id']))
+                
+            cursor.execute("""
+                INSERT INTO activity_log (user_id, action, details)
+                VALUES (?, 'Approve Request', ?)
+            """, (session['user_id'], f"Approved {approval['type']} ID {approval['reference_id']} (Final step approved)."))
+            
+            flash("Request approved and finalized successfully!", "success")
+        else:
+            cursor.execute("""
+                UPDATE approvals
+                SET current_index = ?
+                WHERE id = ?
+            """, (next_idx, approval_id))
+            
+            cursor.execute("""
+                INSERT INTO activity_log (user_id, action, details)
+                VALUES (?, 'Approve Request', ?)
+            """, (session['user_id'], f"Approved {approval['type']} ID {approval['reference_id']} (Advanced to step {next_idx + 1})."))
+            
+            flash("Request approved and advanced to next step in the chain.", "success")
+            
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        flash(f"Error actioning approval: {e}", "error")
+        
+    return redirect(url_for('leaves_page'))
+
+@app.route('/leaves/reject/<int:approval_id>', methods=['POST'])
+def reject_leave(approval_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    cursor.execute("SELECT * FROM approvals WHERE id = ? AND status = 'Pending'", (approval_id,))
+    approval = cursor.fetchone()
+    
+    if not approval:
+        flash("Approval request not found or already actioned.", "error")
+        return redirect(url_for('leaves_page'))
+        
+    import json
+    try:
+        chain = json.loads(approval['approval_chain'])
+        curr_idx = approval['current_index']
+    except Exception as e:
+        flash("Invalid approval request data.", "error")
+        return redirect(url_for('leaves_page'))
+        
+    if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
+        flash("Unauthorized to reject this step.", "error")
+        return redirect(url_for('leaves_page'))
+        
+    try:
+        cursor.execute("""
+            UPDATE approvals 
+            SET status = 'Rejected', actioned_by = ?, actioned_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (session['user_id'], approval_id))
+        
+        if approval['type'] == 'Leave':
+            cursor.execute("""
+                UPDATE leaves
+                SET status = 'Rejected'
+                WHERE id = ?
+            """, (approval['reference_id'],))
+            
+        cursor.execute("""
+            INSERT INTO activity_log (user_id, action, details)
+            VALUES (?, 'Reject Request', ?)
+        """, (session['user_id'], f"Rejected {approval['type']} ID {approval['reference_id']} (Chain terminated)."))
+        
+        db.commit()
+        flash("Request rejected and chain terminated.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error rejecting request: {e}", "error")
+        
+    return redirect(url_for('leaves_page'))
+
 @app.route('/logout')
 def logout():
     if 'user_id' in session:

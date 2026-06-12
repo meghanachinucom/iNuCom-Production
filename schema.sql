@@ -161,10 +161,14 @@ CREATE TABLE IF NOT EXISTS approvals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     requester_id INTEGER NOT NULL,
     type TEXT NOT NULL,
+    reference_id INTEGER,
+    approval_chain TEXT NOT NULL,
+    current_index INTEGER DEFAULT 0,
     details TEXT,
     status TEXT DEFAULT 'Pending',
     actioned_by INTEGER,
-    actioned_at TIMESTAMP,
+    actioned_at TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (actioned_by) REFERENCES users(id) ON DELETE SET NULL
 );

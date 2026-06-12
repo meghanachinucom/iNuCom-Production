@@ -44,6 +44,11 @@
                         <span>Attendance Tracker</span>
                     </a>
                 </li>
+                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}">
+                        <span>Leaves & Approvals</span>
+                    </a>
+                </li>
                 
                 <!-- Role-Based Menus -->
                 {% if session['role'] == 'Admin' %}
@@ -55,7 +60,7 @@
                 {% elif session['role'] == 'HR' %}
                     <li class="menu-section-title">HR Management</li>
                     <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Attendance Roll</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Leave Approvals</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('leaves_page') }}"><span>Leave Approvals</span></a></li>
                     <li class="menu-item"><a href="#"><span>Salary Panels</span></a></li>
                     <li class="menu-item"><a href="#"><span>Holiday Settings</span></a></li>
                 {% elif session['role'] == 'Lead' %}
