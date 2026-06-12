@@ -88,24 +88,92 @@
                     <p>iNuCom Production Tracker LAN Node</p>
                 </div>
                 
-                <!-- Quick-Clock Widget -->
-                <div class="quick-clock-widget">
-                    {% if not attendance_today %}
-                        <form action="{{ url_for('clock_in') }}" method="POST" class="clock-form">
-                            <span class="clock-status-dot offline"></span> Not Checked In
-                            <button type="submit" class="btn btn-sm btn-primary ml-3">Check In</button>
-                        </form>
-                    {% elif not attendance_today['clock_out'] %}
-                        <form action="{{ url_for('clock_out') }}" method="POST" class="clock-form">
-                            <span class="clock-status-dot online"></span> Checked In: <strong class="ml-1">{{ attendance_today['clock_in'] }}</strong>
-                            <button type="submit" class="btn btn-sm btn-danger ml-3">Check Out</button>
-                        </form>
-                    {% else %}
-                        <div class="clock-form">
-                            <span class="clock-status-dot completed"></span> Clocked Out: <strong class="ml-1">{{ attendance_today['clock_out'] }}</strong>
-                            <span class="att-badge {% if attendance_today['status'] == 'Present' %}present{% elif attendance_today['status'] == 'Late' %}late{% else %}half{% endif %} ml-3" style="padding: 4px 10px; border-radius: 12px; font-size: 11px;">{{ attendance_today['status'] }}</span>
+                <div class="header-actions-wrapper">
+                    <!-- Notification Bell Container -->
+                    <div class="notifications-bell-container" id="notifBellContainer">
+                        <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
+                            <span class="bell-icon">🔔</span>
+                            {% if unread_notif_count > 0 %}
+                                <span class="bell-badge">{{ unread_notif_count }}</span>
+                            {% endif %}
+                        </button>
+                        <div class="notif-dropdown" id="notifDropdown">
+                            <div class="notif-header">
+                                <h3>Notifications</h3>
+                                <button onclick="readAllNotifications(event)" class="btn-clear-all">Mark all read</button>
+                            </div>
+                            <div class="notif-list">
+                                {% if recent_notifications %}
+                                    {% for n in recent_notifications %}
+                                        <a href="{{ url_for('click_notification', nid=n.id) }}" class="notif-item {% if not n.is_read %}unread{% endif %}">
+                                            <div class="notif-icon-wrapper">
+                                                {% if n.type == 'task' %}
+                                                    📝
+                                                {% elif n.type == 'leave' or n.type == 'approval' %}
+                                                    ⏳
+                                                {% elif n.type == 'reminder' %}
+                                                    ⏰
+                                                {% else %}
+                                                    ℹ️
+                                                {% endif %}
+                                            </div>
+                                            <div class="notif-content">
+                                                <div class="notif-title">{{ n.title }}</div>
+                                                <div class="notif-body">{{ n.body }}</div>
+                                                <div class="notif-time">{{ n.created_at }}</div>
+                                            </div>
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="notif-empty">No notifications</div>
+                                {% endif %}
+                            </div>
+                            <div class="notif-footer">
+                                <a href="{{ url_for('notifications_page') }}">View All History</a>
+                            </div>
                         </div>
-                    {% endif %}
+                    </div>
+                    <script>
+                    function toggleNotifDropdown(event) {
+                        event.stopPropagation();
+                        const dropdown = document.getElementById('notifDropdown');
+                        dropdown.classList.toggle('show');
+                    }
+                    window.addEventListener('click', function(event) {
+                        const dropdown = document.getElementById('notifDropdown');
+                        if (dropdown && !dropdown.contains(event.target) && !event.target.closest('#bellBtn')) {
+                            dropdown.classList.remove('show');
+                        }
+                    });
+                    function readAllNotifications(event) {
+                        event.stopPropagation();
+                        fetch("{{ url_for('read_all_notifications') }}", {
+                            method: "POST"
+                        }).then(response => {
+                            window.location.reload();
+                        });
+                    }
+                    </script>
+
+                    <!-- Quick-Clock Widget -->
+                    <div class="quick-clock-widget">
+                        {% if not attendance_today %}
+                            <form action="{{ url_for('clock_in') }}" method="POST" class="clock-form">
+                                <span class="clock-status-dot offline"></span> Not Checked In
+                                <button type="submit" class="btn btn-sm btn-primary ml-3">Check In</button>
+                            </form>
+                        {% elif not attendance_today['clock_out'] %}
+                            <form action="{{ url_for('clock_out') }}" method="POST" class="clock-form">
+                                <span class="clock-status-dot online"></span> Checked In: <strong class="ml-1">{{ attendance_today['clock_in'] }}</strong>
+                                <button type="submit" class="btn btn-sm btn-danger ml-3">Check Out</button>
+                            </form>
+                        {% else %}
+                            <div class="clock-form">
+                                <span class="clock-status-dot completed"></span> Clocked Out: <strong class="ml-1">{{ attendance_today['clock_out'] }}</strong>
+                                <span class="att-badge {% if attendance_today['status'] == 'Present' %}present{% elif attendance_today['status'] == 'Late' %}late{% else %}half{% endif %} ml-3" style="padding: 4px 10px; border-radius: 12px; font-size: 11px;">{{ attendance_today['status'] }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </header>
 
@@ -153,9 +221,23 @@
                 {% endif %}
             {% endwith %}
             
+            <!-- View Mode Switcher Tab -->
+            {% if session['role'] != 'HR' %}
+            <div class="view-switcher-tabs" style="margin-bottom: 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 16px;">
+                <a href="{{ url_for('dashboard', view='overview', project_id=selected_project_id) }}" class="tab-link {% if view_tab == 'overview' %}active{% endif %}" style="padding: 10px 16px; font-weight: 600; font-size: 14px; text-decoration: none; color: {% if view_tab == 'overview' %}var(--color-blue){% else %}var(--text-secondary){% endif %}; border-bottom: 2px solid {% if view_tab == 'overview' %}var(--color-blue){% else %}transparent{% endif %};">
+                    Overview Dashboard
+                </a>
+                <a href="{{ url_for('dashboard', view='pipeline', project_id=selected_project_id, chapter_id=selected_chapter_id) }}" class="tab-link {% if view_tab == 'pipeline' %}active{% endif %}" style="padding: 10px 16px; font-weight: 600; font-size: 14px; text-decoration: none; color: {% if view_tab == 'pipeline' %}var(--color-blue){% else %}var(--text-secondary){% endif %}; border-bottom: 2px solid {% if view_tab == 'pipeline' %}var(--color-blue){% else %}transparent{% endif %};">
+                    Pipeline Sheet
+                </a>
+            </div>
+            {% endif %}
+
+            {% if view_tab == 'pipeline' and session['role'] != 'HR' %}
             <!-- Project / Chapter Filter Bar -->
             <div class="filter-bar">
                 <form action="{{ url_for('dashboard') }}" method="GET" class="filter-form">
+                    <input type="hidden" name="view" value="pipeline">
                     {% if session['role'] == 'Admin' and queue_stage %}
                         <input type="hidden" name="queue_stage" value="{{ queue_stage }}">
                     {% endif %}
@@ -508,6 +590,338 @@
                 </div>
                 {% endif %}
             </div>
+            {% endif %}
+
+            {% if view_tab == 'overview' or session['role'] == 'HR' %}
+                <!-- Zoho Projects Style Dashboard Overview -->
+                
+                <!-- Project Switcher for Admin (All Projects + individual projects switcher) -->
+                {% if session['role'] == 'Admin' %}
+                <div class="filter-bar" style="margin-bottom: 24px;">
+                    <form action="{{ url_for('dashboard') }}" method="GET" class="filter-form">
+                        <input type="hidden" name="view" value="overview">
+                        <div class="filter-group">
+                            <label for="project_id_switcher">Select Project Profile:</label>
+                            <select name="project_id" id="project_id_switcher" class="select-input" onchange="this.form.submit()">
+                                <option value="0" {% if selected_project_id == 0 %}selected{% endif %}>All Projects Combined</option>
+                                {% for project in projects %}
+                                    <option value="{{ project['id'] }}" {% if project['id'] == selected_project_id %}selected{% endif %}>
+                                        {{ project['name'] }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+                
+                <!-- TOP ROW: Summary Stat Cards -->
+                <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 30px;">
+                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Active Projects</div>
+                            <div style="font-size: 28px; font-weight: 800; color: var(--text-primary); margin-top: 4px;">{{ active_projects_count }}</div>
+                        </div>
+                        <span style="font-size: 28px;">📁</span>
+                    </div>
+                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Total Files</div>
+                            <div style="font-size: 28px; font-weight: 800; color: var(--text-primary); margin-top: 4px;">{{ total_files_count }}</div>
+                        </div>
+                        <span style="font-size: 28px;">📄</span>
+                    </div>
+                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Files Done</div>
+                            <div style="font-size: 28px; font-weight: 800; color: var(--color-green); margin-top: 4px;">{{ files_done_count }}</div>
+                        </div>
+                        <span style="font-size: 28px;">✅</span>
+                    </div>
+                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Files WIP</div>
+                            <div style="font-size: 28px; font-weight: 800; color: var(--color-blue); margin-top: 4px;">{{ files_wip_count }}</div>
+                        </div>
+                        <span style="font-size: 28px;">⚙️</span>
+                    </div>
+                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Pending Approvals</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #d97706; margin-top: 4px;">{{ pending_approvals_count }}</div>
+                        </div>
+                        <span style="font-size: 28px;">⏳</span>
+                    </div>
+                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Present Today</div>
+                            <div style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin-top: 10px;">{{ attendance_ratio }}</div>
+                        </div>
+                        <span style="font-size: 28px;">👥</span>
+                    </div>
+                </div>
+                
+                <!-- GRAPHS SECTION -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin-bottom: 30px;">
+                    <!-- 1. Pipeline stages progress chart -->
+                    <div class="card">
+                        <h3 class="card-title">Pipeline Stages Completion %</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="stagesChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. Overall status breakdown donut chart -->
+                    <div class="card">
+                        <h3 class="card-title">Overall File Status Breakdown</h3>
+                        <div style="height: 300px; position: relative; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 3. Velocity chart -->
+                    <div class="card">
+                        <h3 class="card-title">Weekly Completions Velocity (Last 6 Weeks)</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="velocityChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 4. Points vs Target bar chart -->
+                    <div class="card">
+                        <h3 class="card-title">Points Earned vs Target (Current Month)</h3>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ROLE SPECIFIC SCORECARDS & INFOS -->
+                <div class="dashboard-grid" style="margin-bottom: 30px;">
+                    {% if session['role'] == 'Artist' %}
+                        <!-- Artist specific attendance and queue -->
+                        <div class="card">
+                            <h3 class="card-title">My Attendance This Month</h3>
+                            <div class="attendance-stats-summary" style="margin-top: 0; padding: 12px;">
+                                <div class="stat-box">
+                                    <div class="stat-box-num">{{ artist_att_stats['present_days'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Present</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-num" style="color:var(--color-red);">{{ artist_att_stats['late_days'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Late</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-num" style="color:#d97706;">{{ artist_att_stats['half_days'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Half Day</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-num" style="color:var(--text-muted);">{{ artist_att_stats['absent_days'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Absent</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3 class="card-title">My Pending Daily Assignments</h3>
+                            {% if artist_tasks %}
+                                <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px;">
+                                    {% for t in artist_tasks %}
+                                        <li style="padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong class="blue" style="font-size: 13px;">{{ t['file_name'] }}</strong>
+                                                <div style="font-size: 12px; color: var(--text-secondary);">{{ t['task_description'] }}</div>
+                                            </div>
+                                            <span style="font-size: 12px; font-weight: 700; color: #b45309;">{{ t['points'] }} pts</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">No pending assignments today!</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    
+                    {% if session['role'] == 'HR' %}
+                        <!-- HR statistics and leaves summary -->
+                        <div class="card">
+                            <h3 class="card-title">Today's Attendance Overview</h3>
+                            <div class="attendance-stats-summary" style="margin-top: 0; padding: 12px;">
+                                <div class="stat-box">
+                                    <div class="stat-box-num">{{ hr_attendance_stats['present'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Present</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-num" style="color:var(--color-red);">{{ hr_attendance_stats['late'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Late</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-num" style="color:#d97706;">{{ hr_attendance_stats['half'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Half Day</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-num" style="color:var(--text-muted);">{{ hr_attendance_stats['absent'] or 0 }}</div>
+                                    <div class="stat-box-lbl">Absent</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3 class="card-title">Leaves Summary</h3>
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                    <span style="font-size: 13px; font-weight: 600;">Pending Approval Chain Requests</span>
+                                    <span class="badge" style="background-color: var(--color-red-light); color: var(--color-red); padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px;">{{ hr_leave_summary['pending'] }}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                    <span style="font-size: 13px; font-weight: 600;">Employees On Leave Today</span>
+                                    <span class="badge" style="background-color: var(--color-blue-light); color: var(--color-blue); padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px;">{{ hr_leave_summary['active_today'] }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Chart JS scripts using local static js library -->
+                <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+                <script>
+                // 1. Stages Progress Chart
+                const stageLabels = [];
+                const stageDone = [];
+                const stageWip = [];
+                const stageYts = [];
+                const stageReview = [];
+                const stageRtk = [];
+                
+                {% for sc in stage_completion_data %}
+                    stageLabels.push("{{ sc.stage }}");
+                    stageDone.push({{ sc.Done }});
+                    stageWip.push({{ sc.Wip }});
+                    stageYts.push({{ sc.Yts }});
+                    stageReview.push({{ sc.Review }});
+                    stageRtk.push({{ sc.Rtk }});
+                {% endfor %}
+                
+                new Chart(document.getElementById('stagesChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: stageLabels,
+                        datasets: [
+                            { label: 'Done', data: stageDone, backgroundColor: '#16a34a' },
+                            { label: 'Wip', data: stageWip, backgroundColor: '#2563eb' },
+                            { label: 'Review', data: stageReview, backgroundColor: '#d97706' },
+                            { label: 'Rework', data: stageRtk, backgroundColor: '#dc2626' },
+                            { label: 'Yet to Start', data: stageYts, backgroundColor: '#94a3b8' }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        },
+                        scales: {
+                            x: { stacked: true },
+                            y: { stacked: true }
+                        }
+                    }
+                });
+                
+                // 2. Overall Status Breakdown Chart
+                const overallDone = {{ overall_status_counts['Done'] }};
+                const overallWip = {{ overall_status_counts['Wip'] }};
+                const overallReview = {{ overall_status_counts['Review'] }};
+                const overallRtk = {{ overall_status_counts['Rtk'] }};
+                const overallYts = {{ overall_status_counts['Yts'] }};
+                
+                new Chart(document.getElementById('statusChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Done', 'Wip', 'Review', 'Rework', 'Yet to Start'],
+                        datasets: [{
+                            data: [overallDone, overallWip, overallReview, overallRtk, overallYts],
+                            backgroundColor: ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#94a3b8']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+                
+                // 3. Weekly Completions Velocity Chart
+                const velocityLabels = [];
+                const velocityCounts = [];
+                {% for v in velocity_data %}
+                    velocityLabels.push("{{ v.label }}");
+                    velocityCounts.push({{ v.count }});
+                {% endfor %}
+                
+                new Chart(document.getElementById('velocityChart'), {
+                    type: 'line',
+                    data: {
+                        labels: velocityLabels,
+                        datasets: [{
+                            label: 'Tasks Completed',
+                            data: velocityCounts,
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                        }
+                    }
+                });
+                
+                // 4. Performance Chart (Earned vs Target)
+                const performanceNames = [];
+                const performanceEarned = [];
+                const performanceTarget = [];
+                {% for p in performance_data %}
+                    performanceNames.push("{{ p.name }}");
+                    performanceEarned.push({{ p.earned }});
+                    performanceTarget.push({{ p.target }});
+                {% endfor %}
+                
+                new Chart(document.getElementById('performanceChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: performanceNames,
+                        datasets: [
+                            { label: 'Earned Points', data: performanceEarned, backgroundColor: '#2563eb' },
+                            { label: 'Target Points', data: performanceTarget, backgroundColor: '#e2e8f0', borderWidth: 1, borderColor: '#cbd5e1' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+                </script>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>
         </main>
     </div>
 </body>

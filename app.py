@@ -97,6 +97,43 @@ DEMO_FILES = [
     {"chapter_name": "ch_13", "name": "FW_13_08_SunLight", "description": "Sunlight dynamic lighting setup", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned": "abhilash", "content_released_offset": 21600}
 ]
 
+WELDING_FILES = [
+    {"name": "welding_angle_indicator", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_6x6_1_8_stringer_bead_on_plate", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_6x6_3_16_stringer_bead_on_plate", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_6x6_1_4_stringer_bead_on_plate", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_6x6_3_8_stringer_bead_on_plate", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_6x6_3_8_surfacing_bead_on_plate", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_6x6_1_8_puddling_bead_on_plate", "modeling_artist": None, "modeling_status": "Open", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_1_8_lap_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_3_16_lap_joint_1p", "modeling_artist": None, "modeling_status": "In Progress", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_1_4_lap_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_3_8_lap_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_1_16_t_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_1_8_t_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_3_16_t_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_1_4_t_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_3_8_t_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_1_8_corner_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Done", "rigging_status": "Done"},
+    {"name": "la_10x3_3_16_corner_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_1_4_corner_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_3_8_corner_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    
+    # 12 Placeholders to reach exactly 32 assets
+    {"name": "la_10x3_1_8_butt_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_3_16_butt_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_1_4_butt_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_3_8_butt_joint_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_6x6_1_8_fillet_weld_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_6x6_3_16_fillet_weld_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_6x6_1_4_fillet_weld_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_6x6_3_8_fillet_weld_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_1_8_v_groove_butt_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_3_16_v_groove_butt_1p", "modeling_artist": "nagireddy", "modeling_status": "Done", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_1_4_v_groove_butt_1p", "modeling_artist": None, "modeling_status": "Open", "texturing_status": "Pending", "rigging_status": "Pending"},
+    {"name": "la_10x3_3_8_v_groove_butt_1p", "modeling_artist": None, "modeling_status": "Open", "texturing_status": "Pending", "rigging_status": "Pending"}
+]
+
 # Attendance off-day logic
 def is_weekly_off(date_obj):
     if date_obj.weekday() == 6:  # Sunday
@@ -174,6 +211,7 @@ def init_db():
                     user_id INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     body TEXT,
+                    link TEXT,
                     type TEXT DEFAULT 'info',
                     is_read INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -183,6 +221,19 @@ def init_db():
             conn.commit()
             conn.close()
             print("Migrated: notifications table created.")
+
+        # Runtime migration: ensure notifications table has link column
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT link FROM notifications LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = sqlite3.connect(DATABASE)
+            conn.execute("ALTER TABLE notifications ADD COLUMN link TEXT")
+            conn.commit()
+            conn.close()
+            print("Migrated: notifications.link column added.")
 
         # Runtime migration: ensure activity_log table exists (Layer 10)
         try:
@@ -228,6 +279,7 @@ def init_db():
                 
         print("Initializing database from schema...")
         conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
         with open(SCHEMA_FILE, 'r') as f:
             conn.executescript(f.read())
         
@@ -309,7 +361,84 @@ def init_db():
                         INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (stage_assigned, today_str, file_id, f"{stage}: {f_demo['name']}", stage_points, stage_status))
+
+        # Fetch user IDs for Nagireddy, Rattaiah, and Gowri
+        cursor.execute("SELECT id FROM users WHERE username = 'nagireddy'")
+        nagireddy_row = cursor.fetchone()
+        nagireddy_id = nagireddy_row['id'] if nagireddy_row else None
+
+        cursor.execute("SELECT id FROM users WHERE username = 'rattaiah'")
+        rattaiah_row = cursor.fetchone()
+        rattaiah_id = rattaiah_row['id'] if rattaiah_row else None
+
+        cursor.execute("SELECT id FROM users WHERE username = 'gowri'")
+        gowri_row = cursor.fetchone()
+        gowri_id = gowri_row['id'] if gowri_row else None
+
+        # Seed second project: Welding Lab
+        print("Seeding Welding Lab project and chapter...")
+        cursor.execute("INSERT INTO projects (name, description, status) VALUES ('Welding Lab', 'VR welding training project', 'Active')")
+        welding_project_id = cursor.lastrowid
         
+        cursor.execute("INSERT INTO chapters (project_id, name, description, status) VALUES (?, 'lab_assignments', 'VR Welding Lab Assignments', 'Active')", (welding_project_id,))
+        welding_chapter_id = cursor.lastrowid
+        conn.commit()
+
+        # Seed welding files
+        print("Seeding welding files...")
+        for idx, f_weld in enumerate(WELDING_FILES):
+            file_status = 'Pending'
+            dt = datetime.datetime.now() - datetime.timedelta(seconds=14400)
+            content_released = dt.strftime('%Y-%m-%d %H:%M:%S')
+
+            cursor.execute("""
+                INSERT INTO files (chapter_id, name, description, status, content_released_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (welding_chapter_id, f_weld['name'], f"VR Asset: {f_weld['name']}", file_status, content_released))
+            file_id = cursor.lastrowid
+
+            for stage in PIPELINE_STAGES:
+                stage_status = 'Pending'
+                stage_assigned = None
+                stage_points = 0
+
+                if stage == 'Content':
+                    stage_status = 'Done'
+                    stage_points = 50
+                elif stage == 'Modeling':
+                    stage_status = f_weld['modeling_status']
+                    stage_points = 50
+                    if stage_status == 'In Progress':
+                        stage_assigned = nagireddy_id
+                elif stage == 'Texturing':
+                    if idx < 14:
+                        stage_status = 'Done'
+                    else:
+                        stage_status = 'In Progress'
+                        stage_assigned = rattaiah_id
+                    stage_points = 50
+                elif stage == 'Rig':
+                    if idx < 14:
+                        stage_status = 'Done'
+                    elif idx < 17:
+                        stage_status = 'In Progress'
+                        stage_assigned = gowri_id
+                    else:
+                        stage_status = 'Pending'
+                    stage_points = 80
+
+                cursor.execute("""
+                    INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (file_id, stage, stage_status, stage_assigned, stage_points))
+
+                if stage_status == 'In Progress' and stage_assigned:
+                    cursor.execute("""
+                        INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
+                        VALUES (?, ?, ?, ?, ?, 'Pending')
+                    """, (stage_assigned, today_str, file_id, f"{stage}: {f_weld['name']}", stage_points))
+        conn.commit()
+
         # Seed targets
         current_month = datetime.date.today().strftime('%Y-%m')
         cursor.execute("SELECT id FROM users WHERE role = 'Artist'")
@@ -434,8 +563,11 @@ def dashboard():
     db = get_db()
     cursor = db.cursor()
     
-    # Run EOD validations check
+    # Run notifications checks
     check_and_push_eod_reminders(db, session['user_id'])
+    check_and_push_morning_reminders(db, session['user_id'])
+    if session['role'] == 'Admin':
+        check_and_push_admin_target_alerts(db, session['user_id'])
     
     # Get user profile
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
@@ -589,6 +721,292 @@ def dashboard():
             if pending_cnt > 0:
                 late_validation_flag = True
 
+    # ─── CALCULATE ZOHO-STYLE DASHBOARD DATA ───
+    import json
+    view_tab = request.args.get('view', 'overview')
+    
+    # 1. Summary Cards calculation
+    # Active Projects
+    cursor.execute("SELECT COUNT(*) FROM projects WHERE status = 'Active'")
+    active_projects_count = cursor.fetchone()[0]
+    
+    # Selected Project
+    if session['role'] == 'Admin':
+        selected_proj_id = request.args.get('project_id', default=0, type=int)
+    else:
+        selected_proj_id = request.args.get('project_id', default=project_id, type=int)
+        
+    # Total Files, Done, Wip counts
+    if selected_proj_id > 0:
+        cursor.execute("SELECT COUNT(*) FROM files f JOIN chapters c ON f.chapter_id = c.id WHERE c.project_id = ?", (selected_proj_id,))
+        total_files_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM files f JOIN chapters c ON f.chapter_id = c.id WHERE c.project_id = ? AND f.status = 'Completed'", (selected_proj_id,))
+        files_done_count = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(DISTINCT fp.file_id) 
+            FROM file_pipeline fp 
+            JOIN files f ON fp.file_id = f.id 
+            JOIN chapters c ON f.chapter_id = c.id 
+            WHERE c.project_id = ? AND fp.status = 'In Progress'
+        """, (selected_proj_id,))
+        files_wip_count = cursor.fetchone()[0]
+    else:
+        # All projects combined
+        cursor.execute("SELECT COUNT(*) FROM files")
+        total_files_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM files WHERE status = 'Completed'")
+        files_done_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(DISTINCT file_id) FROM file_pipeline WHERE status = 'In Progress'")
+        files_wip_count = cursor.fetchone()[0]
+        
+    # Pending Approvals
+    if session['role'] == 'Admin':
+        cursor.execute("SELECT COUNT(*) FROM approvals WHERE status = 'Pending'")
+        pending_approvals_count = cursor.fetchone()[0]
+    elif session['role'] == 'Lead':
+        cursor.execute("SELECT approval_chain, current_index FROM approvals WHERE status = 'Pending'")
+        all_pending_aprv = cursor.fetchall()
+        lead_aprv_cnt = 0
+        for aprv in all_pending_aprv:
+            try:
+                aprv_chain = json.loads(aprv['approval_chain'])
+                if aprv_chain[aprv['current_index']] == session['user_id']:
+                    lead_aprv_cnt += 1
+            except:
+                pass
+        cursor.execute("""
+            SELECT COUNT(*) FROM daily_assignments da 
+            JOIN users u ON da.user_id = u.id 
+            WHERE da.date = ? AND u.team = ? AND da.status = 'Pending'
+        """, (today_str, session['team']))
+        val_cnt = cursor.fetchone()[0]
+        pending_approvals_count = lead_aprv_cnt + val_cnt
+    else:
+        cursor.execute("SELECT COUNT(*) FROM approvals WHERE requester_id = ? AND status = 'Pending'", (session['user_id'],))
+        pending_approvals_count = cursor.fetchone()[0]
+        
+    # Present Today ratio
+    if session['role'] == 'Lead':
+        cursor.execute("""
+            SELECT COUNT(*) FROM attendance a 
+            JOIN users u ON a.user_id = u.id 
+            WHERE u.team = ? AND u.role = 'Artist' AND a.date = ? AND a.status IN ('Present', 'Late', 'Half Day')
+        """, (session['team'], today_str))
+        present_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
+        total_count = cursor.fetchone()[0]
+    else:
+        cursor.execute("SELECT COUNT(*) FROM attendance WHERE date = ? AND status IN ('Present', 'Late', 'Half Day')", (today_str,))
+        present_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role IN ('Artist', 'Lead', 'HR')")
+        total_count = cursor.fetchone()[0]
+        
+    attendance_ratio = f"{present_count} / {total_count}" if total_count > 0 else "0 / 0"
+    
+    # Graphs Data
+    chart_stages = [
+        'Content', 'Modeling', 'Texturing', 'Rig', 'Animation', 
+        'VFX', 'Lighting/Rendering', 'Motion Graphics/3D Comp'
+    ]
+    
+    stage_completion_data = []
+    stage_stats = {stage: {'Done': 0, 'Wip': 0, 'Yts': 0, 'Review': 0, 'Rtk': 0, 'Total': 0} for stage in chart_stages}
+    
+    if selected_proj_id > 0:
+        cursor.execute("""
+            SELECT fp.step_name, fp.status as fp_status, da.status as da_status, da.submit_time, da.remarks
+            FROM file_pipeline fp
+            JOIN files f ON fp.file_id = f.id
+            JOIN chapters c ON f.chapter_id = c.id
+            LEFT JOIN daily_assignments da ON (da.file_id = f.id AND da.user_id = fp.assigned_to AND da.date = ?)
+            WHERE c.project_id = ?
+        """, (today_str, selected_proj_id))
+    else:
+        cursor.execute("""
+            SELECT fp.step_name, fp.status as fp_status, da.status as da_status, da.submit_time, da.remarks
+            FROM file_pipeline fp
+            JOIN files f ON fp.file_id = f.id
+            LEFT JOIN daily_assignments da ON (da.file_id = f.id AND da.user_id = fp.assigned_to AND da.date = ?)
+        """, (today_str,))
+        
+    for row in cursor.fetchall():
+        stage = row['step_name']
+        if stage in stage_stats:
+            fp_status = row['fp_status']
+            da_status = row['da_status']
+            submit_time = row['submit_time']
+            remarks = row['remarks']
+            
+            stage_stats[stage]['Total'] += 1
+            if fp_status == 'Done':
+                stage_stats[stage]['Done'] += 1
+            elif fp_status == 'In Progress':
+                if da_status == 'Pending':
+                    if submit_time:
+                        stage_stats[stage]['Review'] += 1
+                    elif remarks and remarks != 'Validated Done':
+                        stage_stats[stage]['Rtk'] += 1
+                    else:
+                        stage_stats[stage]['Wip'] += 1
+                else:
+                    stage_stats[stage]['Wip'] += 1
+            else:
+                stage_stats[stage]['Yts'] += 1
+                
+    for stage in chart_stages:
+        stats = stage_stats[stage]
+        total = stats['Total']
+        pct = round((stats['Done'] / total) * 100, 1) if total > 0 else 0
+        stage_completion_data.append({
+            'stage': stage,
+            'pct': pct,
+            'Done': stats['Done'],
+            'Wip': stats['Wip'],
+            'Yts': stats['Yts'],
+            'Review': stats['Review'],
+            'Rtk': stats['Rtk']
+        })
+        
+    overall_status_counts = {'Done': 0, 'Wip': 0, 'Yts': 0, 'Review': 0, 'Rtk': 0}
+    if selected_proj_id > 0:
+        cursor.execute("SELECT f.id, f.status FROM files f JOIN chapters c ON f.chapter_id = c.id WHERE c.project_id = ?", (selected_proj_id,))
+    else:
+        cursor.execute("SELECT id, status FROM files")
+        
+    for file_row in cursor.fetchall():
+        fid = file_row['id']
+        f_status = file_row['status']
+        if f_status == 'Completed':
+            overall_status_counts['Done'] += 1
+        else:
+            cursor.execute("""
+                SELECT fp.status as fp_status, da.status as da_status, da.submit_time, da.remarks
+                FROM file_pipeline fp
+                LEFT JOIN daily_assignments da ON (da.file_id = fp.file_id AND da.user_id = fp.assigned_to AND da.date = ?)
+                WHERE fp.file_id = ? AND fp.status != 'Done'
+                ORDER BY fp.id ASC LIMIT 1
+            """, (today_str, fid))
+            active_step = cursor.fetchone()
+            if active_step:
+                fp_status = active_step['fp_status']
+                da_status = active_step['da_status']
+                submit_time = active_step['submit_time']
+                remarks = active_step['remarks']
+                
+                if fp_status == 'In Progress':
+                    if da_status == 'Pending':
+                        if submit_time:
+                            overall_status_counts['Review'] += 1
+                        elif remarks and remarks != 'Validated Done':
+                            overall_status_counts['Rtk'] += 1
+                        else:
+                            overall_status_counts['Wip'] += 1
+                    else:
+                        overall_status_counts['Wip'] += 1
+                else:
+                    overall_status_counts['Yts'] += 1
+            else:
+                overall_status_counts['Yts'] += 1
+                
+    velocity_data = []
+    try:
+        today_date = datetime.datetime.strptime(today_str, '%Y-%m-%d').date()
+    except:
+        today_date = datetime.date.today()
+        
+    for i in range(5, -1, -1):
+        start_w = today_date - datetime.timedelta(days=today_date.weekday() + i*7)
+        end_w = start_w + datetime.timedelta(days=6)
+        
+        if selected_proj_id > 0:
+            cursor.execute("""
+                SELECT COUNT(*) FROM daily_assignments da
+                JOIN files f ON da.file_id = f.id
+                JOIN chapters c ON f.chapter_id = c.id
+                WHERE da.status = 'Done' AND c.project_id = ? AND da.date BETWEEN ? AND ?
+            """, (selected_proj_id, start_w.strftime('%Y-%m-%d'), end_w.strftime('%Y-%m-%d')))
+        else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM daily_assignments da
+                WHERE da.status = 'Done' AND da.date BETWEEN ? AND ?
+            """, (start_w.strftime('%Y-%m-%d'), end_w.strftime('%Y-%m-%d')))
+        velocity_data.append({
+            'label': f"Wk -{i}" if i > 0 else "This Wk",
+            'count': cursor.fetchone()[0]
+        })
+        
+    current_month = today_str[:7]
+    performance_data = []
+    if session['role'] == 'Artist':
+        cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (session['user_id'], current_month))
+        target_res = cursor.fetchone()
+        tgt = target_res['target_points'] if target_res else 500
+        
+        cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (session['user_id'], current_month))
+        earned = cursor.fetchone()[0] or 0
+        performance_data.append({'name': session['name'], 'target': tgt, 'earned': earned})
+    elif session['role'] == 'Lead':
+        cursor.execute("SELECT id, name FROM users WHERE team = ? AND role = 'Artist' ORDER BY name", (session['team'],))
+        for artist in cursor.fetchall():
+            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (artist['id'], current_month))
+            target_res = cursor.fetchone()
+            tgt = target_res['target_points'] if target_res else 500
+            
+            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (artist['id'], current_month))
+            earned = cursor.fetchone()[0] or 0
+            performance_data.append({'name': artist['name'], 'target': tgt, 'earned': earned})
+    else:
+        cursor.execute("SELECT id, name, team FROM users WHERE role = 'Artist' ORDER BY name")
+        for artist in cursor.fetchall():
+            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (artist['id'], current_month))
+            target_res = cursor.fetchone()
+            tgt = target_res['target_points'] if target_res else 500
+            
+            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (artist['id'], current_month))
+            earned = cursor.fetchone()[0] or 0
+            performance_data.append({'name': f"{artist['name']} ({artist['team']})", 'target': tgt, 'earned': earned})
+            
+    artist_att_stats = None
+    if session['role'] == 'Artist':
+        month_prefix = today_str[:7]
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_days,
+                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_days,
+                SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) as half_days,
+                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_days
+            FROM attendance
+            WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+        """, (session['user_id'], month_prefix))
+        artist_att_stats = cursor.fetchone()
+        
+    hr_attendance_stats = None
+    hr_leave_summary = None
+    if session['role'] == 'HR':
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late,
+                SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) as half,
+                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent
+            FROM attendance WHERE date = ?
+        """, (today_str,))
+        hr_attendance_stats = cursor.fetchone()
+        
+        cursor.execute("SELECT COUNT(*) FROM leaves WHERE status = 'Pending'")
+        pending_leaves_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM leaves WHERE ? BETWEEN start_date AND end_date AND status = 'Approved'", (today_str,))
+        active_leaves_today = cursor.fetchone()[0]
+        
+        hr_leave_summary = {'pending': pending_leaves_count, 'active_today': active_leaves_today}
+
     recent_logs = []
     if session['role'] == 'Admin':
         cursor.execute("""
@@ -605,7 +1023,7 @@ def dashboard():
         logs=recent_logs,
         projects=projects,
         chapters=chapters,
-        selected_project_id=project_id,
+        selected_project_id=selected_proj_id,
         selected_chapter_id=chapter_id,
         selected_chapter_name=selected_chapter_name,
         files=files,
@@ -619,7 +1037,21 @@ def dashboard():
         late_assignment_flag=late_assignment_flag,
         late_validation_flag=late_validation_flag,
         today_str=today_str,
-        attendance_today=attendance_today
+        attendance_today=attendance_today,
+        view_tab=view_tab,
+        active_projects_count=active_projects_count,
+        total_files_count=total_files_count,
+        files_done_count=files_done_count,
+        files_wip_count=files_wip_count,
+        pending_approvals_count=pending_approvals_count,
+        attendance_ratio=attendance_ratio,
+        stage_completion_data=stage_completion_data,
+        overall_status_counts=overall_status_counts,
+        velocity_data=velocity_data,
+        performance_data=performance_data,
+        artist_att_stats=artist_att_stats,
+        hr_attendance_stats=hr_attendance_stats,
+        hr_leave_summary=hr_leave_summary
     )
 
 @app.route('/file/add', methods=['POST'])
@@ -741,7 +1173,7 @@ def assign_file():
                 """, (artist_id, today_str, file_id, f"{step_name}: {f_info['name']}", points))
                 
         if artist_id:
-            _push_notification(db, artist_id, "Task Assigned", f"You have been assigned: '{f_info['name']}' ({step_name}) with {points} points.", "task")
+            _push_notification(db, artist_id, "New task assigned", f"You have been assigned: '{f_info['name']}' ({step_name}) with {points} points.", "task", link=url_for('dashboard'))
             
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Assign File', ?)",
                        (session['user_id'], f"Assigned '{f_info['name']}' [{step_name}] to {artist_name} (Points: {points})"))
@@ -814,7 +1246,7 @@ def update_status():
         cursor.execute("SELECT id FROM users WHERE role = 'Lead' AND team = ?", (target_team,))
         leads = cursor.fetchall()
         for lead in leads:
-            _push_notification(db, lead['id'], "Validation Required", f"Artist {session['name']} marked '{pipeline_step['file_name']}' [{step_name}] Done. Please validate.", "approval")
+            _push_notification(db, lead['id'], "Validation Required", f"Artist {session['name']} marked '{pipeline_step['file_name']}' [{step_name}] Done. Please validate.", "approval", link=url_for('dashboard'))
     
     if status == 'Done' and (is_lead or is_admin):
         cursor.execute("""
@@ -841,6 +1273,13 @@ def update_status():
                 SET status = 'Open' 
                 WHERE file_id = ? AND step_name = ? AND status = 'Pending'
             """, (file_id, next_stage))
+            
+            next_team = STAGE_TEAMS.get(next_stage)
+            if next_team:
+                cursor.execute("SELECT id FROM users WHERE team = ? AND role = 'Lead'", (next_team,))
+                next_leads = cursor.fetchall()
+                for nl in next_leads:
+                    _push_notification(db, nl['id'], "File now open for your team", f"File '{pipeline_step['file_name']}' is now open for your stage ({next_stage}).", "info", link=url_for('dashboard'))
             
     cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)",
                    (session['user_id'], 'Pipeline Update', log_details))
@@ -918,12 +1357,19 @@ def validate_assignment():
                     UPDATE file_pipeline SET status = 'Open' 
                     WHERE file_id = ? AND step_name = ? AND status = 'Pending'
                 """, (da['file_id'], next_stage))
+                
+                next_team = STAGE_TEAMS.get(next_stage)
+                if next_team:
+                    cursor.execute("SELECT id FROM users WHERE team = ? AND role = 'Lead'", (next_team,))
+                    next_leads = cursor.fetchall()
+                    for nl in next_leads:
+                        _push_notification(db, nl['id'], "File now open for your team", f"File '{da['file_name']}' is now open for your stage ({next_stage}).", "info", link=url_for('dashboard'))
             else:
                 cursor.execute("UPDATE files SET status = 'Completed' WHERE id = ?", (da['file_id'],))
                 
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Done', ?)",
                        (session['user_id'], f"Validated EOD Task Done for {da['artist_name']} on '{da['file_name']}'"))
-        _push_notification(db, da['user_id'], "Task Completed", f"Your task '{da['file_name']}' has been validated as Done. Points credited!", "task")
+        _push_notification(db, da['user_id'], "Task Completed", f"Your task '{da['file_name']}' has been validated as Done. Points credited!", "task", link=url_for('dashboard'))
         db.commit()
         flash(f"Task for {da['artist_name']} validated as completed. Points credited!", "success")
         
@@ -944,7 +1390,7 @@ def validate_assignment():
         
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Pending', ?)",
                        (session['user_id'], f"Carried forward task for {da['artist_name']} on '{da['file_name']}' to tomorrow. Reason: {remarks}"))
-        _push_notification(db, da['user_id'], "Task Pending", f"Your task '{da['file_name']}' has been marked Pending. Reason: {remarks}", "task")
+        _push_notification(db, da['user_id'], "Task Pending", f"Your task '{da['file_name']}' has been marked Pending. Reason: {remarks}", "task", link=url_for('dashboard'))
         db.commit()
         flash(f"Task for {da['artist_name']} marked pending and carried forward to tomorrow.", "info")
         
@@ -1692,7 +2138,7 @@ def leaves_page():
                     VALUES (?, 'Leave Request', ?)
                 """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} ({requested_days} days) - Pending approval chain {chain_json}"))
                 
-                _push_notification(db, chain[0], "Pending Approval Waiting", f"Leave request from {session['name']} needs your approval.", "approval")
+                _push_notification(db, chain[0], "Pending Approval Waiting", f"Leave request from {session['name']} needs your approval.", "approval", link=url_for('leaves'))
                 db.commit()
                 flash("Leave request submitted successfully, pending approval chain.", "success")
                 
@@ -1851,7 +2297,7 @@ def approve_leave(approval_id):
                     SET status = 'Approved', approved_by = ?
                     WHERE id = ?
                 """, (session['user_id'], approval['reference_id']))
-                _push_notification(db, approval['requester_id'], "Leave Approved", f"Your leave request has been approved.", "leave")
+                _push_notification(db, approval['requester_id'], "Leave Approved", f"Your leave request has been approved.", "leave", link=url_for('leaves'))
                 
             cursor.execute("""
                 INSERT INTO activity_log (user_id, action, details)
@@ -1871,7 +2317,7 @@ def approve_leave(approval_id):
                 VALUES (?, 'Approve Request', ?)
             """, (session['user_id'], f"Approved {approval['type']} ID {approval['reference_id']} (Advanced to step {next_idx + 1})."))
             
-            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Leave request needs your approval.", "approval")
+            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Leave request needs your approval.", "approval", link=url_for('leaves'))
             flash("Request approved and advanced to next step in the chain.", "success")
             
         db.commit()
@@ -1921,7 +2367,7 @@ def reject_leave(approval_id):
                 SET status = 'Rejected'
                 WHERE id = ?
             """, (approval['reference_id'],))
-            _push_notification(db, approval['requester_id'], "Leave Rejected", f"Your leave request has been rejected.", "leave")
+            _push_notification(db, approval['requester_id'], "Leave Rejected", f"Your leave request has been rejected.", "leave", link=url_for('leaves'))
             
         cursor.execute("""
             INSERT INTO activity_log (user_id, action, details)
@@ -2056,7 +2502,7 @@ def permissions_page():
                 """, (session['user_id'], pr_id, chain_json, details_str))
                 cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Permission Request', ?)",
                                (session['user_id'], details_str))
-                _push_notification(db, chain[0], "Pending Approval Waiting", f"Permission request from {session['name']} needs your approval.", "approval")
+                _push_notification(db, chain[0], "Pending Approval Waiting", f"Permission request from {session['name']} needs your approval.", "approval", link=url_for('permissions_page'))
                 db.commit()
                 flash("Permission request submitted — pending approval chain.", "success")
         except Exception as e:
@@ -2186,13 +2632,13 @@ def approve_permission(approval_id):
             """, (session['user_id'], approval['reference_id']))
             cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Approve Permission', ?)",
                            (session['user_id'], f"Approved Permission ID {approval['reference_id']} (Final)."))
-            _push_notification(db, approval['requester_id'], "Permission Approved", f"Your permission request has been approved.", "approval")
+            _push_notification(db, approval['requester_id'], "Permission Approved", f"Your permission request has been approved.", "approval", link=url_for('permissions_page'))
             flash("Permission approved and finalized!", "success")
         else:
             cursor.execute("UPDATE approvals SET current_index = ? WHERE id = ?", (next_idx, approval_id))
             cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Approve Permission', ?)",
                            (session['user_id'], f"Approved Permission ID {approval['reference_id']} — advanced to step {next_idx+1}."))
-            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Permission request needs your approval.", "approval")
+            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Permission request needs your approval.", "approval", link=url_for('permissions_page'))
             flash("Permission approved — advanced to next step in chain.", "success")
         db.commit()
     except Exception as e:
@@ -2235,7 +2681,7 @@ def reject_permission(approval_id):
         cursor.execute("UPDATE permission_requests SET status = 'Rejected' WHERE id = ?", (approval['reference_id'],))
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Reject Permission', ?)",
                        (session['user_id'], f"Rejected Permission ID {approval['reference_id']} — chain terminated."))
-        _push_notification(db, approval['requester_id'], "Permission Rejected", f"Your permission request has been rejected.", "approval")
+        _push_notification(db, approval['requester_id'], "Permission Rejected", f"Your permission request has been rejected.", "approval", link=url_for('permissions_page'))
         db.commit()
         flash("Permission request rejected.", "success")
     except Exception as e:
@@ -2733,15 +3179,15 @@ def holidays_page():
 # LAYER 10: NOTIFICATIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _push_notification(db, user_id, title, body="", ntype="info"):
+def _push_notification(db, user_id, title, body="", ntype="info", link=None):
     """Create a notification for a user. Call and commit outside."""
     try:
         db.cursor().execute(
-            "INSERT INTO notifications (user_id, title, body, type) VALUES (?,?,?,?)",
-            (user_id, title, body, ntype)
+            "INSERT INTO notifications (user_id, title, body, link, type) VALUES (?,?,?,?,?)",
+            (user_id, title, body, link, ntype)
         )
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error pushing notification: {e}")
 
 def check_and_push_eod_reminders(db, user_id):
     """Check if the user has pending tasks or validations after 5 PM and push EOD reminder."""
@@ -2793,15 +3239,115 @@ def check_and_push_eod_reminders(db, user_id):
                         """, (today_str,))
                     unvalidated = cursor.fetchone()[0]
                     if unvalidated > 0:
-                        _push_notification(db, user_id, "EOD Validation Reminder", "There are pending daily tasks that require validation.", "reminder")
+                        _push_notification(db, user_id, "EOD Validation Reminder", "There are pending daily tasks that require validation.", "reminder", link=url_for('dashboard'))
                         db.commit()
     except Exception as e:
         print(f"Error checking EOD reminders: {e}")
 
+def check_and_push_morning_reminders(db, user_id):
+    """Check morning assignments status after 9:30 AM and push reminders/alerts."""
+    try:
+        now = datetime.datetime.now()
+        if now.hour > 9 or (now.hour == 9 and now.minute >= 30):
+            today_str = now.strftime('%Y-%m-%d')
+            cursor = db.cursor()
+            
+            cursor.execute("SELECT role, team FROM users WHERE id=?", (user_id,))
+            u = cursor.fetchone()
+            if not u:
+                return
+            
+            role = u['role']
+            team = u['team']
+            
+            if role == 'Lead':
+                cursor.execute("""
+                    SELECT COUNT(*) FROM notifications
+                    WHERE user_id=? AND title = 'Morning assignment reminder' AND created_at >= ?
+                """, (user_id, today_str + ' 00:00:00'))
+                if cursor.fetchone()[0] == 0:
+                    # Check if there are Open (unassigned) files for their team's stage
+                    for stage, stg_team in STAGE_TEAMS.items():
+                        if stg_team == team:
+                            cursor.execute("""
+                                SELECT COUNT(*) FROM file_pipeline fp
+                                JOIN files f ON fp.file_id = f.id
+                                WHERE fp.step_name = ? AND fp.status = 'Open'
+                            """, (stage,))
+                            open_cnt = cursor.fetchone()[0]
+                            if open_cnt > 0:
+                                _push_notification(db, user_id, "Morning assignment reminder", 
+                                                   f"You have {open_cnt} unassigned files in {stage} queue. Please allocate them.", 
+                                                   "reminder", link=url_for('dashboard'))
+                                db.commit()
+                                break
+                                
+            elif role == 'Admin':
+                cursor.execute("""
+                    SELECT COUNT(*) FROM notifications
+                    WHERE user_id=? AND title = 'Lead missed morning assignment' AND created_at >= ?
+                """, (user_id, today_str + ' 00:00:00'))
+                if cursor.fetchone()[0] == 0:
+                    for stage, stg_team in STAGE_TEAMS.items():
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM file_pipeline fp
+                            JOIN files f ON fp.file_id = f.id
+                            WHERE fp.step_name = ? AND fp.status = 'Open'
+                        """, (stage,))
+                        open_cnt = cursor.fetchone()[0]
+                        if open_cnt > 0:
+                            cursor.execute("SELECT name FROM users WHERE team = ? AND role = 'Lead'", (stg_team,))
+                            lead_res = cursor.fetchone()
+                            lead_name = lead_res['name'] if lead_res else f"the {stg_team} Lead"
+                            _push_notification(db, user_id, "Lead missed morning assignment", 
+                                               f"{lead_name} has not allocated {open_cnt} files in {stage} queue.", 
+                                               "warning", link=url_for('dashboard'))
+                            db.commit()
+    except Exception as e:
+        print(f"Error check_and_push_morning_reminders: {e}")
+
+def check_and_push_admin_target_alerts(db, admin_id):
+    """Check if any artist is far below their target and notify admin."""
+    try:
+        now = datetime.datetime.now()
+        today_str = now.strftime('%Y-%m-%d')
+        current_month = now.strftime('%Y-%m')
+        cursor = db.cursor()
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM notifications
+            WHERE user_id=? AND title = 'Target alert' AND created_at >= ?
+        """, (admin_id, today_str + ' 00:00:00'))
+        if cursor.fetchone()[0] > 0:
+            return
+            
+        cursor.execute("SELECT id, name FROM users WHERE role = 'Artist'")
+        artists = cursor.fetchall()
+        
+        for artist in artists:
+            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", 
+                            (artist['id'], current_month))
+            tgt_row = cursor.fetchone()
+            target = tgt_row['target_points'] if tgt_row else 500
+            
+            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", 
+                            (artist['id'], current_month))
+            earned = cursor.fetchone()[0] or 0
+            
+            if target > 0 and (earned / target) < 0.3:
+                _push_notification(db, admin_id, "Target alert", 
+                                   f"Artist {artist['name']} is far below target: earned {earned}/{target} pts.", 
+                                   "warning", link=url_for('points_page'))
+                db.commit()
+                break
+    except Exception as e:
+        print(f"Error check_and_push_admin_target_alerts: {e}")
+
 @app.context_processor
-def inject_notification_count():
-    """Inject unread notification count into every template."""
+def inject_notifications():
+    """Inject unread notification count and recent list into every template."""
     count = 0
+    recent = []
     if 'user_id' in session:
         try:
             db = get_db()
@@ -2810,9 +3356,18 @@ def inject_notification_count():
                 (session['user_id'],)
             ).fetchone()
             count = row[0] if row else 0
+            
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT id, title, body, link, type, is_read, created_at
+                FROM notifications 
+                WHERE user_id=? 
+                ORDER BY created_at DESC LIMIT 10
+            """, (session['user_id'],))
+            recent = cursor.fetchall()
         except Exception:
             count = 0
-    return dict(unread_notif_count=count)
+    return dict(unread_notif_count=count, recent_notifications=recent)
 
 @app.route('/notifications')
 def notifications_page():
@@ -2831,6 +3386,31 @@ def notifications_page():
     cursor.execute("UPDATE notifications SET is_read=1 WHERE user_id=?", (session['user_id'],))
     db.commit()
     return render_template('notifications.html', user=user_info, notifs=notifs)
+
+@app.route('/notifications/click/<int:nid>')
+def click_notification(nid):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM notifications WHERE id=? AND user_id=?", (nid, session['user_id']))
+    notif = cursor.fetchone()
+    if notif:
+        cursor.execute("UPDATE notifications SET is_read=1 WHERE id=?", (nid,))
+        db.commit()
+        if notif['link']:
+            return redirect(notif['link'])
+    return redirect(url_for('dashboard'))
+
+@app.route('/notifications/read-all', methods=['POST'])
+def read_all_notifications():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("UPDATE notifications SET is_read=1 WHERE user_id=?", (session['user_id'],))
+    db.commit()
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/notifications/mark-read', methods=['POST'])
 def mark_notification_read():

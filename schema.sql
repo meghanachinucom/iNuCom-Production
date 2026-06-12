@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     user_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     body TEXT,
+    link TEXT,
     type TEXT DEFAULT 'info',
     is_read INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

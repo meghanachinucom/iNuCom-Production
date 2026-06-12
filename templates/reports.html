@@ -145,6 +145,73 @@
                 <h1>Admin Reports</h1>
                 <p>Excel-style production reporting — export any tab as .xlsx</p>
             </div>
+            <div class="header-actions-wrapper">
+                <!-- Notification Bell Container -->
+                <div class="notifications-bell-container" id="notifBellContainer">
+                    <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
+                        <span class="bell-icon">🔔</span>
+                        {% if unread_notif_count > 0 %}
+                            <span class="bell-badge">{{ unread_notif_count }}</span>
+                        {% endif %}
+                    </button>
+                    <div class="notif-dropdown" id="notifDropdown">
+                        <div class="notif-header">
+                            <h3>Notifications</h3>
+                            <button onclick="readAllNotifications(event)" class="btn-clear-all">Mark all read</button>
+                        </div>
+                        <div class="notif-list">
+                            {% if recent_notifications %}
+                                {% for n in recent_notifications %}
+                                    <a href="{{ url_for('click_notification', nid=n.id) }}" class="notif-item {% if not n.is_read %}unread{% endif %}">
+                                        <div class="notif-icon-wrapper">
+                                            {% if n.type == 'task' %}
+                                                📝
+                                            {% elif n.type == 'leave' or n.type == 'approval' %}
+                                                ⏳
+                                            {% elif n.type == 'reminder' %}
+                                                ⏰
+                                            {% else %}
+                                                ℹ️
+                                            {% endif %}
+                                        </div>
+                                        <div class="notif-content">
+                                            <div class="notif-title">{{ n.title }}</div>
+                                            <div class="notif-body">{{ n.body }}</div>
+                                            <div class="notif-time">{{ n.created_at }}</div>
+                                        </div>
+                                    </a>
+                                {% endfor %}
+                            {% else %}
+                                <div class="notif-empty">No notifications</div>
+                            {% endif %}
+                        </div>
+                        <div class="notif-footer">
+                            <a href="{{ url_for('notifications_page') }}">View All History</a>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                function toggleNotifDropdown(event) {
+                    event.stopPropagation();
+                    const dropdown = document.getElementById('notifDropdown');
+                    dropdown.classList.toggle('show');
+                }
+                window.addEventListener('click', function(event) {
+                    const dropdown = document.getElementById('notifDropdown');
+                    if (dropdown && !dropdown.contains(event.target) && !event.target.closest('#bellBtn')) {
+                        dropdown.classList.remove('show');
+                    }
+                });
+                function readAllNotifications(event) {
+                    event.stopPropagation();
+                    fetch("{{ url_for('read_all_notifications') }}", {
+                        method: "POST"
+                    }).then(response => {
+                        window.location.reload();
+                    });
+                }
+                </script>
+            </div>
         </header>
 
         {% with messages = get_flashed_messages(category_filter=["error"]) %}
