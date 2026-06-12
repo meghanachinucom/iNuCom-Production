@@ -285,6 +285,24 @@ def init_db():
             conn.close()
             print("Migrated: daily_assignments.submit_time column added.")
 
+        # Runtime migration: ensure all artists and leads have monthly targets for the current month
+        try:
+            conn = sqlite3.connect(DATABASE)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            current_month = datetime.date.today().strftime('%Y-%m')
+            cursor.execute("SELECT id FROM users WHERE role IN ('Artist', 'Lead')")
+            u_ids = [row['id'] for row in cursor.fetchall()]
+            for uid in u_ids:
+                cursor.execute("SELECT id FROM monthly_targets WHERE user_id = ? AND month = ?", (uid, current_month))
+                if not cursor.fetchone():
+                    cursor.execute("INSERT INTO monthly_targets (user_id, month, target_points) VALUES (?, ?, ?)", (uid, current_month, 500))
+            conn.commit()
+            conn.close()
+            print("Migrated: ensured all artists and leads have targets for the current month.")
+        except Exception as e:
+            print(f"Error checking/migrating monthly targets: {e}")
+
     if not db_exists or schema_needs_update:
         if db_exists:
             try:
@@ -517,7 +535,7 @@ def init_db():
 
         # Seed targets
         current_month = datetime.date.today().strftime('%Y-%m')
-        cursor.execute("SELECT id FROM users WHERE role = 'Artist'")
+        cursor.execute("SELECT id FROM users WHERE role IN ('Artist', 'Lead')")
         artist_ids = [row[0] for row in cursor.fetchall()]
         for aid in artist_ids:
             cursor.execute("INSERT INTO monthly_targets (user_id, month, target_points) VALUES (?, ?, ?)", (aid, current_month, 500))
@@ -1051,25 +1069,28 @@ def dashboard():
         earned = cursor.fetchone()[0] or 0
         performance_data.append({'name': session['name'], 'target': tgt, 'earned': earned})
     elif session['role'] == 'Lead':
-        cursor.execute("SELECT id, name FROM users WHERE team = ? AND role = 'Artist' ORDER BY name", (session['team'],))
-        for artist in cursor.fetchall():
-            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (artist['id'], current_month))
+        # Show self (lead) + team artists
+        cursor.execute("SELECT id, name, role FROM users WHERE (team = ? AND role = 'Artist') OR id = ? ORDER BY role DESC, name", (session['team'], session['user_id']))
+        for member in cursor.fetchall():
+            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (member['id'], current_month))
             target_res = cursor.fetchone()
             tgt = target_res['target_points'] if target_res else 500
             
-            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (artist['id'], current_month))
+            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (member['id'], current_month))
             earned = cursor.fetchone()[0] or 0
-            performance_data.append({'name': artist['name'], 'target': tgt, 'earned': earned})
+            label = f"{member['name']} (Lead)" if member['role'] == 'Lead' else member['name']
+            performance_data.append({'name': label, 'target': tgt, 'earned': earned})
     else:
-        cursor.execute("SELECT id, name, team FROM users WHERE role = 'Artist' ORDER BY name")
-        for artist in cursor.fetchall():
-            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (artist['id'], current_month))
+        cursor.execute("SELECT id, name, team, role FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team, role DESC, name")
+        for member in cursor.fetchall():
+            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", (member['id'], current_month))
             target_res = cursor.fetchone()
             tgt = target_res['target_points'] if target_res else 500
             
-            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (artist['id'], current_month))
+            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", (member['id'], current_month))
             earned = cursor.fetchone()[0] or 0
-            performance_data.append({'name': f"{artist['name']} ({artist['team']})", 'target': tgt, 'earned': earned})
+            role_tag = ' ★' if member['role'] == 'Lead' else ''
+            performance_data.append({'name': f"{member['name']}{role_tag} ({member['team']})", 'target': tgt, 'earned': earned})
             
     artist_att_stats = None
     if session['role'] == 'Artist':
@@ -1512,16 +1533,17 @@ def set_monthly_target():
     db = get_db()
     cursor = db.cursor()
     
-    cursor.execute("SELECT team, name FROM users WHERE id = ?", (artist_id,))
+    cursor.execute("SELECT team, name, role FROM users WHERE id = ?", (artist_id,))
     artist = cursor.fetchone()
     
     if not artist:
-        flash("Artist not found.", "error")
+        flash("Employee not found.", "error")
         return redirect(url_for('points_page'))
         
-    if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == artist['team']):
-        flash("Unauthorized to set target for this artist.", "error")
-        return redirect(url_for('points_page'))
+    if session['role'] != 'Admin':
+        if not (session['role'] == 'Lead' and session['team'] == artist['team'] and artist['role'] == 'Artist'):
+            flash("Unauthorized to set target for this user.", "error")
+            return redirect(url_for('points_page'))
         
     cursor.execute("SELECT id FROM monthly_targets WHERE user_id = ? AND month = ?", (artist_id, month))
     target_row = cursor.fetchone()
@@ -1598,17 +1620,18 @@ def points_page():
             })
             
     elif session['role'] == 'Admin':
-        cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY team")
-        artists = cursor.fetchall()
-        for artist in artists:
-            team = artist['team']
+        cursor.execute("SELECT id, name, username, team, role FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team, role, name")
+        all_users = cursor.fetchall()
+        for u in all_users:
+            team = u['team']
             if team not in global_scoreboard:
                 global_scoreboard[team] = []
-            target, earned, pct = get_user_progress(artist['id'])
+            target, earned, pct = get_user_progress(u['id'])
             global_scoreboard[team].append({
-                'id': artist['id'],
-                'name': artist['name'],
-                'username': artist['username'],
+                'id': u['id'],
+                'name': u['name'],
+                'username': u['username'],
+                'role': u['role'],
                 'target': target,
                 'earned': earned,
                 'pct': pct
@@ -1619,7 +1642,7 @@ def points_page():
         cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
         target_artists = cursor.fetchall()
     elif session['role'] == 'Admin':
-        cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY name")
+        cursor.execute("SELECT id, name, username, team, role FROM users WHERE role IN ('Artist', 'Lead') ORDER BY name")
         target_artists = cursor.fetchall()
         
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
@@ -3421,22 +3444,23 @@ def check_and_push_admin_target_alerts(db, admin_id):
         if cursor.fetchone()[0] > 0:
             return
             
-        cursor.execute("SELECT id, name FROM users WHERE role = 'Artist'")
-        artists = cursor.fetchall()
+        cursor.execute("SELECT id, name, role FROM users WHERE role IN ('Artist', 'Lead')")
+        employees = cursor.fetchall()
         
-        for artist in artists:
+        for emp in employees:
             cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", 
-                            (artist['id'], current_month))
+                            (emp['id'], current_month))
             tgt_row = cursor.fetchone()
             target = tgt_row['target_points'] if tgt_row else 500
             
             cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", 
-                            (artist['id'], current_month))
+                            (emp['id'], current_month))
             earned = cursor.fetchone()[0] or 0
             
             if target > 0 and (earned / target) < 0.3:
+                role_label = "Lead" if emp['role'] == 'Lead' else "Artist"
                 _push_notification(db, admin_id, "Target alert", 
-                                   f"Artist {artist['name']} is far below target: earned {earned}/{target} pts.", 
+                                   f"{role_label} {emp['name']} is far below target: earned {earned}/{target} pts.", 
                                    "warning", link=url_for('points_page'))
                 db.commit()
                 break

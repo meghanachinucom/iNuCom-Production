@@ -324,6 +324,9 @@
                                                 <tr>
                                                     <td>
                                                         <strong>{{ row['name'] }}</strong>
+                                                        {% if row.get('role') == 'Lead' %}
+                                                            <span style="background: var(--color-blue-light); color: var(--color-blue); padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; margin-left: 4px;">LEAD</span>
+                                                        {% endif %}
                                                         <div style="font-size: 10px; color: var(--text-secondary);">@{{ row['username'] }}</div>
                                                     </td>
                                                     <td>{{ row['target'] }} pts</td>
@@ -357,7 +360,7 @@
                                 <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT EMPLOYEE:</label>
                                 <select name="artist_id" class="select-input" required>
                                     {% for artist in target_artists %}
-                                        <option value="{{ artist['id'] }}">{{ artist['name'] }} (@{{ artist['username'] }})</option>
+                                        <option value="{{ artist['id'] }}">{{ artist['name'] }}{% if artist.get('role') == 'Lead' %} [Lead]{% endif %} (@{{ artist['username'] }})</option>
                                     {% endfor %}
                                 </select>
                             </div>
