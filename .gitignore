@@ -1,0 +1,22 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+*.db
+*.sqlite
+
+# Backups folder
+/backups/
+backups/
+
+# OS files
+.DS_Store
+Thumbs.db
