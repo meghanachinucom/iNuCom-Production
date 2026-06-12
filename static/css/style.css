@@ -764,6 +764,123 @@ body {
     color: var(--text-primary);
 }
 
+/* Progress Bar Styles */
+.progress-bar-container {
+    width: 100%;
+    height: 12px;
+    background-color: var(--bg-input);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 10px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--color-blue);
+    border-radius: 6px;
+    transition: width 0.4s ease-out;
+}
+
+.progress-bar-fill.high-prog {
+    background-color: var(--color-green);
+}
+
+.progress-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Deadline Warning Banners */
+.deadline-warning-banner {
+    background-color: #fffbeb;
+    border: 1px solid #fde047;
+    border-radius: var(--radius-md);
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #b45309;
+    font-size: 13.5px;
+    font-weight: 600;
+    animation: fadeIn var(--transition-normal);
+}
+
+.deadline-warning-banner.late-val {
+    background-color: var(--color-red-light);
+    border-color: #fca5a5;
+    color: var(--color-red);
+}
+
+/* Scoreboard Matrix & Breakdown Tables */
+.score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 30px;
+}
+
+.scoreboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+.scoreboard-table th, .scoreboard-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.scoreboard-table th {
+    background-color: var(--bg-main);
+    color: var(--text-secondary);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+}
+
+.scoreboard-table tr:hover td {
+    background-color: #f8fafc;
+}
+
+.progress-cell {
+    min-width: 150px;
+}
+
+/* Validation layout edits */
+.validation-card-actions {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.reason-input {
+    width: 100%;
+    font-family: var(--font-primary);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-input);
+    transition: all var(--transition-fast);
+}
+
+.reason-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    background-color: var(--bg-card);
+}
+
 /* Responsive Overrides */
 @media (max-width: 768px) {
     .dashboard-layout {

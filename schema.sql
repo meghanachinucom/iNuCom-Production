@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS file_pipeline (
     step_name TEXT NOT NULL,
     status TEXT DEFAULT 'Pending',
     assigned_to INTEGER,
+    points INTEGER DEFAULT 0,
     start_date TEXT,
     end_date TEXT,
     remarks TEXT,
@@ -74,6 +75,7 @@ CREATE TABLE IF NOT EXISTS daily_assignments (
     date TEXT NOT NULL,
     file_id INTEGER,
     task_description TEXT NOT NULL,
+    points INTEGER DEFAULT 0,
     status TEXT DEFAULT 'Pending',
     remarks TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -139,6 +141,7 @@ CREATE TABLE IF NOT EXISTS monthly_targets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     month TEXT NOT NULL,
+    target_points INTEGER DEFAULT 500,
     target_details TEXT,
     status TEXT DEFAULT 'Pending',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

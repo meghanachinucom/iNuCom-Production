@@ -85,7 +85,7 @@ DEMO_FILES = [
     {"chapter_name": "ch_13", "name": "FW_13_05_StallTexture", "description": "Stylized texturing for the market structures", "active_stage": "Texturing", "status": "In Progress", "assigned": "rattaiah", "content_released_offset": 10800},
     {"chapter_name": "ch_13", "name": "FW_13_06_HeroWalk", "description": "Walk cycle animation for main character", "active_stage": "Animation", "status": "In Progress", "assigned": "bhavani", "content_released_offset": 14400},
     {"chapter_name": "ch_13", "name": "FW_13_07_DustFX", "description": "Wind and dust particle FX simulation", "active_stage": "VFX", "status": "Open", "assigned": None, "content_released_offset": 18000},
-    {"chapter_name": "ch_13", "name": "FW_13_08_SunLight", "description": "Daytime lighting and ambient occlusion rendering", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned": "abhilash", "content_released_offset": 21600}
+    {"chapter_name": "ch_13", "name": "FW_13_08_SunLight", "description": "Sunlight dynamic lighting setup", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned": "abhilash", "content_released_offset": 21600}
 ]
 
 def get_db():
@@ -109,7 +109,7 @@ def init_db():
         try:
             conn = sqlite3.connect(DATABASE)
             cursor = conn.cursor()
-            cursor.execute("SELECT content_released_at FROM files LIMIT 1")
+            cursor.execute("SELECT points FROM file_pipeline LIMIT 1")
             conn.close()
         except sqlite3.OperationalError:
             schema_needs_update = True
@@ -133,8 +133,6 @@ def init_db():
         print("Seeding initial 28 user accounts...")
         default_pwd_hash = generate_password_hash("inucom@123")
         for user in SEEDED_USERS:
-            # We set must_change_password=0 by default now for convenience of testing,
-            # but let's keep the option. To match user request, let's set it to 0 as updated.
             cursor.execute("""
                 INSERT INTO users (name, username, password_hash, role, team, reports_to, must_change_password)
                 VALUES (?, ?, ?, ?, ?, ?, 0)
@@ -153,8 +151,10 @@ def init_db():
         ch_13_id = cursor.lastrowid
         conn.commit()
         
-        # Seed demo files
+        # Seed demo files and pipelines
         print("Seeding demo pipeline files...")
+        today_str = datetime.date.today().strftime('%Y-%m-%d')
+        
         for f_demo in DEMO_FILES:
             chap_id = ch_12_id if f_demo['chapter_name'] == 'ch_12' else ch_13_id
             
@@ -180,22 +180,51 @@ def init_db():
                 if res:
                     artist_id = res[0]
             
+            # Default complexity points based on active stage
+            points_val = 50 if f_demo['active_stage'] in ['Content', 'Modeling', 'Texturing'] else 80
+            
             for stage in PIPELINE_STAGES:
                 if stage == f_demo['active_stage']:
                     stage_status = f_demo['status']
                     stage_assigned = artist_id
+                    stage_points = points_val
                 elif PIPELINE_STAGES.index(stage) < PIPELINE_STAGES.index(f_demo['active_stage']):
                     stage_status = 'Done'
                     stage_assigned = None
+                    stage_points = points_val
                 else:
                     stage_status = 'Pending'
                     stage_assigned = None
+                    stage_points = 0
                     
                 cursor.execute("""
-                    INSERT INTO file_pipeline (file_id, step_name, status, assigned_to)
-                    VALUES (?, ?, ?, ?)
-                """, (file_id, stage, stage_status, stage_assigned))
+                    INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (file_id, stage, stage_status, stage_assigned, stage_points))
+                
+                # If currently assigned/in progress, seed a daily assignment for today
+                if stage == f_demo['active_stage'] and stage_assigned and stage_status != 'Done':
+                    cursor.execute("""
+                        INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (stage_assigned, today_str, file_id, f"{stage}: {f_demo['name']}", stage_points, stage_status))
         
+        # Seed targets for current month for all artists (default 500)
+        current_month = datetime.date.today().strftime('%Y-%m')
+        cursor.execute("SELECT id FROM users WHERE role = 'Artist'")
+        artist_ids = [row[0] for row in cursor.fetchall()]
+        for aid in artist_ids:
+            cursor.execute("INSERT INTO monthly_targets (user_id, month, target_points) VALUES (?, ?, ?)", (aid, current_month, 500))
+            
+        # Seed some demo points (points earned earlier this week)
+        yesterday_str = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        # Award 60 points to raveendra yesterday
+        cursor.execute("SELECT id FROM users WHERE username = 'raveendra'")
+        rav_row = cursor.fetchone()
+        if rav_row:
+            cursor.execute("INSERT INTO points (user_id, date, points, reason, awarded_by) VALUES (?, ?, ?, ?, ?)",
+                           (rav_row[0], yesterday_str, 60, "Modeling completion: FW_12_05", 1))
+            
         print("Seeding activity log...")
         cursor.execute("INSERT INTO activity_log (action, details) VALUES ('System Init', 'Database schema created and seeded with 28 user accounts and demo project.')")
         conn.commit()
@@ -322,8 +351,15 @@ def dashboard():
     cursor.execute("SELECT * FROM chapters WHERE project_id = ? AND status = 'Active'", (project_id,))
     chapters = cursor.fetchall()
     
+    selected_chapter_name = ""
     if not chapter_id and chapters:
         chapter_id = chapters[0]['id']
+        selected_chapter_name = chapters[0]['name']
+    elif chapter_id:
+        for ch in chapters:
+            if ch['id'] == chapter_id:
+                selected_chapter_name = ch['name']
+                break
         
     # Get all files in selected chapter
     files = []
@@ -332,11 +368,10 @@ def dashboard():
         files = cursor.fetchall()
         
     # Build status matrix for the active chapter
-    # matrix[file_id][stage_name] = {status, artist_name, artist_username}
     matrix = {}
     if chapter_id:
         cursor.execute("""
-            SELECT fp.file_id, fp.step_name, fp.status, u.name as artist_name, u.username as artist_username 
+            SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username 
             FROM file_pipeline fp
             JOIN files f ON fp.file_id = f.id
             LEFT JOIN users u ON fp.assigned_to = u.id
@@ -349,6 +384,7 @@ def dashboard():
                 matrix[f_id] = {}
             matrix[f_id][row['step_name']] = {
                 'status': row['status'],
+                'points': row['points'],
                 'artist_name': row['artist_name'],
                 'artist_username': row['artist_username']
             }
@@ -360,18 +396,14 @@ def dashboard():
     
     if session['role'] in ['Lead', 'Admin']:
         if session['role'] == 'Lead':
-            # Map lead team to pipeline stage
             for stage, team in STAGE_TEAMS.items():
                 if team == session['team']:
                     queue_stage = stage
                     break
         else:
-            # Admins can choose which queue stage to view, default to first stage
             queue_stage = request.args.get('queue_stage', 'Content')
             
         if queue_stage and chapter_id:
-            # Query open/in-progress files for this stage in this chapter
-            # Sort by content_released_at. If stage is Content, order by file_id
             if queue_stage == 'Content':
                 order_clause = "f.id ASC"
             else:
@@ -380,7 +412,7 @@ def dashboard():
             cursor.execute(f"""
                 SELECT f.id as file_id, f.name as file_name, f.description as file_desc, 
                        fp.id as pipeline_id, fp.status as step_status, fp.assigned_to as step_assigned_to,
-                       f.content_released_at
+                       fp.points, f.content_released_at
                 FROM file_pipeline fp
                 JOIN files f ON fp.file_id = f.id
                 WHERE f.chapter_id = ? AND fp.step_name = ? AND fp.status IN ('Open', 'In Progress')
@@ -393,26 +425,75 @@ def dashboard():
                 cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
                 artists = cursor.fetchall()
             else:
-                # Admin can assign anyone on the target team for the selected stage
                 target_team = STAGE_TEAMS[queue_stage]
                 cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (target_team,))
                 artists = cursor.fetchall()
+
+    # EOD Validation Panel List (Leads / Admins)
+    validation_list = []
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    
+    if session['role'] in ['Lead', 'Admin'] and chapter_id:
+        # Fetch today's assignments for EOD validation for this team/stage
+        target_team = session['team'] if session['role'] == 'Lead' else STAGE_TEAMS.get(queue_stage)
+        
+        cursor.execute("""
+            SELECT da.id as assignment_id, da.points, da.status as assignment_status, da.task_description, da.remarks,
+                   u.name as artist_name, u.username as artist_username, f.name as file_name, f.id as file_id
+            FROM daily_assignments da
+            JOIN users u ON da.user_id = u.id
+            JOIN files f ON da.file_id = f.id
+            WHERE da.date = ? AND u.team = ? AND da.status = 'Pending'
+        """, (today_str, target_team))
+        validation_list = cursor.fetchall()
 
     # Artist personal tasks board
     artist_tasks = []
     if session['role'] == 'Artist':
         cursor.execute("""
-            SELECT f.id as file_id, f.name as file_name, f.description as file_desc, 
-                   fp.id as pipeline_id, fp.step_name, fp.status as step_status,
-                   p.name as project_name, c.name as chapter_name
-            FROM file_pipeline fp
-            JOIN files f ON fp.file_id = f.id
+            SELECT da.id as assignment_id, da.task_description, da.points, da.status as assignment_status,
+                   f.id as file_id, f.name as file_name, f.description as file_desc, 
+                   fp.step_name, p.name as project_name, c.name as chapter_name
+            FROM daily_assignments da
+            JOIN files f ON da.file_id = f.id
             JOIN chapters c ON f.chapter_id = c.id
             JOIN projects p ON c.project_id = p.id
-            WHERE fp.assigned_to = ? AND fp.status IN ('Open', 'In Progress')
+            JOIN file_pipeline fp ON (fp.file_id = f.id AND fp.assigned_to = da.user_id AND fp.status IN ('Open', 'In Progress'))
+            WHERE da.user_id = ? AND da.date = ? AND da.status = 'Pending'
             ORDER BY p.name, c.name, f.name
-        """, (session['user_id'],))
+        """, (session['user_id'], today_str))
         artist_tasks = cursor.fetchall()
+
+    # DEADLINE WARNING CHECKS
+    now = datetime.datetime.now()
+    late_assignment_flag = False
+    late_validation_flag = False
+    
+    # 1. Morning Assignment (10:00 AM)
+    if now.hour >= 10:
+        # Check if there are active files open at any pipeline stage that are not assigned to anyone
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM file_pipeline fp
+            JOIN files f ON fp.file_id = f.id
+            WHERE fp.status = 'Open' AND f.chapter_id = ?
+        """, (chapter_id,))
+        open_count = cursor.fetchone()[0]
+        if open_count > 0:
+            late_assignment_flag = True
+            
+    # 2. EOD Validation (6:30 PM)
+    # Check if past 6:30 PM and there are unvalidated daily assignments for today for this team
+    if now.hour >= 18 or (now.hour == 18 and now.minute >= 30):
+        if session['role'] == 'Lead':
+            cursor.execute("""
+                SELECT COUNT(*) FROM daily_assignments da
+                JOIN users u ON da.user_id = u.id
+                WHERE da.date = ? AND da.status = 'Pending' AND u.team = ?
+            """, (today_str, session['team']))
+            pending_cnt = cursor.fetchone()[0]
+            if pending_cnt > 0:
+                late_validation_flag = True
 
     # Fetch audit logs for admins
     recent_logs = []
@@ -433,13 +514,18 @@ def dashboard():
         chapters=chapters,
         selected_project_id=project_id,
         selected_chapter_id=chapter_id,
+        selected_chapter_name=selected_chapter_name,
         files=files,
         matrix=matrix,
         stages=PIPELINE_STAGES,
         lead_queue=lead_queue,
         queue_stage=queue_stage,
         artists=artists,
-        artist_tasks=artist_tasks
+        artist_tasks=artist_tasks,
+        validation_list=validation_list,
+        late_assignment_flag=late_assignment_flag,
+        late_validation_flag=late_validation_flag,
+        today_str=today_str
     )
 
 @app.route('/file/add', methods=['POST'])
@@ -447,7 +533,6 @@ def add_file():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
-    # Content Lead and Admins only
     if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == 'Content'):
         flash("Unauthorized to add files.", "error")
         return redirect(url_for('dashboard'))
@@ -470,13 +555,11 @@ def add_file():
         """, (chapter_id, name, description))
         file_id = cursor.lastrowid
         
-        # Initialize pipeline stages
         for stage in PIPELINE_STAGES:
-            # First stage (Content) is Open, others are Pending
             status = 'Open' if stage == 'Content' else 'Pending'
             cursor.execute("""
-                INSERT INTO file_pipeline (file_id, step_name, status, assigned_to)
-                VALUES (?, ?, ?, NULL)
+                INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
+                VALUES (?, ?, ?, NULL, 0)
             """, (file_id, stage, status))
             
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Create File', ?)",
@@ -497,6 +580,7 @@ def assign_file():
     file_id = request.form.get('file_id', type=int)
     step_name = request.form.get('step_name', '')
     artist_id = request.form.get('artist_id', '')
+    points = request.form.get('points', type=int, default=0)
     
     if artist_id == '':
         artist_id = None
@@ -512,7 +596,6 @@ def assign_file():
         flash("Invalid pipeline stage.", "error")
         return redirect(url_for('dashboard'))
         
-    # Permission check: Admin or Lead of target team
     if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == target_team):
         flash("Unauthorized to assign files for this stage.", "error")
         return redirect(url_for('dashboard'))
@@ -520,7 +603,6 @@ def assign_file():
     db = get_db()
     cursor = db.cursor()
     
-    # Verify the artist belongs to target team (if artist assigned)
     if artist_id:
         cursor.execute("SELECT name, team, role FROM users WHERE id = ?", (artist_id,))
         artist = cursor.fetchone()
@@ -532,25 +614,56 @@ def assign_file():
     else:
         artist_name = "Unassigned"
         new_status = 'Open'
+        points = 0
         
-    cursor.execute("""
-        UPDATE file_pipeline 
-        SET assigned_to = ?, status = ?
-        WHERE file_id = ? AND step_name = ?
-    """, (artist_id, new_status, file_id, step_name))
-    
-    cursor.execute("SELECT name, chapter_id FROM files WHERE id = ?", (file_id,))
-    f_info = cursor.fetchone()
-    
-    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Assign File', ?)",
-                   (session['user_id'], f"Assigned '{f_info['name']}' [{step_name}] to {artist_name}"))
-    db.commit()
-    
-    flash(f"File updated: {f_info['name']} assigned to {artist_name}.", "success")
-    return redirect(url_for('dashboard', chapter_id=f_info['chapter_id']))
+    try:
+        # Update pipeline step status, assignee, and complexity points
+        cursor.execute("""
+            UPDATE file_pipeline 
+            SET assigned_to = ?, status = ?, points = ?
+            WHERE file_id = ? AND step_name = ?
+        """, (artist_id, new_status, points, file_id, step_name))
+        
+        cursor.execute("SELECT name, chapter_id FROM files WHERE id = ?", (file_id,))
+        f_info = cursor.fetchone()
+        
+        # If assigning an artist, create a daily assignment for today
+        if artist_id:
+            today_str = datetime.date.today().strftime('%Y-%m-%d')
+            # Check if active daily assignment for today already exists
+            cursor.execute("""
+                SELECT id FROM daily_assignments 
+                WHERE user_id = ? AND date = ? AND file_id = ?
+            """, (artist_id, today_str, file_id))
+            exist_da = cursor.fetchone()
+            
+            if exist_da:
+                cursor.execute("""
+                    UPDATE daily_assignments 
+                    SET points = ?, status = 'Pending', task_description = ?
+                    WHERE id = ?
+                """, (points, f"{step_name}: {f_info['name']}", exist_da['id']))
+            else:
+                cursor.execute("""
+                    INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
+                    VALUES (?, ?, ?, ?, ?, 'Pending')
+                """, (artist_id, today_str, file_id, f"{step_name}: {f_info['name']}", points))
+                
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Assign File', ?)",
+                       (session['user_id'], f"Assigned '{f_info['name']}' [{step_name}] to {artist_name} (Points: {points})"))
+        db.commit()
+        flash(f"File updated: {f_info['name']} assigned to {artist_name} with {points} complexity points.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error assigning file: {e}", "error")
+        
+    return redirect(url_for('dashboard', chapter_id=f_info['chapter_id'] if artist_id else None))
 
 @app.route('/file/status', methods=['POST'])
 def update_status():
+    # Keep standard status updates (Artist setting In Progress or Done).
+    # Done triggers direct EOD Validation style done, or artist sets done.
+    # To support direct EOD done credits points, we also update file_pipeline.
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
@@ -565,9 +678,8 @@ def update_status():
     db = get_db()
     cursor = db.cursor()
     
-    # Retrieve pipeline details
     cursor.execute("""
-        SELECT fp.id, fp.status, fp.assigned_to, f.name as file_name, f.chapter_id 
+        SELECT fp.id, fp.status, fp.assigned_to, fp.points, f.name as file_name, f.chapter_id 
         FROM file_pipeline fp
         JOIN files f ON fp.file_id = f.id
         WHERE fp.file_id = ? AND fp.step_name = ?
@@ -580,7 +692,6 @@ def update_status():
         
     target_team = STAGE_TEAMS.get(step_name)
     
-    # Permission check: Assigned artist, their lead, or Admin
     is_assigned = (pipeline_step['assigned_to'] == session['user_id'])
     is_lead = (session['role'] == 'Lead' and session['team'] == target_team)
     is_admin = (session['role'] == 'Admin')
@@ -589,16 +700,41 @@ def update_status():
         flash("Unauthorized to update status for this stage.", "error")
         return redirect(url_for('dashboard'))
         
+    # Artist can update daily assignment to Done or In Progress
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
     cursor.execute("""
         UPDATE file_pipeline 
         SET status = ? 
         WHERE file_id = ? AND step_name = ?
     """, (status, file_id, step_name))
     
-    log_details = f"Updated status of '{pipeline_step['file_name']}' [{step_name}] to '{status}'"
+    # Update today's daily assignment status as well
+    cursor.execute("""
+        UPDATE daily_assignments 
+        SET status = 'Pending' if ? == 'In Progress' else 'Pending' 
+        WHERE file_id = ? AND user_id = ? AND date = ?
+    """, ('Pending' if status == 'In Progress' else 'Pending', file_id, pipeline_step['assigned_to'], today_str))
     
-    if status == 'Done':
-        # If Content stage marked done, record content_released_at
+    log_details = f"Artist updated status of '{pipeline_step['file_name']}' [{step_name}] to '{status}'"
+    
+    # If artist marks Done, it goes to Lead EOD queue for final approval (it stays Pending in daily_assignments
+    # until validated Done by Lead, which awards points).
+    # However, if Admin or Lead changes it, they can validate it directly.
+    if status == 'Done' and (is_lead or is_admin):
+        # Direct validation via Lead/Admin
+        cursor.execute("""
+            UPDATE daily_assignments 
+            SET status = 'Done' 
+            WHERE file_id = ? AND date = ?
+        """, (file_id, today_str))
+        
+        # Credit points
+        cursor.execute("""
+            INSERT INTO points (user_id, date, points, reason, awarded_by)
+            VALUES (?, ?, ?, ?, ?)
+        """, (pipeline_step['assigned_to'], today_str, pipeline_step['points'], 
+              f"Completed stage: {pipeline_step['file_name']} [{step_name}]", session['user_id']))
+              
         if step_name == 'Content':
             now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("UPDATE files SET content_released_at = ? WHERE id = ?", (now_str, file_id))
@@ -612,18 +748,275 @@ def update_status():
                 SET status = 'Open' 
                 WHERE file_id = ? AND step_name = ? AND status = 'Pending'
             """, (file_id, next_stage))
-            log_details += f". Released to next stage: {next_stage}."
-        else:
-            # Final pipeline stage completed
-            cursor.execute("UPDATE files SET status = 'Completed' WHERE id = ?", (file_id,))
-            log_details += ". Project file fully completed."
             
-    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)",
+    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Status Update', ?)",
                    (session['user_id'], 'Pipeline Update', log_details))
     db.commit()
     
     flash(f"Status updated for '{pipeline_step['file_name']}' [{step_name}] to '{status}'.", "success")
     return redirect(url_for('dashboard', chapter_id=pipeline_step['chapter_id']))
+
+@app.route('/assignment/validate', methods=['POST'])
+def validate_assignment():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    assignment_id = request.form.get('assignment_id', type=int)
+    validation_status = request.form.get('validation_status', '') # 'Done' or 'Pending'
+    remarks = request.form.get('remarks', '').strip()
+    
+    if not assignment_id or validation_status not in ['Done', 'Pending']:
+        flash("Invalid validation parameters.", "error")
+        return redirect(url_for('dashboard'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    # Retrieve assignment details
+    cursor.execute("""
+        SELECT da.*, u.team, u.name as artist_name, f.name as file_name 
+        FROM daily_assignments da
+        JOIN users u ON da.user_id = u.id
+        JOIN files f ON da.file_id = f.id
+        WHERE da.id = ?
+    """, (assignment_id,))
+    da = cursor.fetchone()
+    
+    if not da:
+        flash("Assignment record not found.", "error")
+        return redirect(url_for('dashboard'))
+        
+    # Permission check: Admin or Lead of that team
+    if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == da['team']):
+        flash("Unauthorized to validate assignments for this team.", "error")
+        return redirect(url_for('dashboard'))
+        
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    
+    if validation_status == 'Done':
+        # Mark daily assignment as Done
+        cursor.execute("UPDATE daily_assignments SET status = 'Done', remarks = ? WHERE id = ?", ("Validated Done", assignment_id))
+        
+        # Get active step name for this file/artist
+        cursor.execute("""
+            SELECT step_name, points FROM file_pipeline 
+            WHERE file_id = ? AND assigned_to = ? AND status IN ('Open', 'In Progress')
+        """, (da['file_id'], da['user_id']))
+        step_row = cursor.fetchone()
+        
+        if step_row:
+            step_name = step_row['step_name']
+            points_val = step_row['points']
+            
+            # Set pipeline step status to Done
+            cursor.execute("""
+                UPDATE file_pipeline SET status = 'Done' 
+                WHERE file_id = ? AND step_name = ?
+            """, (da['file_id'], step_name))
+            
+            # Credit points to the artist
+            cursor.execute("""
+                INSERT INTO points (user_id, date, points, reason, awarded_by)
+                VALUES (?, ?, ?, ?, ?)
+            """, (da['user_id'], today_str, points_val, f"EOD Completed: {da['file_name']} [{step_name}]", session['user_id']))
+            
+            # Record content release
+            if step_name == 'Content':
+                now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                cursor.execute("UPDATE files SET content_released_at = ? WHERE id = ?", (now_str, da['file_id']))
+                
+            # Transition to the next stage
+            idx = PIPELINE_STAGES.index(step_name)
+            if idx < len(PIPELINE_STAGES) - 1:
+                next_stage = PIPELINE_STAGES[idx + 1]
+                cursor.execute("""
+                    UPDATE file_pipeline SET status = 'Open' 
+                    WHERE file_id = ? AND step_name = ? AND status = 'Pending'
+                """, (da['file_id'], next_stage))
+            else:
+                cursor.execute("UPDATE files SET status = 'Completed' WHERE id = ?", (da['file_id'],))
+                
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Done', ?)",
+                       (session['user_id'], f"Validated EOD Task Done for {da['artist_name']} on '{da['file_name']}'"))
+        db.commit()
+        flash(f"Task for {da['artist_name']} validated as completed. Points credited!", "success")
+        
+    elif validation_status == 'Pending':
+        if not remarks:
+            flash("A typed reason is required to mark a task as Pending.", "error")
+            return redirect(url_for('dashboard'))
+            
+        # Update current daily assignment with remarks/reason
+        cursor.execute("UPDATE daily_assignments SET status = 'Pending', remarks = ? WHERE id = ?", (remarks, assignment_id))
+        
+        # Calculate tomorrow's date
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+        
+        # Roll forward: Create a new daily assignment for tomorrow
+        cursor.execute("""
+            INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
+            VALUES (?, ?, ?, ?, ?, 'Pending')
+        """, (da['user_id'], tomorrow_str, da['file_id'], da['task_description'], da['points']))
+        
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Pending', ?)",
+                       (session['user_id'], f"Carried forward task for {da['artist_name']} on '{da['file_name']}' to tomorrow. Reason: {remarks}"))
+        db.commit()
+        flash(f"Task for {da['artist_name']} marked pending and carried forward to tomorrow.", "info")
+        
+    return redirect(url_for('dashboard'))
+
+@app.route('/target/set', methods=['POST'])
+def set_monthly_target():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    artist_id = request.form.get('artist_id', type=int)
+    target_points = request.form.get('target_points', type=int)
+    month = request.form.get('month', '')
+    
+    if not artist_id or not target_points or not month:
+        flash("Invalid target values.", "error")
+        return redirect(url_for('points_page'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    # Check artist's team
+    cursor.execute("SELECT team, name FROM users WHERE id = ?", (artist_id,))
+    artist = cursor.fetchone()
+    
+    if not artist:
+        flash("Artist not found.", "error")
+        return redirect(url_for('points_page'))
+        
+    # Permission check: Admin or Lead of artist's team
+    if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == artist['team']):
+        flash("Unauthorized to set target for this artist.", "error")
+        return redirect(url_for('points_page'))
+        
+    # Check if target already exists
+    cursor.execute("SELECT id FROM monthly_targets WHERE user_id = ? AND month = ?", (artist_id, month))
+    target_row = cursor.fetchone()
+    
+    if target_row:
+        cursor.execute("UPDATE monthly_targets SET target_points = ? WHERE id = ?", (target_points, target_row['id']))
+    else:
+        cursor.execute("INSERT INTO monthly_targets (user_id, month, target_points) VALUES (?, ?, ?)", (artist_id, month, target_points))
+        
+    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Set Target', ?)",
+                   (session['user_id'], f"Set monthly target of {target_points} pts for {artist['name']} for {month}"))
+    db.commit()
+    
+    flash(f"Monthly points target set to {target_points} for {artist['name']}.", "success")
+    return redirect(url_for('points_page'))
+
+@app.route('/points')
+def points_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    # 1. Fetch current month metrics
+    current_month = datetime.date.today().strftime('%Y-%m')
+    
+    # Helper to calculate points and progress for a user
+    def get_user_progress(uid):
+        cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (uid, current_month))
+        target_res = cursor.fetchone()
+        target = target_res['target_points'] if target_res else 500
+        
+        cursor.execute("""
+            SELECT SUM(points) FROM points 
+            WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+        """, (uid, current_month))
+        earned_res = cursor.fetchone()
+        earned = earned_res[0] if earned_res and earned_res[0] is not None else 0
+        
+        pct = int((earned / target) * 100) if target > 0 else 0
+        return target, earned, pct
+        
+    my_target, my_earned, my_pct = get_user_progress(session['user_id'])
+    
+    # 2. Build 7-day Weekly Breakdown (Monday - Sunday)
+    today = datetime.date.today()
+    start_of_week = today - datetime.timedelta(days=today.weekday()) # Monday
+    week_days = [start_of_week + datetime.timedelta(days=i) for i in range(7)]
+    
+    weekly_points = []
+    for day in week_days:
+        day_str = day.strftime('%Y-%m-%d')
+        cursor.execute("SELECT SUM(points) FROM points WHERE user_id = ? AND date = ?", (session['user_id'], day_str))
+        pts = cursor.fetchone()[0]
+        weekly_points.append({
+            'day_name': day.strftime('%A'),
+            'date': day_str,
+            'points': pts if pts is not None else 0
+        })
+        
+    # 3. Resolve Admin / Lead views
+    team_scoreboard = []
+    global_scoreboard = {}
+    
+    if session['role'] == 'Lead':
+        # Fetch scoreboard for all artists on the Lead's team
+        cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
+        artists = cursor.fetchall()
+        for artist in artists:
+            target, earned, pct = get_user_progress(artist['id'])
+            team_scoreboard.append({
+                'id': artist['id'],
+                'name': artist['name'],
+                'username': artist['username'],
+                'target': target,
+                'earned': earned,
+                'pct': pct
+            })
+            
+    elif session['role'] == 'Admin':
+        # Fetch scoreboard for all artists, grouped by team
+        cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY team")
+        artists = cursor.fetchall()
+        for artist in artists:
+            team = artist['team']
+            if team not in global_scoreboard:
+                global_scoreboard[team] = []
+            target, earned, pct = get_user_progress(artist['id'])
+            global_scoreboard[team].append({
+                'id': artist['id'],
+                'name': artist['name'],
+                'username': artist['username'],
+                'target': target,
+                'earned': earned,
+                'pct': pct
+            })
+            
+    # Fetch all artists that this user has authority to set target for (Leads/Admins)
+    target_artists = []
+    if session['role'] == 'Lead':
+        cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
+        target_artists = cursor.fetchall()
+    elif session['role'] == 'Admin':
+        cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY name")
+        target_artists = cursor.fetchall()
+        
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_profile = cursor.fetchone()
+
+    return render_template(
+        'points.html',
+        user=user_profile,
+        my_target=my_target,
+        my_earned=my_earned,
+        my_pct=my_pct,
+        weekly_points=weekly_points,
+        team_scoreboard=team_scoreboard,
+        global_scoreboard=global_scoreboard,
+        target_artists=target_artists,
+        current_month=current_month
+    )
 
 @app.route('/logout')
 def logout():

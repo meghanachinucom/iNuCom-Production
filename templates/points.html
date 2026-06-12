@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Points & Targets - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+            </div>
+            
+            <div class="sidebar-user">
+                <div class="user-name">{{ session['name'] }}</div>
+                {% if session['role'] == 'Admin' %}
+                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+                {% elif session['role'] == 'HR' %}
+                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
+                {% elif session['role'] == 'Lead' %}
+                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
+                {% else %}
+                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
+                {% endif %}
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li class="menu-section-title">Navigation</li>
+                <li class="menu-item">
+                    <a href="{{ url_for('dashboard') }}">
+                        <span>Dashboard Overview</span>
+                    </a>
+                </li>
+                <li class="menu-item active">
+                    <a href="{{ url_for('points_page') }}">
+                        <span>Points & Targets</span>
+                    </a>
+                </li>
+                
+                <!-- Role-Based Menus -->
+                {% if session['role'] == 'Admin' %}
+                    <li class="menu-section-title">Admin Management</li>
+                    <li class="menu-item"><a href="#"><span>Project Setup</span></a></li>
+                    <li class="menu-item"><a href="#"><span>User Accounts</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Activity Logs</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Global Settings</span></a></li>
+                {% elif session['role'] == 'HR' %}
+                    <li class="menu-section-title">HR Management</li>
+                    <li class="menu-item"><a href="#"><span>Attendance Roll</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Leave Approvals</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Salary Panels</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Holiday Settings</span></a></li>
+                {% elif session['role'] == 'Lead' %}
+                    <li class="menu-section-title">Team Management</li>
+                    <li class="menu-item"><a href="#"><span>Team Overview</span></a></li>
+                    <li class="menu-item"><a href="#"><span>EOD Validations</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Task Allocations</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Award Team Points</span></a></li>
+                {% elif session['role'] == 'Artist' %}
+                    <li class="menu-section-title">My Workspace</li>
+                    <li class="menu-item"><a href="#"><span>My Tasks</span></a></li>
+                    <li class="menu-item"><a href="#"><span>EOD Submission</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Clock-in / Clock-out</span></a></li>
+                    <li class="menu-item"><a href="#"><span>My Points Board</span></a></li>
+                {% endif %}
+            </ul>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout">
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Main Panel -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Points & Targets Ledger</h1>
+                    <p>Track targets, performance completions, and credits</p>
+                </div>
+            </header>
+
+            <!-- Alerts Block -->
+            {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-error" style="margin-bottom: 20px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-success" style="margin-bottom: 20px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="score-grid">
+                <!-- Personal Target Progress Card -->
+                <div class="card" style="grid-column: span 2;">
+                    <h3 class="card-title">My Target Progress (Current Month: {{ current_month }})</h3>
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+                            <span style="font-size: 24px; font-weight: 700; color: var(--color-blue);">
+                                {{ my_earned }} <span style="font-size: 14px; font-weight: 500; color: var(--text-secondary);">earned points</span>
+                            </span>
+                            <span style="font-size: 14px; font-weight: 500; color: var(--text-secondary);">
+                                Monthly Target: <strong>{{ my_target }} pts</strong>
+                            </span>
+                        </div>
+                        
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill {% if my_pct >= 80 %}high-prog{% endif %}" style="width: {{ [my_pct, 100]|min }}%;"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span>Target Status</span>
+                            <span>{{ my_pct }}% Completed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Personal Weekly Breakdown Card -->
+                <div class="card">
+                    <h3 class="card-title">Weekly Points Breakdown</h3>
+                    <table class="scoreboard-table" style="font-size: 12.5px;">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for day in weekly_points %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ day['day_name'] }}</strong>
+                                        <div style="font-size: 9.5px; color: var(--text-muted);">{{ day['date'] }}</div>
+                                    </td>
+                                    <td style="font-weight: 700; color: {% if day['points'] > 0 %}var(--color-green){% else %}var(--text-muted){% endif %}; text-align: right;">
+                                        +{{ day['points'] }} pts
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Lead Team Scoreboard View -->
+            {% if session['role'] == 'Lead' %}
+                <div class="score-grid">
+                    <!-- Team Scoreboard List -->
+                    <div class="card" style="grid-column: span 2;">
+                        <h3 class="card-title">Team Scoreboard ({{ session['team'] }} Team)</h3>
+                        <table class="scoreboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Artist</th>
+                                    <th>Monthly Target</th>
+                                    <th>Earned</th>
+                                    <th class="progress-cell">Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if team_scoreboard %}
+                                    {% for row in team_scoreboard %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ row['name'] }}</strong>
+                                                <div style="font-size: 10px; color: var(--text-secondary);">@{{ row['username'] }}</div>
+                                            </td>
+                                            <td>{{ row['target'] }} pts</td>
+                                            <td style="font-weight: 700; color: var(--color-blue);">{{ row['earned'] }} pts</td>
+                                            <td>
+                                                <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px;">
+                                                    <div class="progress-bar-fill {% if row['pct'] >= 80 %}high-prog{% endif %}" style="width: {{ [row['pct'], 100]|min }}%;"></div>
+                                                </div>
+                                                <div style="font-size: 10px; font-weight: 600; color: var(--text-secondary); text-align: right;">
+                                                    {{ row['pct'] }}%
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">No team artists found.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Manage Team Targets -->
+                    <div class="card">
+                        <h3 class="card-title">Set Monthly Target</h3>
+                        <form action="{{ url_for('set_monthly_target') }}" method="POST" class="form-card-inline">
+                            <input type="hidden" name="month" value="{{ current_month }}">
+                            
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT ARTIST:</label>
+                                <select name="artist_id" class="select-input" required>
+                                    {% for artist in target_artists %}
+                                        <option value="{{ artist['id'] }}">{{ artist['name'] }} (@{{ artist['username'] }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">TARGET POINTS:</label>
+                                <input type="number" name="target_points" class="form-input" placeholder="e.g. 500" min="100" max="5000" required>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px;">Save Target</button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Admin Global Scoreboard View -->
+            {% if session['role'] == 'Admin' %}
+                <div class="score-grid">
+                    <!-- Global Scoreboard list -->
+                    <div class="card" style="grid-column: span 2;">
+                        <h3 class="card-title">Global Scoreboard</h3>
+                        {% if global_scoreboard %}
+                            {% for team, rows in global_scoreboard.items() %}
+                                <div style="margin-bottom: 24px;">
+                                    <h4 class="blue" style="font-size: 14px; font-weight: 700; border-bottom: 1px dashed var(--border-color); padding-bottom: 6px; margin-bottom: 8px;">
+                                        {{ team }} Department
+                                    </h4>
+                                    <table class="scoreboard-table" style="margin-bottom: 12px;">
+                                        <thead>
+                                            <tr>
+                                                <th>Artist</th>
+                                                <th>Target</th>
+                                                <th>Earned</th>
+                                                <th class="progress-cell">Progress</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in rows %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ row['name'] }}</strong>
+                                                        <div style="font-size: 10px; color: var(--text-secondary);">@{{ row['username'] }}</div>
+                                                    </td>
+                                                    <td>{{ row['target'] }} pts</td>
+                                                    <td style="font-weight: 700; color: var(--color-blue);">{{ row['earned'] }} pts</td>
+                                                    <td>
+                                                        <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px;">
+                                                            <div class="progress-bar-fill {% if row['pct'] >= 80 %}high-prog{% endif %}" style="width: {{ [row['pct'], 100]|min }}%;"></div>
+                                                        </div>
+                                                        <div style="font-size: 10px; font-weight: 600; color: var(--text-secondary); text-align: right;">
+                                                            {{ row['pct'] }}%
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align: center; padding: 24px; color: var(--text-muted);">No scoreboard data available.</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Admin Target Editor Card -->
+                    <div class="card">
+                        <h3 class="card-title">Set Monthly Target (Admin)</h3>
+                        <form action="{{ url_for('set_monthly_target') }}" method="POST" class="form-card-inline">
+                            <input type="hidden" name="month" value="{{ current_month }}">
+                            
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT EMPLOYEE:</label>
+                                <select name="artist_id" class="select-input" required>
+                                    {% for artist in target_artists %}
+                                        <option value="{{ artist['id'] }}">{{ artist['name'] }} (@{{ artist['username'] }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">TARGET POINTS:</label>
+                                <input type="number" name="target_points" class="form-input" placeholder="e.g. 500" min="100" max="5000" required>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px;">Save Target</button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>
