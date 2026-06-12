@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+            </div>
+            
+            <div class="sidebar-user">
+                <div class="user-name">{{ session['name'] }}</div>
+                {% if session['role'] == 'Admin' %}
+                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+                {% elif session['role'] == 'HR' %}
+                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
+                {% elif session['role'] == 'Lead' %}
+                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
+                {% else %}
+                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
+                {% endif %}
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li class="menu-section-title">Navigation</li>
+                <li class="menu-item active">
+                    <a href="{{ url_for('dashboard') }}">
+                        <span>Dashboard Overview</span>
+                    </a>
+                </li>
+                
+                <!-- Role-Based Menus -->
+                {% if session['role'] == 'Admin' %}
+                    <li class="menu-section-title">Admin Management</li>
+                    <li class="menu-item"><a href="#"><span>Project Setup</span></a></li>
+                    <li class="menu-item"><a href="#"><span>User Accounts</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Activity Logs</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Global Settings</span></a></li>
+                {% elif session['role'] == 'HR' %}
+                    <li class="menu-section-title">HR Management</li>
+                    <li class="menu-item"><a href="#"><span>Attendance Roll</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Leave Approvals</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Salary Panels</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Holiday Settings</span></a></li>
+                {% elif session['role'] == 'Lead' %}
+                    <li class="menu-section-title">Team Management</li>
+                    <li class="menu-item"><a href="#"><span>Team Overview</span></a></li>
+                    <li class="menu-item"><a href="#"><span>EOD Validations</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Task Allocations</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Award Team Points</span></a></li>
+                {% elif session['role'] == 'Artist' %}
+                    <li class="menu-section-title">My Workspace</li>
+                    <li class="menu-item"><a href="#"><span>My Tasks</span></a></li>
+                    <li class="menu-item"><a href="#"><span>EOD Submission</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Clock-in / Clock-out</span></a></li>
+                    <li class="menu-item"><a href="#"><span>My Points Board</span></a></li>
+                {% endif %}
+            </ul>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout">
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Main Dashboard View -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Welcome, {{ session['name'] }}!</h1>
+                    <p>iNuCom Production Tracker LAN Node</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-success" style="margin-bottom: 24px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="dashboard-grid">
+                <!-- User Profile Card -->
+                <div class="card">
+                    <h3 class="card-title">My Profile</h3>
+                    <div class="profile-details">
+                        <div class="profile-group">
+                            <span class="profile-label">Full Name</span>
+                            <span class="profile-value">{{ user['name'] }}</span>
+                        </div>
+                        <div class="profile-group">
+                            <span class="profile-label">Username</span>
+                            <span class="profile-value">{{ user['username'] }}</span>
+                        </div>
+                        <div class="profile-group">
+                            <span class="profile-label">Role</span>
+                            <span class="profile-value">{{ user['role'] }}</span>
+                        </div>
+                        <div class="profile-group">
+                            <span class="profile-label">Team / Department</span>
+                            <span class="profile-value">{{ user['team'] }}</span>
+                        </div>
+                        <div class="profile-group">
+                            <span class="profile-label">Shift Hours</span>
+                            <span class="profile-value">{{ user['shift_start'] }} - {{ user['shift_end'] }}</span>
+                        </div>
+                        <div class="profile-group">
+                            <span class="profile-label">Reports To</span>
+                            <span class="profile-value">{{ user['reports_to'] if user['reports_to'] else '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Card -->
+                <div class="card">
+                    <h3 class="card-title">Production Status</h3>
+                    <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+                        System initialized and online. This node is serving the local office LAN.
+                    </p>
+                    <p style="font-size: 14px; color: var(--text-secondary);">
+                        Future layers will enable work tracking, points distribution, file pipelines, and EOD validation processes.
+                    </p>
+                </div>
+
+                <!-- Admin Audit Logs -->
+                {% if session['role'] == 'Admin' %}
+                <div class="card" style="grid-column: 1 / -1;">
+                    <h3 class="card-title">Recent System Activity</h3>
+                    <ul class="log-list">
+                        {% for log in logs %}
+                        <li class="log-item">
+                            <span class="log-time">{{ log['timestamp'] }}</span>
+                            <span class="log-desc">
+                                <strong>{{ log['user_name'] if log['user_name'] else 'System' }}</strong>: 
+                                {{ log['action'] }} - {{ log['details'] }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>
