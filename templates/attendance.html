@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+            </div>
+            
+            <div class="sidebar-user">
+                <div class="user-name">{{ session['name'] }}</div>
+                {% if session['role'] == 'Admin' %}
+                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+                {% elif session['role'] == 'HR' %}
+                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
+                {% elif session['role'] == 'Lead' %}
+                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
+                {% else %}
+                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
+                {% endif %}
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li class="menu-section-title">Navigation</li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard') }}">
+                        <span>Dashboard Overview</span>
+                    </a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
+                    <a href="{{ url_for('points_page') }}">
+                        <span>Points & Targets</span>
+                    </a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}">
+                        <span>Attendance Tracker</span>
+                    </a>
+                </li>
+                
+                <!-- Role-Based Menus -->
+                {% if session['role'] == 'Admin' %}
+                    <li class="menu-section-title">Admin Management</li>
+                    <li class="menu-item"><a href="#"><span>Project Setup</span></a></li>
+                    <li class="menu-item"><a href="#"><span>User Accounts</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Activity Logs</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Global Settings</span></a></li>
+                {% elif session['role'] == 'HR' %}
+                    <li class="menu-section-title">HR Management</li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Attendance Roll</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Leave Approvals</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Salary Panels</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Holiday Settings</span></a></li>
+                {% elif session['role'] == 'Lead' %}
+                    <li class="menu-section-title">Team Management</li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Team Overview</span></a></li>
+                    <li class="menu-item"><a href="#"><span>EOD Validations</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Task Allocations</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Award Team Points</span></a></li>
+                {% elif session['role'] == 'Artist' %}
+                    <li class="menu-section-title">My Workspace</li>
+                    <li class="menu-item"><a href="#"><span>My Tasks</span></a></li>
+                    <li class="menu-item"><a href="#"><span>EOD Submission</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Clock-in / Clock-out</span></a></li>
+                    <li class="menu-item"><a href="#"><span>My Points Board</span></a></li>
+                {% endif %}
+            </ul>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout">
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Main Panel -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Attendance & Shifts Tracker</h1>
+                    <p>Manage daily clocking, shifts, and compensation hours</p>
+                </div>
+            </header>
+
+            <!-- Alerts Block -->
+            {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-error" style="margin-bottom: 20px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-success" style="margin-bottom: 20px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="attendance-layout">
+                <!-- Clock Widget / Dev Test Panel Row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                    <!-- Check-in / Check-out Panel -->
+                    <div class="card" style="margin: 0;">
+                        <h3 class="card-title">Clock Panel</h3>
+                        <div style="text-align: center; padding: 20px 0;">
+                            <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500;">
+                                Today: <span style="font-weight: 600;">{{ today_str }}</span>
+                            </div>
+                            
+                            <div class="clock-time-display" id="live-clock">--:--:--</div>
+                            
+                            <div style="margin-top: 15px;">
+                                {% if not attendance_today %}
+                                    <form action="{{ url_for('clock_in') }}" method="POST">
+                                        <button type="submit" class="btn btn-primary" style="width: 200px; padding: 12px 24px; font-size: 15px;">Check In</button>
+                                    </form>
+                                    <div style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">
+                                        <span class="clock-status-dot offline"></span> Not checked in today
+                                    </div>
+                                {% elif not attendance_today['clock_out'] %}
+                                    <form action="{{ url_for('clock_out') }}" method="POST">
+                                        <button type="submit" class="btn btn-danger" style="width: 200px; padding: 12px 24px; font-size: 15px;">Check Out</button>
+                                    </form>
+                                    <div style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">
+                                        <span class="clock-status-dot online"></span> Checked In at <strong>{{ attendance_today['clock_in'] }}</strong>
+                                    </div>
+                                {% else %}
+                                    <div style="background-color: var(--bg-main); padding: 16px; border-radius: var(--radius-md); display: inline-block;">
+                                        <div style="font-size: 14px; font-weight: 600; color: var(--color-green);">
+                                            <span class="clock-status-dot completed"></span> Shift Completed
+                                        </div>
+                                        <div style="font-size: 13px; color: var(--text-secondary); margin-top: 6px;">
+                                            Checked In: <strong>{{ attendance_today['clock_in'] }}</strong><br>
+                                            Checked Out: <strong>{{ attendance_today['clock_out'] }}</strong>
+                                        </div>
+                                    </div>
+                                    <div style="margin-top: 10px;">
+                                        <span class="att-badge {% if attendance_today['status'] == 'Present' %}present{% elif attendance_today['status'] == 'Late' %}late{% else %}half{% endif %}">{{ attendance_today['status'] }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Developer Test override card -->
+                    <div class="card" style="margin: 0; border: 1px dashed var(--color-blue);">
+                        <h3 class="card-title" style="color: var(--color-blue);">Developer Test Panel</h3>
+                        <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 12px;">
+                            Quick-test late rules, shift logic, and compensation. Set date and time, then click clock in/out.
+                        </p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Date</label>
+                                <input type="date" id="dev-date" class="reason-input" style="background-color: #ffffff;" value="{{ today_str }}">
+                            </div>
+                            
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Time</label>
+                                <input type="text" id="dev-time" class="reason-input" style="background-color: #ffffff;" placeholder="e.g. 09:20">
+                            </div>
+                            
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn-control" style="font-size: 11px; padding: 4px 8px; flex-grow: 1;" onclick="setDevTime('09:20')">09:20 On-Time</button>
+                                <button type="button" class="btn-control" style="font-size: 11px; padding: 4px 8px; flex-grow: 1;" onclick="setDevTime('09:50')">09:50 Late</button>
+                                <button type="button" class="btn-control" style="font-size: 11px; padding: 4px 8px; flex-grow: 1;" onclick="setDevTime('11:30')">11:30 Half-Day</button>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; margin-top: 6px;">
+                                <button type="button" class="btn btn-sm btn-primary" style="flex: 1;" onclick="submitDevClock('in')">Clock In</button>
+                                <button type="button" class="btn btn-sm btn-danger" style="flex: 1;" onclick="submitDevClock('out')">Clock Out</button>
+                            </div>
+                        </div>
+
+                        <!-- Forms for Developer clocking -->
+                        <form id="dev-clock-in-form" action="{{ url_for('clock_in') }}" method="POST" style="display: none;">
+                            <input type="hidden" name="custom_date" id="form-in-date">
+                            <input type="hidden" name="custom_time" id="form-in-time">
+                        </form>
+                        <form id="dev-clock-out-form" action="{{ url_for('clock_out') }}" method="POST" style="display: none;">
+                            <input type="hidden" name="custom_date" id="form-out-date">
+                            <input type="hidden" name="custom_time" id="form-out-time">
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Monthly Calendar view of the target employee -->
+                <div class="calendar-card">
+                    <!-- If viewing someone else -->
+                    {% if target_user['id'] != session['user_id'] %}
+                        <div style="background-color: var(--color-blue-light); border: 1px solid var(--border-focus); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 13.5px; font-weight: 500; color: var(--color-blue);">
+                                Viewing calendar of: <strong>{{ target_user['name'] }}</strong> ({{ target_user['role'] }} - Team {{ target_user['team'] }})
+                            </span>
+                            <a href="{{ url_for('attendance_page') }}" class="btn-control" style="background-color: #ffffff;">Back to My Calendar</a>
+                        </div>
+                    {% endif %}
+
+                    {% set prev_month = selected_month - 1 if selected_month > 1 else 12 %}
+                    {% set prev_year = selected_year if selected_month > 1 else selected_year - 1 %}
+                    {% set next_month = selected_month + 1 if selected_month < 12 else 1 %}
+                    {% set next_year = selected_year if selected_month < 12 else selected_year + 1 %}
+
+                    <div class="calendar-controls">
+                        <a href="{{ url_for('attendance_page', employee_id=target_user['id'], year=prev_year, month=prev_month) }}" class="btn-control">&laquo; Previous Month</a>
+                        <span class="month-year-title">
+                            {% if selected_month == 1 %}January{% elif selected_month == 2 %}February{% elif selected_month == 3 %}March{% elif selected_month == 4 %}April{% elif selected_month == 5 %}May{% elif selected_month == 6 %}June{% elif selected_month == 7 %}July{% elif selected_month == 8 %}August{% elif selected_month == 9 %}September{% elif selected_month == 10 %}October{% elif selected_month == 11 %}November{% else %}December{% endif %} {{ selected_year }}
+                        </span>
+                        <a href="{{ url_for('attendance_page', employee_id=target_user['id'], year=next_year, month=next_month) }}" class="btn-control">Next Month &raquo;</a>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div class="calendar-header">
+                        <div class="calendar-header-day">Mon</div>
+                        <div class="calendar-header-day">Tue</div>
+                        <div class="calendar-header-day">Wed</div>
+                        <div class="calendar-header-day">Thu</div>
+                        <div class="calendar-header-day">Fri</div>
+                        <div class="calendar-header-day">Sat</div>
+                        <div class="calendar-header-day">Sun</div>
+                    </div>
+
+                    <div class="calendar-grid">
+                        {% for week in calendar_weeks %}
+                            {% for day in week %}
+                                {% if day['type'] == 'padding' %}
+                                    <div class="calendar-day att-padding"></div>
+                                {% else %}
+                                    <div class="calendar-day {% if day['status'] == 'Half Day' %}att-half{% else %}att-{{ day['status']|lower }}{% endif %}">
+                                        <div class="calendar-day-number">{{ day['day'] }}</div>
+                                        
+                                        <div class="calendar-day-info">
+                                            {% if day['status'] != 'Future' %}
+                                                <span class="calendar-day-status">{{ day['status'] }}</span>
+                                                
+                                                {% if day['clock_in'] %}
+                                                    <div class="calendar-day-time">In: {{ day['clock_in'][:5] }}</div>
+                                                {% endif %}
+                                                
+                                                {% if day['clock_out'] %}
+                                                    <div class="calendar-day-time">Out: {{ day['clock_out'][:5] }}</div>
+                                                {% endif %}
+                                                
+                                                {% if day['late_minutes'] > 0 %}
+                                                    <div class="calendar-day-time" style="color: var(--color-red); font-weight: 600;">Late: {{ day['late_minutes'] }}m</div>
+                                                {% endif %}
+                                                
+                                                {% if day['extra_hours'] > 0 %}
+                                                    <div class="calendar-day-extra">+{{ "%.1f"|format(day['extra_hours']) }} hrs</div>
+                                                {% endif %}
+                                                
+                                                {% if day['label'] %}
+                                                    <div style="font-size: 8px; color: var(--color-blue); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ day['label'] }}">{{ day['label'] }}</div>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+
+                    <!-- Calculate stats using namespace -->
+                    {% set stats = namespace(present=0, late=0, half=0, absent=0, leave=0, off=0, holiday=0, extra_hours=0.0, late_minutes=0) %}
+                    {% for week in calendar_weeks %}
+                        {% for day in week %}
+                            {% if day.type == 'day' %}
+                                {% if day.status == 'Present' %}{% set stats.present = stats.present + 1 %}
+                                {% elif day.status == 'Late' %}{% set stats.late = stats.late + 1 %}{% set stats.late_minutes = stats.late_minutes + day.late_minutes %}
+                                {% elif day.status == 'Half Day' %}{% set stats.half = stats.half + 1 %}
+                                {% elif day.status == 'Absent' %}{% set stats.absent = stats.absent + 1 %}
+                                {% elif day.status == 'Leave' %}{% set stats.leave = stats.leave + 1 %}
+                                {% elif day.status == 'Off' %}{% set stats.off = stats.off + 1 %}
+                                {% elif day.status == 'Holiday' %}{% set stats.holiday = stats.holiday + 1 %}
+                                {% endif %}
+                                {% if day.extra_hours %}{% set stats.extra_hours = stats.extra_hours + day.extra_hours %}{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+
+                    <!-- Statistics Summary boxes -->
+                    <div class="attendance-stats-summary">
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: var(--color-green);">{{ stats.present }}</div>
+                            <div class="stat-box-lbl">Present</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: var(--color-red);">{{ stats.late }}</div>
+                            <div class="stat-box-lbl">Late Days</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: #b45309;">{{ stats.half }}</div>
+                            <div class="stat-box-lbl">Half Days</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: var(--text-muted);">{{ stats.absent }}</div>
+                            <div class="stat-box-lbl">Absent</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: #6b21a8;">{{ stats.leave }}</div>
+                            <div class="stat-box-lbl">Leave</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: #475569;">{{ stats.off }}</div>
+                            <div class="stat-box-lbl">Off Days</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: var(--color-blue);">{{ stats.holiday }}</div>
+                            <div class="stat-box-lbl">Holiday</div>
+                        </div>
+                        <div class="stat-box" style="border-left: 1px solid var(--border-color); padding-left: 10px;">
+                            <div class="stat-box-num" style="color: var(--color-green);">{{ "%.1f"|format(stats.extra_hours) }}h</div>
+                            <div class="stat-box-lbl">Extra Hours</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: var(--color-red);">{{ stats.late_minutes }}m</div>
+                            <div class="stat-box-lbl">Late Minutes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Role Based Views: Lead (Team Summary) -->
+                {% if session['role'] == 'Lead' %}
+                    <div class="card">
+                        <h3 class="card-title">Team Attendance - Today</h3>
+                        <table class="scoreboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Artist</th>
+                                    <th>Clock In</th>
+                                    <th>Clock Out</th>
+                                    <th>Late Minutes</th>
+                                    <th>Extra Hours</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if team_today %}
+                                    {% for row in team_today %}
+                                        <tr>
+                                            <td><strong>{{ row['name'] }}</strong> <span style="font-size: 11px; color: var(--text-muted);">(@{{ row['username'] }})</span></td>
+                                            <td>{{ row['clock_in'] if row['clock_in'] else '--' }}</td>
+                                            <td>{{ row['clock_out'] if row['clock_out'] else '--' }}</td>
+                                            <td style="color: {% if row['late_minutes'] > 0 %}var(--color-red){% else %}inherit{% endif %}; font-weight: {% if row['late_minutes'] > 0 %}600{% else %}normal{% endif %};">
+                                                {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
+                                            </td>
+                                            <td style="color: {% if row['extra_hours'] > 0 %}var(--color-green){% else %}inherit{% endif %}; font-weight: {% if row['extra_hours'] > 0 %}600{% else %}normal{% endif %};">
+                                                +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
+                                            </td>
+                                            <td>
+                                                {% set status_lower = row['att_status']|lower if row['att_status'] else 'absent' %}
+                                                <span class="att-badge {% if status_lower == 'half day' %}half{% else %}{{ status_lower }}{% endif %}">
+                                                    {{ row['att_status'] if row['att_status'] else 'Absent' }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No artists registered in your team.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="card-title">Team Statistics - Selected Month</h3>
+                        <table class="scoreboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Artist</th>
+                                    <th>Present</th>
+                                    <th>Late Days</th>
+                                    <th>Half Days</th>
+                                    <th>Absent</th>
+                                    <th>Leaves</th>
+                                    <th>Late Minutes</th>
+                                    <th>Extra Hours</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if team_monthly_stats %}
+                                    {% for row in team_monthly_stats %}
+                                        <tr>
+                                            <td><strong>{{ row['name'] }}</strong></td>
+                                            <td style="color: var(--color-green); font-weight: 600;">{{ row['present'] }}</td>
+                                            <td style="color: var(--color-red);">{{ row['late'] }}</td>
+                                            <td style="color: #b45309;">{{ row['half_day'] }}</td>
+                                            <td style="color: var(--text-muted);">{{ row['absent'] }}</td>
+                                            <td style="color: #6b21a8;">{{ row['leaves'] }}</td>
+                                            <td style="color: var(--color-red); font-weight: 600;">{{ row['late_minutes'] }}m</td>
+                                            <td style="color: var(--color-green); font-weight: 600;">+{{ "%.1f"|format(row['extra_hours']) }}h</td>
+                                            <td>
+                                                <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No records available.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                <!-- Role Based Views: Admin / HR (Global Summary) -->
+                {% if session['role'] in ['Admin', 'HR'] %}
+                    <div class="card">
+                        <h3 class="card-title">Global Team Attendance - Today</h3>
+                        
+                        {% for team, members in global_today.items() %}
+                            <div style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
+                                <table class="scoreboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Role</th>
+                                            <th>Clock In</th>
+                                            <th>Clock Out</th>
+                                            <th>Late Minutes</th>
+                                            <th>Extra Hours</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in members %}
+                                            <tr>
+                                                <td><strong>{{ row['name'] }}</strong> <span style="font-size: 11px; color: var(--text-muted);">(@{{ row['username'] }})</span></td>
+                                                <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
+                                                <td>{{ row['clock_in'] if row['clock_in'] else '--' }}</td>
+                                                <td>{{ row['clock_out'] if row['clock_out'] else '--' }}</td>
+                                                <td style="color: {% if row['late_minutes'] > 0 %}var(--color-red){% else %}inherit{% endif %}; font-weight: {% if row['late_minutes'] > 0 %}600{% else %}normal{% endif %};">
+                                                    {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
+                                                </td>
+                                                <td style="color: {% if row['extra_hours'] > 0 %}var(--color-green){% else %}inherit{% endif %}; font-weight: {% if row['extra_hours'] > 0 %}600{% else %}normal{% endif %};">
+                                                    +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
+                                                </td>
+                                                <td>
+                                                    {% set status_lower = row['status']|lower if row['status'] else 'absent' %}
+                                                    <span class="att-badge {% if status_lower == 'half day' %}half{% else %}{{ status_lower }}{% endif %}">
+                                                        {{ row['status'] if row['status'] else 'Absent' }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="card">
+                        <h3 class="card-title">Global Employee Statistics - Selected Month</h3>
+                        
+                        {% for team, members in global_monthly_stats.items() %}
+                            <div style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
+                                <table class="scoreboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Role</th>
+                                            <th>Present</th>
+                                            <th>Late Days</th>
+                                            <th>Half Days</th>
+                                            <th>Absent</th>
+                                            <th>Leaves</th>
+                                            <th>Late Minutes</th>
+                                            <th>Extra Hours</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in members %}
+                                            <tr>
+                                                <td><strong>{{ row['name'] }}</strong></td>
+                                                <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
+                                                <td style="color: var(--color-green); font-weight: 600;">{{ row['present'] }}</td>
+                                                <td style="color: var(--color-red);">{{ row['late'] }}</td>
+                                                <td style="color: #b45309;">{{ row['half_day'] }}</td>
+                                                <td style="color: var(--text-muted);">{{ row['absent'] }}</td>
+                                                <td style="color: #6b21a8;">{{ row['leaves'] }}</td>
+                                                <td style="color: var(--color-red); font-weight: 600;">{{ row['late_minutes'] }}m</td>
+                                                <td style="color: var(--color-green); font-weight: 600;">+{{ "%.1f"|format(row['extra_hours']) }}h</td>
+                                                <td>
+                                                    <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Live clock and dev panel scripts -->
+    <script>
+        function updateLiveClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const clockEl = document.getElementById('live-clock');
+            if (clockEl) {
+                clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+        }
+        setInterval(updateLiveClock, 1000);
+        updateLiveClock();
+
+        function setDevTime(timeStr) {
+            document.getElementById('dev-time').value = timeStr;
+        }
+
+        function submitDevClock(action) {
+            const dateStr = document.getElementById('dev-date').value.trim();
+            const timeStr = document.getElementById('dev-time').value.trim();
+            
+            if (!timeStr) {
+                alert("Please specify a custom time.");
+                return;
+            }
+
+            if (action === 'in') {
+                document.getElementById('form-in-date').value = dateStr;
+                document.getElementById('form-in-time').value = timeStr;
+                document.getElementById('dev-clock-in-form').submit();
+            } else {
+                document.getElementById('form-out-date').value = dateStr;
+                document.getElementById('form-out-time').value = timeStr;
+                document.getElementById('dev-clock-out-form').submit();
+            }
+        }
+    </script>
+</body>
+</html>

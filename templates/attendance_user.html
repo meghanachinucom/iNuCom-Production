@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Attendance - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- This template redirects to the main attendance tracker page passing employee_id -->
+    <script>
+        window.location.href = "{{ url_for('attendance_page', employee_id=target_user_id) if target_user_id else url_for('attendance_page') }}";
+    </script>
+    <div style="padding: 40px; text-align: center; font-family: sans-serif;">
+        <h2>Redirecting to employee calendar...</h2>
+        <p>If you are not redirected automatically, <a href="{{ url_for('attendance_page', employee_id=target_user_id) }}">click here</a>.</p>
+    </div>
+</body>
+</html>

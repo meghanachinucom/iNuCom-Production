@@ -29,14 +29,19 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                <li class="menu-item active">
+                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}">
                         <span>Dashboard Overview</span>
                     </a>
                 </li>
-                <li class="menu-item">
+                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                     <a href="{{ url_for('points_page') }}">
                         <span>Points & Targets</span>
+                    </a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}">
+                        <span>Attendance Tracker</span>
                     </a>
                 </li>
                 
@@ -49,13 +54,13 @@
                     <li class="menu-item"><a href="#"><span>Global Settings</span></a></li>
                 {% elif session['role'] == 'HR' %}
                     <li class="menu-section-title">HR Management</li>
-                    <li class="menu-item"><a href="#"><span>Attendance Roll</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Attendance Roll</span></a></li>
                     <li class="menu-item"><a href="#"><span>Leave Approvals</span></a></li>
                     <li class="menu-item"><a href="#"><span>Salary Panels</span></a></li>
                     <li class="menu-item"><a href="#"><span>Holiday Settings</span></a></li>
                 {% elif session['role'] == 'Lead' %}
                     <li class="menu-section-title">Team Management</li>
-                    <li class="menu-item"><a href="#"><span>Team Overview</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Team Overview</span></a></li>
                     <li class="menu-item"><a href="#"><span>EOD Validations</span></a></li>
                     <li class="menu-item"><a href="#"><span>Task Allocations</span></a></li>
                     <li class="menu-item"><a href="#"><span>Award Team Points</span></a></li>
@@ -63,7 +68,7 @@
                     <li class="menu-section-title">My Workspace</li>
                     <li class="menu-item"><a href="#"><span>My Tasks</span></a></li>
                     <li class="menu-item"><a href="#"><span>EOD Submission</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Clock-in / Clock-out</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Clock-in / Clock-out</span></a></li>
                     <li class="menu-item"><a href="#"><span>My Points Board</span></a></li>
                 {% endif %}
             </ul>
@@ -81,6 +86,26 @@
                 <div>
                     <h1>Welcome, {{ session['name'] }}!</h1>
                     <p>iNuCom Production Tracker LAN Node</p>
+                </div>
+                
+                <!-- Quick-Clock Widget -->
+                <div class="quick-clock-widget">
+                    {% if not attendance_today %}
+                        <form action="{{ url_for('clock_in') }}" method="POST" class="clock-form">
+                            <span class="clock-status-dot offline"></span> Not Checked In
+                            <button type="submit" class="btn btn-sm btn-primary ml-3">Check In</button>
+                        </form>
+                    {% elif not attendance_today['clock_out'] %}
+                        <form action="{{ url_for('clock_out') }}" method="POST" class="clock-form">
+                            <span class="clock-status-dot online"></span> Checked In: <strong class="ml-1">{{ attendance_today['clock_in'] }}</strong>
+                            <button type="submit" class="btn btn-sm btn-danger ml-3">Check Out</button>
+                        </form>
+                    {% else %}
+                        <div class="clock-form">
+                            <span class="clock-status-dot completed"></span> Clocked Out: <strong class="ml-1">{{ attendance_today['clock_out'] }}</strong>
+                            <span class="att-badge {% if attendance_today['status'] == 'Present' %}present{% elif attendance_today['status'] == 'Late' %}late{% else %}half{% endif %} ml-3" style="padding: 4px 10px; border-radius: 12px; font-size: 11px;">{{ attendance_today['status'] }}</span>
+                        </div>
+                    {% endif %}
                 </div>
             </header>
 

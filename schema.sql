@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     team TEXT NOT NULL,
     reports_to TEXT,
     shift_start TEXT DEFAULT '09:00',
-    shift_end TEXT DEFAULT '18:00',
+    shift_end TEXT DEFAULT '19:00',
     basic_salary REAL DEFAULT 0.0,
     carry_forward REAL DEFAULT 0.0,
     device_id TEXT DEFAULT NULL,
@@ -102,6 +102,9 @@ CREATE TABLE IF NOT EXISTS attendance (
     clock_in TEXT,
     clock_out TEXT,
     status TEXT DEFAULT 'Absent',
+    late_minutes INTEGER DEFAULT 0,
+    total_hours REAL DEFAULT 0.0,
+    extra_hours REAL DEFAULT 0.0,
     device_id TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

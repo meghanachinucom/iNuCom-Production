@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import datetime
+import calendar
 from flask import Flask, render_template, request, redirect, url_for, session, g, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -88,6 +89,16 @@ DEMO_FILES = [
     {"chapter_name": "ch_13", "name": "FW_13_08_SunLight", "description": "Sunlight dynamic lighting setup", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned": "abhilash", "content_released_offset": 21600}
 ]
 
+# Attendance off-day logic
+def is_weekly_off(date_obj):
+    if date_obj.weekday() == 6:  # Sunday
+        return True
+    if date_obj.weekday() == 5:  # Saturday
+        day = date_obj.day
+        if (8 <= day <= 14) or (22 <= day <= 28):
+            return True
+    return False
+
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
@@ -109,7 +120,7 @@ def init_db():
         try:
             conn = sqlite3.connect(DATABASE)
             cursor = conn.cursor()
-            cursor.execute("SELECT points FROM file_pipeline LIMIT 1")
+            cursor.execute("SELECT total_hours FROM attendance LIMIT 1")
             conn.close()
         except sqlite3.OperationalError:
             schema_needs_update = True
@@ -172,7 +183,6 @@ def init_db():
             """, (chap_id, f_demo['name'], f_demo['description'], content_released))
             file_id = cursor.lastrowid
             
-            # Find artist ID if assigned
             artist_id = None
             if f_demo['assigned']:
                 cursor.execute("SELECT id FROM users WHERE username = ?", (f_demo['assigned'],))
@@ -180,7 +190,6 @@ def init_db():
                 if res:
                     artist_id = res[0]
             
-            # Default complexity points based on active stage
             points_val = 50 if f_demo['active_stage'] in ['Content', 'Modeling', 'Texturing'] else 80
             
             for stage in PIPELINE_STAGES:
@@ -202,23 +211,21 @@ def init_db():
                     VALUES (?, ?, ?, ?, ?)
                 """, (file_id, stage, stage_status, stage_assigned, stage_points))
                 
-                # If currently assigned/in progress, seed a daily assignment for today
                 if stage == f_demo['active_stage'] and stage_assigned and stage_status != 'Done':
                     cursor.execute("""
                         INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (stage_assigned, today_str, file_id, f"{stage}: {f_demo['name']}", stage_points, stage_status))
         
-        # Seed targets for current month for all artists (default 500)
+        # Seed targets
         current_month = datetime.date.today().strftime('%Y-%m')
         cursor.execute("SELECT id FROM users WHERE role = 'Artist'")
         artist_ids = [row[0] for row in cursor.fetchall()]
         for aid in artist_ids:
             cursor.execute("INSERT INTO monthly_targets (user_id, month, target_points) VALUES (?, ?, ?)", (aid, current_month, 500))
             
-        # Seed some demo points (points earned earlier this week)
+        # Seed some demo points
         yesterday_str = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-        # Award 60 points to raveendra yesterday
         cursor.execute("SELECT id FROM users WHERE username = 'raveendra'")
         rav_row = cursor.fetchone()
         if rav_row:
@@ -338,6 +345,11 @@ def dashboard():
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
     user_profile = cursor.fetchone()
     
+    # Check today's clock status
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    cursor.execute("SELECT * FROM attendance WHERE user_id = ? AND date = ?", (session['user_id'], today_str))
+    attendance_today = cursor.fetchone()
+    
     # Project & Chapter selections
     cursor.execute("SELECT * FROM projects WHERE status = 'Active'")
     projects = cursor.fetchall()
@@ -361,13 +373,11 @@ def dashboard():
                 selected_chapter_name = ch['name']
                 break
         
-    # Get all files in selected chapter
     files = []
     if chapter_id:
         cursor.execute("SELECT * FROM files WHERE chapter_id = ? ORDER BY id", (chapter_id,))
         files = cursor.fetchall()
         
-    # Build status matrix for the active chapter
     matrix = {}
     if chapter_id:
         cursor.execute("""
@@ -389,7 +399,6 @@ def dashboard():
                 'artist_username': row['artist_username']
             }
             
-    # Resolve user active stage queue (Leads and Admins)
     lead_queue = []
     queue_stage = None
     artists = []
@@ -420,7 +429,6 @@ def dashboard():
             """, (chapter_id, queue_stage))
             lead_queue = cursor.fetchall()
             
-            # Fetch artists for assignment selection
             if session['role'] == 'Lead':
                 cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
                 artists = cursor.fetchall()
@@ -429,14 +437,9 @@ def dashboard():
                 cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (target_team,))
                 artists = cursor.fetchall()
 
-    # EOD Validation Panel List (Leads / Admins)
     validation_list = []
-    today_str = datetime.date.today().strftime('%Y-%m-%d')
-    
     if session['role'] in ['Lead', 'Admin'] and chapter_id:
-        # Fetch today's assignments for EOD validation for this team/stage
         target_team = session['team'] if session['role'] == 'Lead' else STAGE_TEAMS.get(queue_stage)
-        
         cursor.execute("""
             SELECT da.id as assignment_id, da.points, da.status as assignment_status, da.task_description, da.remarks,
                    u.name as artist_name, u.username as artist_username, f.name as file_name, f.id as file_id
@@ -447,7 +450,6 @@ def dashboard():
         """, (today_str, target_team))
         validation_list = cursor.fetchall()
 
-    # Artist personal tasks board
     artist_tasks = []
     if session['role'] == 'Artist':
         cursor.execute("""
@@ -469,9 +471,7 @@ def dashboard():
     late_assignment_flag = False
     late_validation_flag = False
     
-    # 1. Morning Assignment (10:00 AM)
     if now.hour >= 10:
-        # Check if there are active files open at any pipeline stage that are not assigned to anyone
         cursor.execute("""
             SELECT COUNT(*) 
             FROM file_pipeline fp
@@ -482,8 +482,6 @@ def dashboard():
         if open_count > 0:
             late_assignment_flag = True
             
-    # 2. EOD Validation (6:30 PM)
-    # Check if past 6:30 PM and there are unvalidated daily assignments for today for this team
     if now.hour >= 18 or (now.hour == 18 and now.minute >= 30):
         if session['role'] == 'Lead':
             cursor.execute("""
@@ -495,7 +493,6 @@ def dashboard():
             if pending_cnt > 0:
                 late_validation_flag = True
 
-    # Fetch audit logs for admins
     recent_logs = []
     if session['role'] == 'Admin':
         cursor.execute("""
@@ -525,7 +522,8 @@ def dashboard():
         validation_list=validation_list,
         late_assignment_flag=late_assignment_flag,
         late_validation_flag=late_validation_flag,
-        today_str=today_str
+        today_str=today_str,
+        attendance_today=attendance_today
     )
 
 @app.route('/file/add', methods=['POST'])
@@ -617,7 +615,6 @@ def assign_file():
         points = 0
         
     try:
-        # Update pipeline step status, assignee, and complexity points
         cursor.execute("""
             UPDATE file_pipeline 
             SET assigned_to = ?, status = ?, points = ?
@@ -627,10 +624,8 @@ def assign_file():
         cursor.execute("SELECT name, chapter_id FROM files WHERE id = ?", (file_id,))
         f_info = cursor.fetchone()
         
-        # If assigning an artist, create a daily assignment for today
         if artist_id:
             today_str = datetime.date.today().strftime('%Y-%m-%d')
-            # Check if active daily assignment for today already exists
             cursor.execute("""
                 SELECT id FROM daily_assignments 
                 WHERE user_id = ? AND date = ? AND file_id = ?
@@ -661,9 +656,6 @@ def assign_file():
 
 @app.route('/file/status', methods=['POST'])
 def update_status():
-    # Keep standard status updates (Artist setting In Progress or Done).
-    # Done triggers direct EOD Validation style done, or artist sets done.
-    # To support direct EOD done credits points, we also update file_pipeline.
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
@@ -700,7 +692,6 @@ def update_status():
         flash("Unauthorized to update status for this stage.", "error")
         return redirect(url_for('dashboard'))
         
-    # Artist can update daily assignment to Done or In Progress
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     cursor.execute("""
         UPDATE file_pipeline 
@@ -708,27 +699,21 @@ def update_status():
         WHERE file_id = ? AND step_name = ?
     """, (status, file_id, step_name))
     
-    # Update today's daily assignment status as well
     cursor.execute("""
         UPDATE daily_assignments 
-        SET status = 'Pending' if ? == 'In Progress' else 'Pending' 
+        SET status = 'Pending' 
         WHERE file_id = ? AND user_id = ? AND date = ?
-    """, ('Pending' if status == 'In Progress' else 'Pending', file_id, pipeline_step['assigned_to'], today_str))
+    """, (file_id, pipeline_step['assigned_to'], today_str))
     
     log_details = f"Artist updated status of '{pipeline_step['file_name']}' [{step_name}] to '{status}'"
     
-    # If artist marks Done, it goes to Lead EOD queue for final approval (it stays Pending in daily_assignments
-    # until validated Done by Lead, which awards points).
-    # However, if Admin or Lead changes it, they can validate it directly.
     if status == 'Done' and (is_lead or is_admin):
-        # Direct validation via Lead/Admin
         cursor.execute("""
             UPDATE daily_assignments 
             SET status = 'Done' 
             WHERE file_id = ? AND date = ?
         """, (file_id, today_str))
         
-        # Credit points
         cursor.execute("""
             INSERT INTO points (user_id, date, points, reason, awarded_by)
             VALUES (?, ?, ?, ?, ?)
@@ -739,7 +724,6 @@ def update_status():
             now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("UPDATE files SET content_released_at = ? WHERE id = ?", (now_str, file_id))
             
-        # Move to next stage
         idx = PIPELINE_STAGES.index(step_name)
         if idx < len(PIPELINE_STAGES) - 1:
             next_stage = PIPELINE_STAGES[idx + 1]
@@ -749,7 +733,7 @@ def update_status():
                 WHERE file_id = ? AND step_name = ? AND status = 'Pending'
             """, (file_id, next_stage))
             
-    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Status Update', ?)",
+    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)",
                    (session['user_id'], 'Pipeline Update', log_details))
     db.commit()
     
@@ -762,7 +746,7 @@ def validate_assignment():
         return redirect(url_for('login'))
         
     assignment_id = request.form.get('assignment_id', type=int)
-    validation_status = request.form.get('validation_status', '') # 'Done' or 'Pending'
+    validation_status = request.form.get('validation_status', '')
     remarks = request.form.get('remarks', '').strip()
     
     if not assignment_id or validation_status not in ['Done', 'Pending']:
@@ -772,7 +756,6 @@ def validate_assignment():
     db = get_db()
     cursor = db.cursor()
     
-    # Retrieve assignment details
     cursor.execute("""
         SELECT da.*, u.team, u.name as artist_name, f.name as file_name 
         FROM daily_assignments da
@@ -786,7 +769,6 @@ def validate_assignment():
         flash("Assignment record not found.", "error")
         return redirect(url_for('dashboard'))
         
-    # Permission check: Admin or Lead of that team
     if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == da['team']):
         flash("Unauthorized to validate assignments for this team.", "error")
         return redirect(url_for('dashboard'))
@@ -794,10 +776,8 @@ def validate_assignment():
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     
     if validation_status == 'Done':
-        # Mark daily assignment as Done
         cursor.execute("UPDATE daily_assignments SET status = 'Done', remarks = ? WHERE id = ?", ("Validated Done", assignment_id))
         
-        # Get active step name for this file/artist
         cursor.execute("""
             SELECT step_name, points FROM file_pipeline 
             WHERE file_id = ? AND assigned_to = ? AND status IN ('Open', 'In Progress')
@@ -808,24 +788,20 @@ def validate_assignment():
             step_name = step_row['step_name']
             points_val = step_row['points']
             
-            # Set pipeline step status to Done
             cursor.execute("""
                 UPDATE file_pipeline SET status = 'Done' 
                 WHERE file_id = ? AND step_name = ?
             """, (da['file_id'], step_name))
             
-            # Credit points to the artist
             cursor.execute("""
                 INSERT INTO points (user_id, date, points, reason, awarded_by)
                 VALUES (?, ?, ?, ?, ?)
             """, (da['user_id'], today_str, points_val, f"EOD Completed: {da['file_name']} [{step_name}]", session['user_id']))
             
-            # Record content release
             if step_name == 'Content':
                 now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 cursor.execute("UPDATE files SET content_released_at = ? WHERE id = ?", (now_str, da['file_id']))
                 
-            # Transition to the next stage
             idx = PIPELINE_STAGES.index(step_name)
             if idx < len(PIPELINE_STAGES) - 1:
                 next_stage = PIPELINE_STAGES[idx + 1]
@@ -846,14 +822,11 @@ def validate_assignment():
             flash("A typed reason is required to mark a task as Pending.", "error")
             return redirect(url_for('dashboard'))
             
-        # Update current daily assignment with remarks/reason
         cursor.execute("UPDATE daily_assignments SET status = 'Pending', remarks = ? WHERE id = ?", (remarks, assignment_id))
         
-        # Calculate tomorrow's date
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         tomorrow_str = tomorrow.strftime('%Y-%m-%d')
         
-        # Roll forward: Create a new daily assignment for tomorrow
         cursor.execute("""
             INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
             VALUES (?, ?, ?, ?, ?, 'Pending')
@@ -882,7 +855,6 @@ def set_monthly_target():
     db = get_db()
     cursor = db.cursor()
     
-    # Check artist's team
     cursor.execute("SELECT team, name FROM users WHERE id = ?", (artist_id,))
     artist = cursor.fetchone()
     
@@ -890,12 +862,10 @@ def set_monthly_target():
         flash("Artist not found.", "error")
         return redirect(url_for('points_page'))
         
-    # Permission check: Admin or Lead of artist's team
     if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == artist['team']):
         flash("Unauthorized to set target for this artist.", "error")
         return redirect(url_for('points_page'))
         
-    # Check if target already exists
     cursor.execute("SELECT id FROM monthly_targets WHERE user_id = ? AND month = ?", (artist_id, month))
     target_row = cursor.fetchone()
     
@@ -919,10 +889,8 @@ def points_page():
     db = get_db()
     cursor = db.cursor()
     
-    # 1. Fetch current month metrics
     current_month = datetime.date.today().strftime('%Y-%m')
     
-    # Helper to calculate points and progress for a user
     def get_user_progress(uid):
         cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (uid, current_month))
         target_res = cursor.fetchone()
@@ -940,9 +908,8 @@ def points_page():
         
     my_target, my_earned, my_pct = get_user_progress(session['user_id'])
     
-    # 2. Build 7-day Weekly Breakdown (Monday - Sunday)
     today = datetime.date.today()
-    start_of_week = today - datetime.timedelta(days=today.weekday()) # Monday
+    start_of_week = today - datetime.timedelta(days=today.weekday())
     week_days = [start_of_week + datetime.timedelta(days=i) for i in range(7)]
     
     weekly_points = []
@@ -956,12 +923,10 @@ def points_page():
             'points': pts if pts is not None else 0
         })
         
-    # 3. Resolve Admin / Lead views
     team_scoreboard = []
     global_scoreboard = {}
     
     if session['role'] == 'Lead':
-        # Fetch scoreboard for all artists on the Lead's team
         cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
         artists = cursor.fetchall()
         for artist in artists:
@@ -976,7 +941,6 @@ def points_page():
             })
             
     elif session['role'] == 'Admin':
-        # Fetch scoreboard for all artists, grouped by team
         cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY team")
         artists = cursor.fetchall()
         for artist in artists:
@@ -993,7 +957,6 @@ def points_page():
                 'pct': pct
             })
             
-    # Fetch all artists that this user has authority to set target for (Leads/Admins)
     target_artists = []
     if session['role'] == 'Lead':
         cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
@@ -1018,6 +981,440 @@ def points_page():
         current_month=current_month
     )
 
+# LAYER 4 - ATTENDANCE ROUTES
+@app.route('/attendance/clock-in', methods=['POST'])
+def clock_in():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    custom_time = request.form.get('custom_time', '').strip()
+    custom_date = request.form.get('custom_date', '').strip()
+    
+    today_str = custom_date if custom_date else datetime.date.today().strftime('%Y-%m-%d')
+    
+    if custom_time:
+        try:
+            if len(custom_time.split(':')) == 2:
+                custom_time += ':00'
+            now = datetime.datetime.strptime(f"{today_str} {custom_time}", "%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            flash(f"Invalid custom time format: {e}", "error")
+            return redirect(request.referrer or url_for('dashboard'))
+    else:
+        now = datetime.datetime.now()
+        
+    clock_in_str = now.strftime('%H:%M:%S')
+    
+    # Check if already clocked in today
+    cursor.execute("SELECT id FROM attendance WHERE user_id = ? AND date = ?", (session['user_id'], today_str))
+    if cursor.fetchone():
+        flash("You have already checked in today.", "error")
+        return redirect(request.referrer or url_for('dashboard'))
+        
+    # Policy Check: Grace 09:30, Late 09:31 - 11:00, Half Day after 11:00
+    minutes_from_midnight = now.hour * 60 + now.minute
+    
+    if minutes_from_midnight <= 570:  # 09:30 AM
+        status = 'Present'
+        late_minutes = 0
+    elif minutes_from_midnight <= 660:  # 11:00 AM
+        status = 'Late'
+        late_minutes = max(0, minutes_from_midnight - 585)  # counts from 09:45 AM (585 mins)
+    else:
+        status = 'Half Day'
+        late_minutes = 0
+        
+    try:
+        cursor.execute("""
+            INSERT INTO attendance (user_id, date, clock_in, status, late_minutes)
+            VALUES (?, ?, ?, ?, ?)
+        """, (session['user_id'], today_str, clock_in_str, status, late_minutes))
+        
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Clock In', ?)",
+                       (session['user_id'], f"Clocked in today at {clock_in_str} (Status: {status}, Late Minutes: {late_minutes})"))
+        db.commit()
+        
+        flash(f"Checked in successfully at {clock_in_str}. Status: {status}.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error clocking in: {e}", "error")
+        
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/attendance/clock-out', methods=['POST'])
+def clock_out():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    custom_time = request.form.get('custom_time', '').strip()
+    custom_date = request.form.get('custom_date', '').strip()
+    
+    today_str = custom_date if custom_date else datetime.date.today().strftime('%Y-%m-%d')
+    
+    if custom_time:
+        try:
+            if len(custom_time.split(':')) == 2:
+                custom_time += ':00'
+            now = datetime.datetime.strptime(f"{today_str} {custom_time}", "%Y-%m-%d %H:%M:%S")
+        except Exception as e:
+            flash(f"Invalid custom time format: {e}", "error")
+            return redirect(request.referrer or url_for('dashboard'))
+    else:
+        now = datetime.datetime.now()
+        
+    clock_out_str = now.strftime('%H:%M:%S')
+    
+    # Fetch active clock-in for today
+    cursor.execute("""
+        SELECT * FROM attendance 
+        WHERE user_id = ? AND date = ? AND clock_out IS NULL
+    """, (session['user_id'], today_str))
+    att = cursor.fetchone()
+    
+    if not att:
+        flash("No active check-in record found for today.", "error")
+        return redirect(request.referrer or url_for('dashboard'))
+        
+    # Calculate elapsed hours
+    in_dt = datetime.datetime.strptime(f"{today_str} {att['clock_in']}", "%Y-%m-%d %H:%M:%S")
+    out_dt = now
+    duration = out_dt - in_dt
+    total_hours = max(0.0, duration.total_seconds() / 3600.0)
+    
+    # Retrieve user's shift length
+    cursor.execute("SELECT shift_start, shift_end FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+    
+    try:
+        start_h, start_m = map(int, user_info['shift_start'].split(':'))
+        end_h, end_m = map(int, user_info['shift_end'].split(':'))
+        shift_length = (end_h * 60 + end_m - (start_h * 60 + start_m)) / 60.0
+        if shift_length < 0:
+            shift_length += 24.0
+    except:
+        shift_length = 10.0 # Default fallback
+        
+    # Check off-day or holiday status
+    try:
+        today_date = datetime.datetime.strptime(today_str, '%Y-%m-%d').date()
+    except:
+        today_date = datetime.date.today()
+    off_day = is_weekly_off(today_date)
+    
+    cursor.execute("SELECT COUNT(*) FROM holidays WHERE date = ?", (today_str,))
+    is_holiday_flag = cursor.fetchone()[0] > 0
+    
+    if off_day or is_holiday_flag:
+        # All hours count as extra compensation on off-days/holidays
+        extra_hours = total_hours
+    else:
+        # Standard day: hours beyond shift length count as extra
+        extra_hours = max(0.0, total_hours - shift_length)
+        
+    try:
+        cursor.execute("""
+            UPDATE attendance 
+            SET clock_out = ?, total_hours = ?, extra_hours = ?
+            WHERE id = ?
+        """, (clock_out_str, total_hours, extra_hours, att['id']))
+        
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Clock Out', ?)",
+                       (session['user_id'], f"Clocked out today at {clock_out_str} (Duration: {total_hours:.2f} hrs, Extra: {extra_hours:.2f} hrs)"))
+        db.commit()
+        
+        flash(f"Checked out successfully at {clock_out_str}. Total hours: {total_hours:.2f}.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error clocking out: {e}", "error")
+        
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/attendance')
+def attendance_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    year = request.args.get('year', default=datetime.date.today().year, type=int)
+    month = request.args.get('month', default=datetime.date.today().month, type=int)
+    
+    # Resolve target employee ID for calendar inspection
+    target_uid = request.args.get('employee_id', default=session['user_id'], type=int)
+    
+    # Permission check for other employee calendar
+    if target_uid != session['user_id'] and session['role'] not in ['Admin', 'HR']:
+        target_uid = session['user_id']
+        
+    cursor.execute("SELECT * FROM users WHERE id = ?", (target_uid,))
+    target_user = cursor.fetchone()
+    
+    # 1. BUILD INDIVIDUAL MONTHLY CALENDAR GRID
+    # calendar.monthrange(year, month) -> (first_weekday, num_days)
+    first_weekday, num_days = calendar.monthrange(year, month)
+    
+    # Get attendance data for selected month
+    month_prefix = f"{year}-{month:02d}"
+    cursor.execute("""
+        SELECT * FROM attendance 
+        WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+    """, (target_uid, month_prefix))
+    att_list = {row['date']: row for row in cursor.fetchall()}
+    
+    # Get approved leaves for selected month
+    cursor.execute("""
+        SELECT * FROM leaves 
+        WHERE user_id = ? AND status = 'Approved' 
+          AND (strftime('%Y-%m', start_date) = ? OR strftime('%Y-%m', end_date) = ?)
+    """, (target_uid, month_prefix, month_prefix))
+    leaves_list = cursor.fetchall()
+    
+    # Get holidays for selected month
+    cursor.execute("SELECT * FROM holidays WHERE strftime('%Y-%m', date) = ?", (month_prefix,))
+    holidays_list = {row['date']: row['name'] for row in cursor.fetchall()}
+    
+    calendar_days = []
+    
+    # Padding cells before first day of month
+    # weekday mapping in calendar: Monday is 0, Sunday is 6
+    for p in range(first_weekday):
+        calendar_days.append({'type': 'padding'})
+        
+    # Main calendar loop
+    today_date = datetime.date.today()
+    
+    for day in range(1, num_days + 1):
+        day_date = datetime.date(year, month, day)
+        day_str = day_date.strftime('%Y-%m-%d')
+        
+        status = 'Future'
+        clock_in_time = None
+        clock_out_time = None
+        late_mins = 0
+        extra_hrs = 0.0
+        label = ""
+        
+        # Check database records
+        if day_str in att_list:
+            status = att_list[day_str]['status']
+            clock_in_time = att_list[day_str]['clock_in']
+            clock_out_time = att_list[day_str]['clock_out']
+            late_mins = att_list[day_str]['late_minutes']
+            extra_hrs = att_list[day_str]['extra_hours']
+        else:
+            # Overlapping leave check
+            is_leave = False
+            for leave in leaves_list:
+                s_date = datetime.datetime.strptime(leave['start_date'], '%Y-%m-%d').date()
+                e_date = datetime.datetime.strptime(leave['end_date'], '%Y-%m-%d').date()
+                if s_date <= day_date <= e_date:
+                    is_leave = True
+                    break
+            
+            if is_leave:
+                status = 'Leave'
+            elif is_weekly_off(day_date):
+                status = 'Off'
+            elif day_str in holidays_list:
+                status = 'Holiday'
+                label = holidays_list[day_str]
+            else:
+                if day_date > today_date:
+                    status = 'Future'
+                elif day_date == today_date:
+                    status = 'Absent' # Not clocked in yet today
+                else:
+                    status = 'Absent' # Past day un-tracked
+                    
+        calendar_days.append({
+            'type': 'day',
+            'day': day,
+            'date': day_str,
+            'status': status,
+            'clock_in': clock_in_time,
+            'clock_out': clock_out_time,
+            'late_minutes': late_mins,
+            'extra_hours': extra_hrs,
+            'label': label
+        })
+        
+    # Group calendar_days into weeks of 7 cells
+    calendar_weeks = [calendar_days[i:i+7] for i in range(0, len(calendar_days), 7)]
+    
+    # 2. RESOLVE OVERVIEW TABLES BY ROLE
+    team_today = []
+    team_monthly_stats = []
+    global_today = {}
+    global_monthly_stats = {}
+    
+    # Fetch team members (Leads / Admin / HR)
+    if session['role'] == 'Lead':
+        # Today's Team status
+        cursor.execute("""
+            SELECT u.id as user_id, u.name, u.username, att.clock_in, att.clock_out, att.status as att_status, att.late_minutes, att.extra_hours
+            FROM users u
+            LEFT JOIN attendance att ON (u.id = att.user_id AND att.date = ?)
+            WHERE u.team = ? AND u.role = 'Artist'
+        """, (today_str, session['team']))
+        team_today = cursor.fetchall()
+        
+        # Monthly team statistics
+        cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
+        team_artists = cursor.fetchall()
+        
+        for artist in team_artists:
+            cursor.execute("""
+                SELECT 
+                    SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_days,
+                    SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_days,
+                    SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) as half_days,
+                    SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_days,
+                    SUM(extra_hours) as extra_hours_total,
+                    SUM(late_minutes) as late_mins_total
+                FROM attendance
+                WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+            """, (artist['id'], month_prefix))
+            stats = cursor.fetchone()
+            
+            # Count leaves approved for this artist in the selected month
+            cursor.execute("""
+                SELECT COUNT(*) FROM leaves 
+                WHERE user_id = ? AND status = 'Approved' AND strftime('%Y-%m', start_date) = ?
+            """, (artist['id'], month_prefix))
+            leaves_cnt = cursor.fetchone()[0]
+            
+            team_monthly_stats.append({
+                'id': artist['id'],
+                'name': artist['name'],
+                'username': artist['username'],
+                'present': stats['present_days'] if stats['present_days'] else 0,
+                'late': stats['late_days'] if stats['late_days'] else 0,
+                'half_day': stats['half_days'] if stats['half_days'] else 0,
+                'absent': stats['absent_days'] if stats['absent_days'] else 0,
+                'leaves': leaves_cnt,
+                'extra_hours': stats['extra_hours_total'] if stats['extra_hours_total'] else 0.0,
+                'late_minutes': stats['late_mins_total'] if stats['late_mins_total'] else 0
+            })
+            
+    elif session['role'] in ['Admin', 'HR']:
+        # Fetch today's summary for all employees in the system, grouped by team
+        cursor.execute("SELECT id, name, username, team, role FROM users ORDER BY team, role")
+        all_users = cursor.fetchall()
+        
+        for emp in all_users:
+            team = emp['team']
+            if team not in global_today:
+                global_today[team] = []
+                global_monthly_stats[team] = []
+                
+            cursor.execute("""
+                SELECT clock_in, clock_out, status, late_minutes, extra_hours 
+                FROM attendance WHERE user_id = ? AND date = ?
+            """, (emp['id'], today_str))
+            emp_att = cursor.fetchone()
+            
+            # Check leave status
+            cursor.execute("""
+                SELECT id FROM leaves 
+                WHERE user_id = ? AND ? BETWEEN start_date AND end_date AND status = 'Approved'
+            """, (emp['id'], today_str))
+            on_leave = cursor.fetchone() is not None
+            
+            resolved_status = 'Absent'
+            if emp_att:
+                resolved_status = emp_att['status']
+            elif on_leave:
+                resolved_status = 'Leave'
+            elif is_weekly_off(today_date):
+                resolved_status = 'Off'
+                
+            global_today[team].append({
+                'id': emp['id'],
+                'name': emp['name'],
+                'username': emp['username'],
+                'role': emp['role'],
+                'clock_in': emp_att['clock_in'] if emp_att else None,
+                'clock_out': emp_att['clock_out'] if emp_att else None,
+                'status': resolved_status,
+                'late_minutes': emp_att['late_minutes'] if emp_att else 0,
+                'extra_hours': emp_att['extra_hours'] if emp_att else 0.0
+            })
+            
+            # Compute monthly statistics
+            cursor.execute("""
+                SELECT 
+                    SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_days,
+                    SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_days,
+                    SUM(CASE WHEN status = 'Half Day' THEN 1 ELSE 0 END) as half_days,
+                    SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_days,
+                    SUM(extra_hours) as extra_hours_total,
+                    SUM(late_minutes) as late_mins_total
+                FROM attendance
+                WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+            """, (emp['id'], month_prefix))
+            stats = cursor.fetchone()
+            
+            cursor.execute("""
+                SELECT COUNT(*) FROM leaves 
+                WHERE user_id = ? AND status = 'Approved' AND strftime('%Y-%m', start_date) = ?
+            """, (emp['id'], month_prefix))
+            leaves_cnt = cursor.fetchone()[0]
+            
+            global_monthly_stats[team].append({
+                'id': emp['id'],
+                'name': emp['name'],
+                'username': emp['username'],
+                'role': emp['role'],
+                'present': stats['present_days'] if stats['present_days'] else 0,
+                'late': stats['late_days'] if stats['late_days'] else 0,
+                'half_day': stats['half_days'] if stats['half_days'] else 0,
+                'absent': stats['absent_days'] if stats['absent_days'] else 0,
+                'leaves': leaves_cnt,
+                'extra_hours': stats['extra_hours_total'] if stats['extra_hours_total'] else 0.0,
+                'late_minutes': stats['late_mins_total'] if stats['late_mins_total'] else 0
+            })
+
+    # Get active clock-in info today for clock-widget on attendance page
+    cursor.execute("SELECT * FROM attendance WHERE user_id = ? AND date = ?", (session['user_id'], today_str))
+    attendance_today = cursor.fetchone()
+    
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_profile = cursor.fetchone()
+
+    return render_template(
+        'attendance.html',
+        user=user_profile,
+        target_user=target_user,
+        calendar_weeks=calendar_weeks,
+        selected_year=year,
+        selected_month=month,
+        team_today=team_today,
+        team_monthly_stats=team_monthly_stats,
+        global_today=global_today,
+        global_monthly_stats=global_monthly_stats,
+        attendance_today=attendance_today,
+        today_str=today_str
+    )
+
+@app.route('/attendance/view/<int:employee_id>')
+def attendance_view_user(employee_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    if session['role'] not in ['Admin', 'HR']:
+        flash("Unauthorized to view other employee records.", "error")
+        return redirect(url_for('attendance_page'))
+        
+    return redirect(url_for('attendance_page', employee_id=employee_id))
+
 @app.route('/logout')
 def logout():
     if 'user_id' in session:
@@ -1031,7 +1428,6 @@ def logout():
     flash("You have been logged out.", "info")
     return redirect(url_for('login'))
 
-# Initialize database on startup
 init_db()
 
 if __name__ == '__main__':
