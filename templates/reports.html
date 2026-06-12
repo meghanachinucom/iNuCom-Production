@@ -79,6 +79,14 @@
                      padding:12px 18px; min-width:110px; text-align:center; box-shadow:var(--shadow-sm); }
         .stat-chip-val { font-size:22px; font-weight:800; }
         .stat-chip-lbl { font-size:10.5px; color:var(--text-secondary); text-transform:uppercase; margin-top:2px; }
+
+        /* Helper classes to avoid Jinja inside style attributes */
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .txt-green { color: var(--color-green); }
+        .txt-red { color: var(--color-red); }
+        .txt-blue { color: var(--color-blue); }
+        .txt-muted { color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -163,7 +171,7 @@
         </div>
 
         <!-- ───────────── TAB 1: MORNING ASSIGNMENT ───────────── -->
-        <div id="panel-morning" class="tab-panel" style="display:{% if tab=='morning' %}block{% else %}none{% endif %}">
+        <div id="panel-morning" class="tab-panel {% if tab=='morning' %}active{% endif %}">
             <div class="rpt-filter-bar">
                 <label>Date:</label>
                 <input type="date" id="morning-date" value="{{ rdate }}" max="{{ today_str }}"
@@ -263,7 +271,7 @@
 
 
         <!-- ───────────── TAB 2: EOD VALIDATION ───────────── -->
-        <div id="panel-eod" class="tab-panel" style="display:{% if tab=='eod' %}block{% else %}none{% endif %}">
+        <div id="panel-eod" class="tab-panel {% if tab=='eod' %}active{% endif %}">
             <div class="rpt-filter-bar">
                 <label>Date:</label>
                 <input type="date" id="eod-date" value="{{ rdate }}" max="{{ today_str }}"
@@ -309,7 +317,7 @@
                                     {{ row['assign_status'] or '—' }}
                                 </span>
                             </td>
-                            <td style="text-align:right;font-weight:700;color:{% if row['assign_status']=='Done' %}var(--color-green){% else %}var(--text-muted){% endif %};">
+                            <td class="{% if row['assign_status']=='Done' %}txt-green{% else %}txt-muted{% endif %}" style="text-align:right;font-weight:700;">
                                 {% if row['assign_status'] == 'Done' %}+{{ row['points'] or 0 }}{% else %}—{% endif %}
                             </td>
                             <td style="font-size:12px;color:var(--text-secondary);max-width:200px;">{{ row['pending_reason'] or '' }}</td>
@@ -334,7 +342,7 @@
 
 
         <!-- ───────────── TAB 3: LOGIN TIMINGS ───────────── -->
-        <div id="panel-login" class="tab-panel" style="display:{% if tab=='login' %}block{% else %}none{% endif %}">
+        <div id="panel-login" class="tab-panel {% if tab=='login' %}active{% endif %}">
             <div class="rpt-filter-bar">
                 <label>Date:</label>
                 <input type="date" id="login-date" value="{{ rdate }}" max="{{ today_str }}"
@@ -376,7 +384,7 @@
                                     {{ row['status'] or '—' }}
                                 </span>
                             </td>
-                            <td style="text-align:right;color:{% if (row['late_minutes'] or 0) > 0 %}var(--color-red){% else %}var(--color-green){% endif %};">
+                            <td class="{% if (row['late_minutes'] or 0) > 0 %}txt-red{% else %}txt-green{% endif %}" style="text-align:right;">
                                 {% if (row['late_minutes'] or 0) > 0 %}+{{ row['late_minutes'] }} min{% else %}—{% endif %}
                             </td>
                         </tr>
@@ -436,7 +444,7 @@
 
 
         <!-- ───────────── TAB 4: MONTHLY POINTS ───────────── -->
-        <div id="panel-monthly" class="tab-panel" style="display:{% if tab=='monthly' %}block{% else %}none{% endif %}">
+        <div id="panel-monthly" class="tab-panel {% if tab=='monthly' %}active{% endif %}">
             <div class="rpt-filter-bar">
                 <label>Month:</label>
                 <input type="month" id="monthly-month" value="{{ rmonth }}"
@@ -499,7 +507,7 @@
                                 <div style="font-size:10px;color:var(--text-muted);">@{{ row['username'] }}</div>
                             </td>
                             {% for wpts in row['week_pts'] %}
-                            <td style="text-align:right;color:{% if wpts > 0 %}var(--color-blue){% else %}var(--text-muted){% endif %};">
+                            <td class="{% if wpts > 0 %}txt-blue{% else %}txt-muted{% endif %}" style="text-align:right;">
                                 {{ wpts if wpts > 0 else '—' }}
                             </td>
                             {% endfor %}
