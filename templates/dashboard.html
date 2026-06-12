@@ -224,10 +224,10 @@
             <!-- View Mode Switcher Tab -->
             {% if session['role'] != 'HR' %}
             <div class="view-switcher-tabs" style="margin-bottom: 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 16px;">
-                <a href="{{ url_for('dashboard', view='overview', project_id=selected_project_id) }}" class="tab-link {% if view_tab == 'overview' %}active{% endif %}" style="padding: 10px 16px; font-weight: 600; font-size: 14px; text-decoration: none; color: {% if view_tab == 'overview' %}var(--color-blue){% else %}var(--text-secondary){% endif %}; border-bottom: 2px solid {% if view_tab == 'overview' %}var(--color-blue){% else %}transparent{% endif %};">
+                <a href="{{ url_for('dashboard', view='overview', project_id=selected_project_id) }}" class="tab-link {% if view_tab == 'overview' %}tab-active{% endif %}">
                     Overview Dashboard
                 </a>
-                <a href="{{ url_for('dashboard', view='pipeline', project_id=selected_project_id, chapter_id=selected_chapter_id) }}" class="tab-link {% if view_tab == 'pipeline' %}active{% endif %}" style="padding: 10px 16px; font-weight: 600; font-size: 14px; text-decoration: none; color: {% if view_tab == 'pipeline' %}var(--color-blue){% else %}var(--text-secondary){% endif %}; border-bottom: 2px solid {% if view_tab == 'pipeline' %}var(--color-blue){% else %}transparent{% endif %};">
+                <a href="{{ url_for('dashboard', view='pipeline', project_id=selected_project_id, chapter_id=selected_chapter_id) }}" class="tab-link {% if view_tab == 'pipeline' %}tab-active{% endif %}">
                     Pipeline Sheet
                 </a>
             </div>
@@ -683,9 +683,9 @@
                                             {{ stage }}
                                         {% endif %}
                                     </div>
-                                    <div style="font-size: 24px; font-weight: 800; color: {% if pipeline_flow_counts[stage] > 0 %}var(--color-blue){% else %}var(--text-muted){% endif %};">
-                                        {{ pipeline_flow_counts[stage] }}
-                                    </div>
+                                    <div class="pipeline-flow-count-val {% if pipeline_flow_counts[stage] > 0 %}active{% else %}muted{% endif %}" style="font-size: 24px; font-weight: 800;">
+                                         {{ pipeline_flow_counts[stage] }}
+                                     </div>
                                 </div>
                                 {% if not loop.last %}
                                     <div style="font-size: 18px; color: #cbd5e1; font-weight: bold; user-select: none; padding: 0 2px;">➔</div>
@@ -827,146 +827,163 @@
                     {% endif %}
                 </div>
                 
+                <script id="stage-completion-data" type="application/json">{{ stage_completion_data | tojson }}</script>
+                <script id="overall-status-counts" type="application/json">{{ overall_status_counts | tojson }}</script>
+                <script id="velocity-data" type="application/json">{{ velocity_data | tojson }}</script>
+                <script id="performance-data" type="application/json">{{ performance_data | tojson }}</script>
+
                 <!-- Chart JS scripts using local static js library -->
                 <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
                 <script>
-                // 1. Stages Progress Chart
-                const stageLabels = [];
-                const stageDone = [];
-                const stageWip = [];
-                const stageYts = [];
-                const stageReview = [];
-                const stageRtk = [];
-                
-                {% for sc in stage_completion_data %}
-                    stageLabels.push("{{ sc.stage }}");
-                    stageDone.push({{ sc.Done }});
-                    stageWip.push({{ sc.Wip }});
-                    stageYts.push({{ sc.Yts }});
-                    stageReview.push({{ sc.Review }});
-                    stageRtk.push({{ sc.Rtk }});
-                {% endfor %}
-                
-                new Chart(document.getElementById('stagesChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: stageLabels,
-                        datasets: [
-                            { label: 'Done', data: stageDone, backgroundColor: '#16a34a' },
-                            { label: 'Wip', data: stageWip, backgroundColor: '#2563eb' },
-                            { label: 'Review', data: stageReview, backgroundColor: '#d97706' },
-                            { label: 'Rework', data: stageRtk, backgroundColor: '#dc2626' },
-                            { label: 'Yet to Start', data: stageYts, backgroundColor: '#94a3b8' }
-                        ]
-                    },
-                    options: {
-                        indexAxis: 'y',
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'bottom' }
+                (function() {
+                    const rawStageCompletionData = document.getElementById('stage-completion-data');
+                    const rawOverallStatusCounts = document.getElementById('overall-status-counts');
+                    const rawVelocityData = document.getElementById('velocity-data');
+                    const rawPerformanceData = document.getElementById('performance-data');
+
+                    if (!rawStageCompletionData || !rawOverallStatusCounts || !rawVelocityData || !rawPerformanceData) {
+                        return;
+                    }
+
+                    const stageCompletionData = JSON.parse(rawStageCompletionData.textContent);
+                    const overallStatusCounts = JSON.parse(rawOverallStatusCounts.textContent);
+                    const velocityData = JSON.parse(rawVelocityData.textContent);
+                    const performanceData = JSON.parse(rawPerformanceData.textContent);
+
+                    // 1. Stages Progress Chart
+                    const stageLabels = [];
+                    const stageDone = [];
+                    const stageWip = [];
+                    const stageYts = [];
+                    const stageReview = [];
+                    const stageRtk = [];
+                    
+                    stageCompletionData.forEach(function(sc) {
+                        stageLabels.push(sc.stage);
+                        stageDone.push(sc.Done);
+                        stageWip.push(sc.Wip);
+                        stageYts.push(sc.Yts);
+                        stageReview.push(sc.Review);
+                        stageRtk.push(sc.Rtk);
+                    });
+                    
+                    new Chart(document.getElementById('stagesChart'), {
+                        type: 'bar',
+                        data: {
+                            labels: stageLabels,
+                            datasets: [
+                                { label: 'Done', data: stageDone, backgroundColor: '#16a34a' },
+                                { label: 'Wip', data: stageWip, backgroundColor: '#2563eb' },
+                                { label: 'Review', data: stageReview, backgroundColor: '#d97706' },
+                                { label: 'Rework', data: stageRtk, backgroundColor: '#dc2626' },
+                                { label: 'Yet to Start', data: stageYts, backgroundColor: '#94a3b8' }
+                            ]
                         },
-                        scales: {
-                            x: { stacked: true },
-                            y: { stacked: true }
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom' }
+                            },
+                            scales: {
+                                x: { stacked: true },
+                                y: { stacked: true }
+                            }
                         }
-                    }
-                });
-                
-                // 2. Overall Status Breakdown Chart
-                const overallDone = {{ overall_status_counts['Done'] }};
-                const overallWip = {{ overall_status_counts['Wip'] }};
-                const overallReview = {{ overall_status_counts['Review'] }};
-                const overallRtk = {{ overall_status_counts['Rtk'] }};
-                const overallYts = {{ overall_status_counts['Yts'] }};
-                
-                new Chart(document.getElementById('statusChart'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Done', 'Wip', 'Review', 'Rework', 'Yet to Start'],
-                        datasets: [{
-                            data: [overallDone, overallWip, overallReview, overallRtk, overallYts],
-                            backgroundColor: ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#94a3b8']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'bottom' }
-                        }
-                    }
-                });
-                
-                // 3. Weekly Completions Velocity Chart
-                const velocityLabels = [];
-                const velocityCounts = [];
-                {% for v in velocity_data %}
-                    velocityLabels.push("{{ v.label }}");
-                    velocityCounts.push({{ v.count }});
-                {% endfor %}
-                
-                new Chart(document.getElementById('velocityChart'), {
-                    type: 'line',
-                    data: {
-                        labels: velocityLabels,
-                        datasets: [{
-                            label: 'Tasks Completed',
-                            data: velocityCounts,
-                            borderColor: '#2563eb',
-                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                            fill: true,
-                            tension: 0.3
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }
+                    });
+                    
+                    // 2. Overall Status Breakdown Chart
+                    const overallDone = overallStatusCounts['Done'] || 0;
+                    const overallWip = overallStatusCounts['Wip'] || 0;
+                    const overallReview = overallStatusCounts['Review'] || 0;
+                    const overallRtk = overallStatusCounts['Rtk'] || 0;
+                    const overallYts = overallStatusCounts['Yts'] || 0;
+                    
+                    new Chart(document.getElementById('statusChart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Done', 'Wip', 'Review', 'Rework', 'Yet to Start'],
+                            datasets: [{
+                                data: [overallDone, overallWip, overallReview, overallRtk, overallYts],
+                                backgroundColor: ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#94a3b8']
+                            }]
                         },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom' }
+                            }
                         }
-                    }
-                });
-                
-                // 4. Performance Chart (Earned vs Target)
-                const performanceNames = [];
-                const performanceEarned = [];
-                const performanceTarget = [];
-                {% for p in performance_data %}
-                    performanceNames.push("{{ p.name }}");
-                    performanceEarned.push({{ p.earned }});
-                    performanceTarget.push({{ p.target }});
-                {% endfor %}
-                
-                new Chart(document.getElementById('performanceChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: performanceNames,
-                        datasets: [
-                            { label: 'Earned Points', data: performanceEarned, backgroundColor: '#2563eb' },
-                            { label: 'Target Points', data: performanceTarget, backgroundColor: '#e2e8f0', borderWidth: 1, borderColor: '#cbd5e1' }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'bottom' }
+                    });
+                    
+                    // 3. Weekly Completions Velocity Chart
+                    const velocityLabels = [];
+                    const velocityCounts = [];
+                    velocityData.forEach(function(v) {
+                        velocityLabels.push(v.label);
+                        velocityCounts.push(v.count);
+                    });
+                    
+                    new Chart(document.getElementById('velocityChart'), {
+                        type: 'line',
+                        data: {
+                            labels: velocityLabels,
+                            datasets: [{
+                                label: 'Tasks Completed',
+                                data: velocityCounts,
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            }]
                         },
-                        scales: {
-                            y: { beginAtZero: true }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                            }
                         }
-                    }
-                });
+                    });
+                    
+                    // 4. Performance Chart (Earned vs Target)
+                    const performanceNames = [];
+                    const performanceEarned = [];
+                    const performanceTarget = [];
+                    performanceData.forEach(function(p) {
+                        performanceNames.push(p.name);
+                        performanceEarned.push(p.earned);
+                        performanceTarget.push(p.target);
+                    });
+                    
+                    new Chart(document.getElementById('performanceChart'), {
+                        type: 'bar',
+                        data: {
+                            labels: performanceNames,
+                            datasets: [
+                                { label: 'Earned Points', data: performanceEarned, backgroundColor: '#2563eb' },
+                                { label: 'Target Points', data: performanceTarget, backgroundColor: '#e2e8f0', borderWidth: 1, borderColor: '#cbd5e1' }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom' }
+                            },
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                })();
                 </script>
             {% endif %}
-        </main>
-    </div>
-</body>
-</html>
         </main>
     </div>
 </body>

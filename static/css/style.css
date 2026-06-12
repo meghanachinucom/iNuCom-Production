@@ -1451,5 +1451,27 @@ body {
     text-decoration: underline;
 }
 
+/* Dashboard Tab Styling */
+.view-switcher-tabs .tab-link {
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+}
+.view-switcher-tabs .tab-link.tab-active {
+    color: var(--color-blue);
+    border-bottom: 2px solid var(--color-blue);
+}
+
+/* Pipeline Flow Tracker stage counts */
+.pipeline-flow-count-val.active {
+    color: var(--color-blue);
+}
+.pipeline-flow-count-val.muted {
+    color: var(--text-muted);
+}
+
 
 
