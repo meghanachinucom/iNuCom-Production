@@ -30,19 +30,13 @@
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}">
-                        <span>Dashboard Overview</span>
-                    </a>
+                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
-                    <a href="{{ url_for('points_page') }}">
-                        <span>Points & Targets</span>
-                    </a>
+                    <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
-                    <a href="{{ url_for('attendance_page') }}">
-                        <span>Attendance Tracker</span>
-                    </a>
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
@@ -55,32 +49,27 @@
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
                 {% endif %}
-                
-                <!-- Role-Based Menus -->
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
                 {% if session['role'] == 'Admin' %}
-                    <li class="menu-section-title">Admin Management</li>
-                    <li class="menu-item"><a href="#"><span>Project Setup</span></a></li>
-                    <li class="menu-item"><a href="#"><span>User Accounts</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Activity Logs</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Global Settings</span></a></li>
+                <li class="menu-section-title">Admin</li>
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+                </li>
                 {% elif session['role'] == 'HR' %}
-                    <li class="menu-section-title">HR Management</li>
-                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Attendance Roll</span></a></li>
-                    <li class="menu-item"><a href="{{ url_for('leaves_page') }}"><span>Leave Approvals</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Salary Panels</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Holiday Settings</span></a></li>
-                {% elif session['role'] == 'Lead' %}
-                    <li class="menu-section-title">Team Management</li>
-                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Team Overview</span></a></li>
-                    <li class="menu-item"><a href="#"><span>EOD Validations</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Task Allocations</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Award Team Points</span></a></li>
-                {% elif session['role'] == 'Artist' %}
-                    <li class="menu-section-title">My Workspace</li>
-                    <li class="menu-item"><a href="#"><span>My Tasks</span></a></li>
-                    <li class="menu-item"><a href="#"><span>EOD Submission</span></a></li>
-                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Clock-in / Clock-out</span></a></li>
-                    <li class="menu-item"><a href="#"><span>My Points Board</span></a></li>
+                <li class="menu-section-title">HR Management</li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
                 {% endif %}
             </ul>
             

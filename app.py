@@ -11,6 +11,14 @@ SCHEMA_FILE = 'schema.sql'
 app = Flask(__name__)
 app.secret_key = 'inucom_production_tracker_secret_key_LAN_offline_2026'
 
+@app.template_filter('strftime')
+def _strftime_filter(value, fmt='%A'):
+    """Format a date string (YYYY-MM-DD) with strftime."""
+    try:
+        return datetime.datetime.strptime(value, '%Y-%m-%d').strftime(fmt)
+    except Exception:
+        return value
+
 # Pipeline Constants
 PIPELINE_STAGES = [
     'Content',
@@ -151,6 +159,65 @@ def init_db():
             conn.commit()
             conn.close()
             print("Migrated: permission_requests table created.")
+
+        # Runtime migration: ensure notifications table exists (Layer 10)
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM notifications LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = sqlite3.connect(DATABASE)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT,
+                    type TEXT DEFAULT 'info',
+                    is_read INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """)
+            conn.commit()
+            conn.close()
+            print("Migrated: notifications table created.")
+
+        # Runtime migration: ensure activity_log table exists (Layer 10)
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM activity_log LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = sqlite3.connect(DATABASE)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                )
+            """)
+            conn.commit()
+            conn.close()
+            print("Migrated: activity_log table created.")
+
+        # Runtime migration: ensure submit_time column exists in daily_assignments (Layer 9)
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT submit_time FROM daily_assignments LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = sqlite3.connect(DATABASE)
+            conn.execute("ALTER TABLE daily_assignments ADD COLUMN submit_time TEXT")
+            conn.commit()
+            conn.close()
+            print("Migrated: daily_assignments.submit_time column added.")
 
     if not db_exists or schema_needs_update:
         if db_exists:
@@ -366,6 +433,9 @@ def dashboard():
         
     db = get_db()
     cursor = db.cursor()
+    
+    # Run EOD validations check
+    check_and_push_eod_reminders(db, session['user_id'])
     
     # Get user profile
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
@@ -670,6 +740,9 @@ def assign_file():
                     VALUES (?, ?, ?, ?, ?, 'Pending')
                 """, (artist_id, today_str, file_id, f"{step_name}: {f_info['name']}", points))
                 
+        if artist_id:
+            _push_notification(db, artist_id, "Task Assigned", f"You have been assigned: '{f_info['name']}' ({step_name}) with {points} points.", "task")
+            
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Assign File', ?)",
                        (session['user_id'], f"Assigned '{f_info['name']}' [{step_name}] to {artist_name} (Points: {points})"))
         db.commit()
@@ -725,13 +798,23 @@ def update_status():
         WHERE file_id = ? AND step_name = ?
     """, (status, file_id, step_name))
     
+    submit_time_val = None
+    if status == 'Done':
+        submit_time_val = datetime.datetime.now().strftime('%H:%M:%S')
+
     cursor.execute("""
         UPDATE daily_assignments 
-        SET status = 'Pending' 
+        SET status = 'Pending', submit_time = ?
         WHERE file_id = ? AND user_id = ? AND date = ?
-    """, (file_id, pipeline_step['assigned_to'], today_str))
+    """, (submit_time_val, file_id, pipeline_step['assigned_to'], today_str))
     
     log_details = f"Artist updated status of '{pipeline_step['file_name']}' [{step_name}] to '{status}'"
+    
+    if status == 'Done' and not (is_lead or is_admin):
+        cursor.execute("SELECT id FROM users WHERE role = 'Lead' AND team = ?", (target_team,))
+        leads = cursor.fetchall()
+        for lead in leads:
+            _push_notification(db, lead['id'], "Validation Required", f"Artist {session['name']} marked '{pipeline_step['file_name']}' [{step_name}] Done. Please validate.", "approval")
     
     if status == 'Done' and (is_lead or is_admin):
         cursor.execute("""
@@ -840,6 +923,7 @@ def validate_assignment():
                 
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Done', ?)",
                        (session['user_id'], f"Validated EOD Task Done for {da['artist_name']} on '{da['file_name']}'"))
+        _push_notification(db, da['user_id'], "Task Completed", f"Your task '{da['file_name']}' has been validated as Done. Points credited!", "task")
         db.commit()
         flash(f"Task for {da['artist_name']} validated as completed. Points credited!", "success")
         
@@ -860,6 +944,7 @@ def validate_assignment():
         
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Pending', ?)",
                        (session['user_id'], f"Carried forward task for {da['artist_name']} on '{da['file_name']}' to tomorrow. Reason: {remarks}"))
+        _push_notification(db, da['user_id'], "Task Pending", f"Your task '{da['file_name']}' has been marked Pending. Reason: {remarks}", "task")
         db.commit()
         flash(f"Task for {da['artist_name']} marked pending and carried forward to tomorrow.", "info")
         
@@ -1606,6 +1691,8 @@ def leaves_page():
                     INSERT INTO activity_log (user_id, action, details)
                     VALUES (?, 'Leave Request', ?)
                 """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} ({requested_days} days) - Pending approval chain {chain_json}"))
+                
+                _push_notification(db, chain[0], "Pending Approval Waiting", f"Leave request from {session['name']} needs your approval.", "approval")
                 db.commit()
                 flash("Leave request submitted successfully, pending approval chain.", "success")
                 
@@ -1764,6 +1851,7 @@ def approve_leave(approval_id):
                     SET status = 'Approved', approved_by = ?
                     WHERE id = ?
                 """, (session['user_id'], approval['reference_id']))
+                _push_notification(db, approval['requester_id'], "Leave Approved", f"Your leave request has been approved.", "leave")
                 
             cursor.execute("""
                 INSERT INTO activity_log (user_id, action, details)
@@ -1783,6 +1871,7 @@ def approve_leave(approval_id):
                 VALUES (?, 'Approve Request', ?)
             """, (session['user_id'], f"Approved {approval['type']} ID {approval['reference_id']} (Advanced to step {next_idx + 1})."))
             
+            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Leave request needs your approval.", "approval")
             flash("Request approved and advanced to next step in the chain.", "success")
             
         db.commit()
@@ -1832,6 +1921,7 @@ def reject_leave(approval_id):
                 SET status = 'Rejected'
                 WHERE id = ?
             """, (approval['reference_id'],))
+            _push_notification(db, approval['requester_id'], "Leave Rejected", f"Your leave request has been rejected.", "leave")
             
         cursor.execute("""
             INSERT INTO activity_log (user_id, action, details)
@@ -1966,6 +2056,7 @@ def permissions_page():
                 """, (session['user_id'], pr_id, chain_json, details_str))
                 cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Permission Request', ?)",
                                (session['user_id'], details_str))
+                _push_notification(db, chain[0], "Pending Approval Waiting", f"Permission request from {session['name']} needs your approval.", "approval")
                 db.commit()
                 flash("Permission request submitted — pending approval chain.", "success")
         except Exception as e:
@@ -2095,11 +2186,13 @@ def approve_permission(approval_id):
             """, (session['user_id'], approval['reference_id']))
             cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Approve Permission', ?)",
                            (session['user_id'], f"Approved Permission ID {approval['reference_id']} (Final)."))
+            _push_notification(db, approval['requester_id'], "Permission Approved", f"Your permission request has been approved.", "approval")
             flash("Permission approved and finalized!", "success")
         else:
             cursor.execute("UPDATE approvals SET current_index = ? WHERE id = ?", (next_idx, approval_id))
             cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Approve Permission', ?)",
                            (session['user_id'], f"Approved Permission ID {approval['reference_id']} — advanced to step {next_idx+1}."))
+            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Permission request needs your approval.", "approval")
             flash("Permission approved — advanced to next step in chain.", "success")
         db.commit()
     except Exception as e:
@@ -2142,6 +2235,7 @@ def reject_permission(approval_id):
         cursor.execute("UPDATE permission_requests SET status = 'Rejected' WHERE id = ?", (approval['reference_id'],))
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Reject Permission', ?)",
                        (session['user_id'], f"Rejected Permission ID {approval['reference_id']} — chain terminated."))
+        _push_notification(db, approval['requester_id'], "Permission Rejected", f"Your permission request has been rejected.", "approval")
         db.commit()
         flash("Permission request rejected.", "success")
     except Exception as e:
@@ -2187,6 +2281,623 @@ def compensation_page():
         filter_team=filter_team,
         today_str=today_str,
     )
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYER 9: ADMIN REPORTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from flask import send_file, Response
+
+_HDR_FILL   = PatternFill("solid", fgColor="1E3A5F")
+_HDR_FONT   = Font(color="FFFFFF", bold=True, size=10)
+_SUBTTL_FILL= PatternFill("solid", fgColor="D6E4F7")
+_SUBTTL_FONT= Font(bold=True, size=10)
+_ALT_FILL   = PatternFill("solid", fgColor="F7FAFF")
+_THIN       = Side(style='thin', color="B0BEC5")
+_BORDER     = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+
+def _xl_header_row(ws, row, cols):
+    for c, val in enumerate(cols, 1):
+        cell = ws.cell(row=row, column=c, value=val)
+        cell.fill = _HDR_FILL; cell.font = _HDR_FONT
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell.border = _BORDER
+
+def _xl_data_row(ws, row, vals, fill=None, bold=False):
+    for c, v in enumerate(vals, 1):
+        cell = ws.cell(row=row, column=c, value=v)
+        cell.border = _BORDER
+        cell.alignment = Alignment(vertical='center', wrap_text=True)
+        if fill: cell.fill = fill
+        if bold: cell.font = Font(bold=True, size=10)
+
+def _xl_autowidth(ws):
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            try:
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            except: pass
+        ws.column_dimensions[col_letter].width = min(max(max_len + 2, 10), 40)
+
+# ── Report data helpers ──────────────────────────────────────────────────────
+
+def _report_morning(db, date_str):
+    """Morning Assignment: per artist per team, what was assigned on date_str."""
+    c = db.cursor()
+    c.execute("""
+        SELECT da.id, da.date, da.status as assign_status, da.points, da.task_description,
+               da.submit_time, f.name as file_name,
+               u.name as artist_name, u.team,
+               fp.step_name as stage
+        FROM daily_assignments da
+        JOIN users u ON da.user_id = u.id
+        LEFT JOIN files f ON da.file_id = f.id
+        LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
+        WHERE da.date = ?
+        ORDER BY u.team, u.name, da.id
+    """, (date_str,))
+    rows = c.fetchall()
+    # Find artists who had NO tasks
+    c.execute("SELECT id, name, team FROM users WHERE role = 'Artist' ORDER BY team, name")
+    all_artists = c.fetchall()
+    assigned_ids = {r['artist_name'] for r in rows}
+    no_task = [a for a in all_artists if a['name'] not in assigned_ids]
+    return [dict(r) for r in rows], [dict(a) for a in no_task]
+
+def _report_eod(db, date_str):
+    """EOD Validation: Done/Pending per file per team on date_str."""
+    c = db.cursor()
+    c.execute("""
+        SELECT da.id, da.status as assign_status, da.points, da.task_description,
+               da.remarks as pending_reason, f.name as file_name,
+               u.name as artist_name, u.team,
+               fp.step_name as stage
+        FROM daily_assignments da
+        JOIN users u ON da.user_id = u.id
+        LEFT JOIN files f ON da.file_id = f.id
+        LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
+        WHERE da.date = ?
+        ORDER BY u.team, da.status, u.name
+    """, (date_str,))
+    return [dict(r) for r in c.fetchall()]
+
+def _report_login(db, date_str):
+    """Login Timings: per employee on date_str."""
+    c = db.cursor()
+    c.execute("""
+        SELECT u.name, u.team, u.role,
+               a.clock_in, a.clock_out, a.status,
+               a.late_minutes, a.total_hours, a.extra_hours
+        FROM attendance a
+        JOIN users u ON a.user_id = u.id
+        WHERE a.date = ?
+        ORDER BY u.team, u.name
+    """, (date_str,))
+    day_rows = [dict(r) for r in c.fetchall()]
+    # Weekly grid: Mon–Sun of the week containing date_str
+    try:
+        d = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+    except:
+        d = datetime.date.today()
+    monday = d - datetime.timedelta(days=d.weekday())
+    week_days = [monday + datetime.timedelta(days=i) for i in range(7)]
+    c.execute("SELECT id, name, team FROM users ORDER BY team, name")
+    all_users = c.fetchall()
+    weekly = {}
+    for u in all_users:
+        weekly[u['name']] = {'team': u['team'], 'days': {}}
+        for wd in week_days:
+            c.execute("SELECT status, clock_in, late_minutes FROM attendance WHERE user_id=? AND date=?",
+                      (u['id'], wd.strftime('%Y-%m-%d')))
+            rec = c.fetchone()
+            weekly[u['name']]['days'][wd.strftime('%a %d')] = dict(rec) if rec else None
+    return day_rows, weekly, [wd.strftime('%a %d') for wd in week_days]
+
+def _report_monthly_points(db, month_str):
+    """Monthly Points: per employee breakdown, earned vs target."""
+    c = db.cursor()
+    # Get all weeks in month
+    try:
+        year, mon = map(int, month_str.split('-'))
+    except:
+        today = datetime.date.today()
+        year, mon = today.year, today.month
+    _, last_day = calendar.monthrange(year, mon)
+    month_start = datetime.date(year, mon, 1)
+    month_end   = datetime.date(year, mon, last_day)
+    # Split into weeks
+    weeks = []
+    wstart = month_start
+    while wstart <= month_end:
+        wend = min(wstart + datetime.timedelta(days=6), month_end)
+        weeks.append((wstart, wend))
+        wstart = wend + datetime.timedelta(days=1)
+
+    c.execute("SELECT id, name, username, team FROM users ORDER BY team, name")
+    all_users = c.fetchall()
+    results = []
+    for u in all_users:
+        # Target
+        c.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?",
+                  (u['id'], month_str))
+        tgt_row = c.fetchone()
+        target = tgt_row['target_points'] if tgt_row else 0
+        # Weekly breakdown
+        week_pts = []
+        total_earned = 0
+        for ws_, we_ in weeks:
+            c.execute("""
+                SELECT COALESCE(SUM(points),0) FROM points
+                WHERE user_id=? AND date>=? AND date<=?
+            """, (u['id'], ws_.strftime('%Y-%m-%d'), we_.strftime('%Y-%m-%d')))
+            wpts = c.fetchone()[0] or 0
+            week_pts.append(wpts)
+            total_earned += wpts
+        pct = round(total_earned / target * 100, 1) if target > 0 else 0
+        results.append({
+            'name': u['name'], 'username': u['username'], 'team': u['team'],
+            'target': target, 'earned': total_earned,
+            'pct': pct, 'week_pts': week_pts,
+            'salary_impact': 'On Track' if pct >= 80 else ('At Risk' if pct >= 50 else 'Below Target'),
+        })
+    return results, weeks
+
+# ── Report page ──────────────────────────────────────────────────────────────
+
+@app.route('/reports')
+def reports_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'Admin':
+        flash("Reports are Admin-only.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE id=?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    today_str   = datetime.date.today().strftime('%Y-%m-%d')
+    month_str   = datetime.date.today().strftime('%Y-%m')
+    tab         = request.args.get('tab', 'morning')
+    rdate       = request.args.get('date', today_str)
+    rmonth      = request.args.get('month', month_str)
+
+    morning_rows, no_task_artists = [], []
+    eod_rows = []
+    login_day, login_weekly, week_labels = [], {}, []
+    monthly_rows, monthly_weeks = [], []
+
+    if tab == 'morning':
+        morning_rows, no_task_artists = _report_morning(db, rdate)
+    elif tab == 'eod':
+        eod_rows = _report_eod(db, rdate)
+    elif tab == 'login':
+        login_day, login_weekly, week_labels = _report_login(db, rdate)
+    elif tab == 'monthly':
+        monthly_rows, monthly_weeks = _report_monthly_points(db, rmonth)
+
+    return render_template('reports.html',
+        user=user_info, tab=tab, rdate=rdate, rmonth=rmonth,
+        morning_rows=morning_rows, no_task_artists=no_task_artists,
+        eod_rows=eod_rows,
+        login_day=login_day, login_weekly=login_weekly, week_labels=week_labels,
+        monthly_rows=monthly_rows, monthly_weeks=monthly_weeks,
+        today_str=today_str, month_str=month_str,
+    )
+
+@app.route('/reports/export/<tab>')
+def reports_export(tab):
+    if 'user_id' not in session or session['role'] != 'Admin':
+        return redirect(url_for('login'))
+
+    db = get_db()
+    rdate  = request.args.get('date', datetime.date.today().strftime('%Y-%m-%d'))
+    rmonth = request.args.get('month', datetime.date.today().strftime('%Y-%m'))
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)  # remove default sheet
+
+    if tab == 'morning':
+        rows, no_task = _report_morning(db, rdate)
+        ws = wb.create_sheet("Morning Assignment")
+        ws.append([f"Morning Assignment Report — {rdate}"])
+        ws['A1'].font = Font(bold=True, size=13)
+        ws.merge_cells('A1:G1')
+        ws.append([])
+        _xl_header_row(ws, 3, ['Team','Artist','File','Stage','Points','Assign Status','Submit Time'])
+        r = 4
+        cur_team = None; team_pts = 0; grand = 0
+        for row in rows:
+            if cur_team and cur_team != row['team']:
+                _xl_data_row(ws, r, [f'{cur_team} Subtotal','','','','', str(team_pts),''], _SUBTTL_FILL, True)
+                r += 1; team_pts = 0
+            cur_team = row['team']
+            team_pts += row['points'] or 0; grand += row['points'] or 0
+            _xl_data_row(ws, r, [row['team'], row['artist_name'],
+                row['file_name'] or row['task_description'], row['stage'] or '',
+                row['points'] or 0, row['assign_status'] or '',
+                row['submit_time'] or ''])
+            r += 1
+        if cur_team:
+            _xl_data_row(ws, r, [f'{cur_team} Subtotal','','','','',str(team_pts),''], _SUBTTL_FILL, True)
+            r += 1
+        _xl_data_row(ws, r, ['GRAND TOTAL','','','','',str(grand),''], _SUBTTL_FILL, True)
+        r += 2
+        if no_task:
+            ws.cell(r, 1, '⚠ Artists with NO tasks:').font = Font(bold=True, color='CC0000')
+            r += 1
+            for a in no_task:
+                _xl_data_row(ws, r, [a['team'], a['name'], 'NO TASKS ASSIGNED','','','',''])
+                r += 1
+        _xl_autowidth(ws)
+        fname = f"MorningAssignment_{rdate}.xlsx"
+
+    elif tab == 'eod':
+        rows = _report_eod(db, rdate)
+        ws = wb.create_sheet("EOD Validation")
+        ws.append([f"EOD Validation Report — {rdate}"])
+        ws['A1'].font = Font(bold=True, size=13)
+        ws.merge_cells('A1:G1')
+        ws.append([])
+        _xl_header_row(ws, 3, ['Team','Artist','File','Stage','Status','Points Credited','Pending Reason'])
+        r = 4
+        done_total = 0; pend_total = 0
+        for row in rows:
+            pts = row['points'] if row['assign_status'] == 'Done' else 0
+            done_total += 1 if row['assign_status'] == 'Done' else 0
+            pend_total += 1 if row['assign_status'] == 'Pending' else 0
+            _xl_data_row(ws, r, [row['team'], row['artist_name'],
+                row['file_name'] or '', row['stage'] or '',
+                row['assign_status'] or '', pts,
+                row['pending_reason'] or ''])
+            r += 1
+        _xl_data_row(ws, r, ['TOTALS','','','','Done: '+str(done_total),'Pending: '+str(pend_total),''], _SUBTTL_FILL, True)
+        _xl_autowidth(ws)
+        fname = f"EODValidation_{rdate}.xlsx"
+
+    elif tab == 'login':
+        day_rows, weekly, week_labels = _report_login(db, rdate)
+        # Sheet 1: daily
+        ws1 = wb.create_sheet("Login Timings")
+        ws1.append([f"Login Timings — {rdate}"])
+        ws1['A1'].font = Font(bold=True, size=13); ws1.merge_cells('A1:H1'); ws1.append([])
+        _xl_header_row(ws1, 3, ['Team','Name','Role','Clock In','Clock Out','Total Hours','Status','Late By (min)'])
+        r = 4
+        for row in day_rows:
+            _xl_data_row(ws1, r, [row['team'], row['name'], row['role'],
+                row['clock_in'] or '', row['clock_out'] or '',
+                round(row['total_hours'] or 0, 2), row['status'] or '',
+                row['late_minutes'] or 0])
+            r += 1
+        _xl_autowidth(ws1)
+        # Sheet 2: weekly grid
+        ws2 = wb.create_sheet("Weekly Overview")
+        header = ['Employee','Team'] + week_labels
+        _xl_header_row(ws2, 1, header)
+        r2 = 2
+        for emp, info in weekly.items():
+            row_vals = [emp, info['team']]
+            for lbl in week_labels:
+                d = info['days'].get(lbl)
+                row_vals.append(d['status'] if d else '–')
+            _xl_data_row(ws2, r2, row_vals)
+            r2 += 1
+        _xl_autowidth(ws2)
+        fname = f"LoginTimings_{rdate}.xlsx"
+
+    elif tab == 'monthly':
+        rows, weeks = _report_monthly_points(db, rmonth)
+        ws = wb.create_sheet("Monthly Points")
+        week_hdrs = [f"Wk {i+1}" for i in range(len(weeks))]
+        all_cols = ['Team','Employee'] + week_hdrs + ['Total Earned','Target','% Done','Salary Impact']
+        ws.append([f"Monthly Points Report — {rmonth}"])
+        ws['A1'].font = Font(bold=True, size=13)
+        ws.merge_cells(f'A1:{get_column_letter(len(all_cols))}1')
+        ws.append([])
+        _xl_header_row(ws, 3, all_cols)
+        r = 4
+        for row in rows:
+            vals = [row['team'], row['name']] + row['week_pts'] + \
+                   [row['earned'], row['target'], f"{row['pct']}%", row['salary_impact']]
+            _xl_data_row(ws, r, vals)
+            r += 1
+        _xl_autowidth(ws)
+        fname = f"MonthlyPoints_{rmonth}.xlsx"
+    else:
+        return redirect(url_for('reports_page'))
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYER 10: HOLIDAYS
+# ─────────────────────────────────────────────────────────────────────────────
+
+INDIA_HOLIDAYS_2026 = [
+    ("2026-01-14", "Sankranti"),
+    ("2026-01-26", "Republic Day"),
+    ("2026-03-17", "Holi"),
+    ("2026-03-30", "Ram Navami"),
+    ("2026-04-02", "Good Friday"),
+    ("2026-04-14", "Ambedkar Jayanti"),
+    ("2026-04-24", "Ugadi"),
+    ("2026-05-01", "Labour Day"),
+    ("2026-06-05", "Eid ul-Adha"),
+    ("2026-08-15", "Independence Day"),
+    ("2026-08-26", "Janmashtami"),
+    ("2026-09-02", "Ganesh Chaturthi"),
+    ("2026-10-02", "Gandhi Jayanti / Navratri"),
+    ("2026-10-20", "Dussehra"),
+    ("2026-11-09", "Diwali"),
+    ("2026-11-10", "Diwali"),
+    ("2026-11-15", "Guru Nanak Jayanti"),
+    ("2026-12-25", "Christmas Day"),
+]
+
+def _seed_holidays(db):
+    c = db.cursor()
+    c.execute("SELECT COUNT(*) FROM holidays")
+    cnt = c.fetchone()[0]
+    if cnt == 0:
+        for date_str, name in INDIA_HOLIDAYS_2026:
+            try:
+                c.execute("INSERT INTO holidays (date, name) VALUES (?, ?)", (date_str, name))
+            except Exception:
+                pass
+        db.commit()
+
+@app.route('/holidays', methods=['GET', 'POST'])
+def holidays_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] not in ['Admin', 'HR']:
+        flash("Access restricted to HR and Admin.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+    _seed_holidays(db)
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'add')
+        if action == 'add':
+            h_date = request.form.get('h_date', '').strip()
+            h_name = request.form.get('h_name', '').strip()
+            if h_date and h_name:
+                try:
+                    cursor.execute("INSERT INTO holidays (date, name) VALUES (?, ?)", (h_date, h_name))
+                    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?,?,?)",
+                                   (session['user_id'], 'Holiday Added', f"{h_name} on {h_date}"))
+                    db.commit()
+                    flash(f"Holiday '{h_name}' added for {h_date}.", "success")
+                except Exception as e:
+                    db.rollback()
+                    flash(f"Error adding holiday: {e}", "error")
+            else:
+                flash("Date and name are required.", "error")
+
+        elif action == 'delete':
+            h_id = request.form.get('h_id', type=int)
+            if h_id:
+                try:
+                    cursor.execute("DELETE FROM holidays WHERE id=?", (h_id,))
+                    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?,?,?)",
+                                   (session['user_id'], 'Holiday Deleted', f"Holiday ID {h_id} removed"))
+                    db.commit()
+                    flash("Holiday deleted.", "success")
+                except Exception as e:
+                    db.rollback()
+                    flash(f"Error deleting: {e}", "error")
+
+        elif action == 'edit':
+            h_id   = request.form.get('h_id', type=int)
+            h_date = request.form.get('h_date', '').strip()
+            h_name = request.form.get('h_name', '').strip()
+            if h_id and h_date and h_name:
+                try:
+                    cursor.execute("UPDATE holidays SET date=?, name=? WHERE id=?", (h_date, h_name, h_id))
+                    db.commit()
+                    flash(f"Holiday updated.", "success")
+                except Exception as e:
+                    db.rollback()
+                    flash(f"Error editing: {e}", "error")
+            else:
+                flash("All fields required for edit.", "error")
+
+        return redirect(url_for('holidays_page'))
+
+    cursor.execute("SELECT id, name, team FROM users WHERE id=?", (session['user_id'],))
+    user_info = cursor.fetchone()
+    cursor.execute("SELECT * FROM holidays ORDER BY date")
+    all_holidays = cursor.fetchall()
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    return render_template('holidays.html',
+        user=user_info, holidays=all_holidays, today_str=today_str)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYER 10: NOTIFICATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _push_notification(db, user_id, title, body="", ntype="info"):
+    """Create a notification for a user. Call and commit outside."""
+    try:
+        db.cursor().execute(
+            "INSERT INTO notifications (user_id, title, body, type) VALUES (?,?,?,?)",
+            (user_id, title, body, ntype)
+        )
+    except Exception:
+        pass
+
+def check_and_push_eod_reminders(db, user_id):
+    """Check if the user has pending tasks or validations after 5 PM and push EOD reminder."""
+    try:
+        now = datetime.datetime.now()
+        if now.hour >= 17:  # 5 PM or later
+            today_str = now.strftime('%Y-%m-%d')
+            cursor = db.cursor()
+            
+            # Get user info
+            cursor.execute("SELECT role, team FROM users WHERE id=?", (user_id,))
+            u = cursor.fetchone()
+            if not u:
+                return
+                
+            role = u['role']
+            team = u['team']
+            
+            # Check if reminder already sent today
+            cursor.execute("""
+                SELECT COUNT(*) FROM notifications 
+                WHERE user_id=? AND title LIKE '%EOD%Reminder%' AND created_at >= ?
+            """, (user_id, today_str + ' 00:00:00'))
+            already_notified = cursor.fetchone()[0]
+            
+            if already_notified == 0:
+                if role == 'Artist':
+                    # Has daily assignments today that are not Done
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM daily_assignments
+                        WHERE user_id=? AND date=? AND status != 'Done'
+                    """, (user_id, today_str))
+                    uncompleted = cursor.fetchone()[0]
+                    if uncompleted > 0:
+                        _push_notification(db, user_id, "EOD Reminder", "You have pending assignments. Please submit EOD updates.", "reminder")
+                        db.commit()
+                elif role in ['Lead', 'Admin']:
+                    # Has unvalidated tasks in their team today
+                    if role == 'Lead':
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM daily_assignments da
+                            JOIN users artist ON da.user_id = artist.id
+                            WHERE artist.team=? AND da.date=? AND da.status != 'Done'
+                        """, (team, today_str))
+                    else:
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM daily_assignments da
+                            WHERE da.date=? AND da.status != 'Done'
+                        """, (today_str,))
+                    unvalidated = cursor.fetchone()[0]
+                    if unvalidated > 0:
+                        _push_notification(db, user_id, "EOD Validation Reminder", "There are pending daily tasks that require validation.", "reminder")
+                        db.commit()
+    except Exception as e:
+        print(f"Error checking EOD reminders: {e}")
+
+@app.context_processor
+def inject_notification_count():
+    """Inject unread notification count into every template."""
+    count = 0
+    if 'user_id' in session:
+        try:
+            db = get_db()
+            row = db.cursor().execute(
+                "SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0",
+                (session['user_id'],)
+            ).fetchone()
+            count = row[0] if row else 0
+        except Exception:
+            count = 0
+    return dict(unread_notif_count=count)
+
+@app.route('/notifications')
+def notifications_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE id=?", (session['user_id'],))
+    user_info = cursor.fetchone()
+    cursor.execute("""
+        SELECT * FROM notifications WHERE user_id=?
+        ORDER BY is_read ASC, created_at DESC LIMIT 100
+    """, (session['user_id'],))
+    notifs = cursor.fetchall()
+    # Mark all as read
+    cursor.execute("UPDATE notifications SET is_read=1 WHERE user_id=?", (session['user_id'],))
+    db.commit()
+    return render_template('notifications.html', user=user_info, notifs=notifs)
+
+@app.route('/notifications/mark-read', methods=['POST'])
+def mark_notification_read():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    nid = request.form.get('nid', type=int)
+    if nid:
+        db = get_db()
+        db.cursor().execute("UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?",
+                            (nid, session['user_id']))
+        db.commit()
+    return redirect(request.referrer or url_for('notifications_page'))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYER 10: ACTIVITY LOG
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route('/activity-log')
+def activity_log_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'Admin':
+        flash("Activity log is Admin-only.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE id=?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    search  = request.args.get('q', '').strip()
+    page    = max(1, request.args.get('page', 1, type=int))
+    per_page = 50
+    offset  = (page - 1) * per_page
+
+    if search:
+        cursor.execute("""
+            SELECT al.*, u.name as actor_name, u.username as actor_username
+            FROM activity_log al
+            LEFT JOIN users u ON al.user_id = u.id
+            WHERE al.action LIKE ? OR al.details LIKE ? OR u.name LIKE ? OR u.username LIKE ?
+            ORDER BY al.id DESC LIMIT ? OFFSET ?
+        """, (f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', per_page, offset))
+        logs = cursor.fetchall()
+        cursor.execute("""
+            SELECT COUNT(*) FROM activity_log al
+            LEFT JOIN users u ON al.user_id = u.id
+            WHERE al.action LIKE ? OR al.details LIKE ? OR u.name LIKE ? OR u.username LIKE ?
+        """, (f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'))
+    else:
+        cursor.execute("""
+            SELECT al.*, u.name as actor_name, u.username as actor_username
+            FROM activity_log al
+            LEFT JOIN users u ON al.user_id = u.id
+            ORDER BY al.id DESC LIMIT ? OFFSET ?
+        """, (per_page, offset))
+        logs = cursor.fetchall()
+        cursor.execute("SELECT COUNT(*) FROM activity_log")
+
+    total = cursor.fetchone()[0]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    return render_template('activity_log.html',
+        user=user_info, logs=logs, search=search,
+        page=page, per_page=per_page, total=total, total_pages=total_pages)
+
 
 
 @app.route('/logout')

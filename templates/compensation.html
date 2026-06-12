@@ -86,6 +86,9 @@
             text-transform: uppercase;
             margin-top: 2px;
         }
+        /* Conditional chip colors — resolved via CSS class to avoid Jinja-in-style IDE errors */
+        .txt-owed-chip  { color: var(--color-red); }
+        .txt-clear-chip { color: var(--color-green); }
     </style>
 </head>
 <body>
@@ -126,25 +129,32 @@
                 <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
                     <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
                 </li>
+                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
-
+                {% endif %}
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
                 {% if session['role'] == 'Admin' %}
-                    <li class="menu-section-title">Admin Management</li>
-                    <li class="menu-item"><a href="#"><span>Project Setup</span></a></li>
-                    <li class="menu-item"><a href="#"><span>User Accounts</span></a></li>
-                    <li class="menu-item"><a href="#"><span>Activity Logs</span></a></li>
+                <li class="menu-section-title">Admin</li>
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+                </li>
                 {% elif session['role'] == 'HR' %}
-                    <li class="menu-section-title">HR Management</li>
-                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Attendance Roll</span></a></li>
-                    <li class="menu-item"><a href="{{ url_for('leaves_page') }}"><span>Leave Approvals</span></a></li>
-                    <li class="menu-item"><a href="{{ url_for('permissions_page') }}"><span>Permission Requests</span></a></li>
-                {% elif session['role'] == 'Lead' %}
-                    <li class="menu-section-title">Team Management</li>
-                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Team Overview</span></a></li>
-                    <li class="menu-item"><a href="{{ url_for('leaves_page') }}"><span>Leave Approvals</span></a></li>
-                    <li class="menu-item"><a href="{{ url_for('permissions_page') }}"><span>Permission Requests</span></a></li>
+                <li class="menu-section-title">HR Management</li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
                 {% endif %}
             </ul>
 
@@ -190,7 +200,7 @@
                     <div class="comp-chip-lbl">Total Extra Hours Banked</div>
                 </div>
                 <div class="comp-chip">
-                    <div class="comp-chip-val" style="color: {% if net_owed_sum > 0 %}var(--color-red){% else %}var(--color-green){% endif %};">{{ "%.1f"|format(net_owed_sum) }}h</div>
+                    <div class="comp-chip-val {% if net_owed_sum > 0 %}txt-owed-chip{% else %}txt-clear-chip{% endif %}">{{ "%.1f"|format(net_owed_sum) }}h</div>
                     <div class="comp-chip-lbl">Net Hours Still Owed</div>
                 </div>
                 <div class="comp-chip">
@@ -285,10 +295,10 @@
                                         {% set max_val = [row['total_owed'], row['total_extra'], 0.01] | max %}
                                         <div class="comp-bar-wrap">
                                             <div class="comp-bar">
-                                                <div class="comp-bar-fill owed" style="width: {{ [(row['total_owed'] / max_val * 100) | int, 100] | min }}%;"></div>
+                                                <div class="comp-bar-fill owed" data-width="{{ [(row['total_owed'] / max_val * 100) | int, 100] | min }}"></div>
                                             </div>
                                             <div class="comp-bar" style="margin-left: 2px;">
-                                                <div class="comp-bar-fill extra" style="width: {{ [(row['total_extra'] / max_val * 100) | int, 100] | min }}%;"></div>
+                                                <div class="comp-bar-fill extra" data-width="{{ [(row['total_extra'] / max_val * 100) | int, 100] | min }}"></div>
                                             </div>
                                         </div>
                                         <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 6px;">
@@ -328,4 +338,11 @@
         </main>
     </div>
 </body>
+<script>
+    /* Apply data-width values to .comp-bar-fill elements (bar charts in compensation table) */
+    document.querySelectorAll('.comp-bar-fill[data-width]').forEach(function(el) {
+        var w = Math.min(parseInt(el.getAttribute('data-width') || '0', 10), 100);
+        el.style.width = w + '%';
+    });
+</script>
 </html>

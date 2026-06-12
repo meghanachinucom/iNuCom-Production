@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holiday Calendar - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    <style>
+        .holiday-table td:first-child { font-family: monospace; font-size: 13px; }
+        .edit-modal { display:none; position:fixed; top:0;left:0;right:0;bottom:0;
+                      background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center; }
+        .edit-modal.show { display:flex; }
+        .edit-modal-box { background:var(--bg-card); border-radius:14px; padding:28px; width:380px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+        .holiday-row-upcoming { background: var(--color-blue-light); }
+        .holiday-row-past { opacity: .6; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+        </div>
+        <div class="sidebar-user">
+            <div class="user-name">{{ session['name'] }}</div>
+            {% if session['role']=='Admin' %}
+                <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+            {% else %}
+                <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
+            {% endif %}
+        </div>
+        <ul class="sidebar-menu">
+            <li class="menu-section-title">Navigation</li>
+            <li class="menu-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+                <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a></li>
+            <li class="menu-item {% if request.endpoint=='attendance_page' %}active{% endif %}">
+                <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a></li>
+            <li class="menu-item {% if request.endpoint=='leaves_page' %}active{% endif %}">
+                <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a></li>
+            <li class="menu-item {% if request.endpoint=='permissions_page' %}active{% endif %}">
+                <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a></li>
+            <li class="menu-item {% if request.endpoint=='compensation_page' %}active{% endif %}">
+                <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a></li>
+            <li class="menu-item {% if request.endpoint=='notifications_page' %}active{% endif %}">
+                <a href="{{ url_for('notifications_page') }}">
+                    <span>Notifications{% if unread_notif_count>0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                </a>
+            </li>
+            {% if session['role']=='Admin' %}
+            <li class="menu-section-title">Admin</li>
+            <li class="menu-item {% if request.endpoint=='reports_page' %}active{% endif %}">
+                <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a></li>
+            <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
+                <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
+            <li class="menu-item {% if request.endpoint=='activity_log_page' %}active{% endif %}">
+                <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a></li>
+            {% else %}
+            <li class="menu-section-title">HR Management</li>
+            <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
+                <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
+            {% endif %}
+        </ul>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="btn-logout"><span>Sign Out</span></a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Holiday Calendar — 2026</h1>
+                <p>Manage company holidays. Holidays appear on attendance calendars and count as off-days for compensation.</p>
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(category_filter=["error"]) %}
+            {% if messages %}{% for m in messages %}
+                <div class="alert alert-error" style="margin-bottom:14px;"><span>{{ m }}</span></div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+        {% with messages = get_flashed_messages(category_filter=["success"]) %}
+            {% if messages %}{% for m in messages %}
+                <div class="alert alert-success" style="margin-bottom:14px;"><span>{{ m }}</span></div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
+
+            <!-- Holiday Table -->
+            <div class="card" style="margin:0;">
+                <h3 class="card-title">All Holidays ({{ holidays | length }})</h3>
+                <table class="scoreboard-table holiday-table" style="margin-top:12px;">
+                    <thead><tr>
+                        <th>Date</th><th>Day</th><th>Holiday Name</th>
+                        <th style="text-align:center;">Status</th>
+                        <th style="text-align:center;">Actions</th>
+                    </tr></thead>
+                    <tbody>
+                    {% for h in holidays %}
+                        {% set is_past = h['date'] < today_str %}
+                        {% set is_today = h['date'] == today_str %}
+                        <tr class="{% if not is_past %}holiday-row-upcoming{% else %}holiday-row-past{% endif %}">
+                            <td><strong>{{ h['date'] }}</strong></td>
+                            <td style="font-size:12px;color:var(--text-secondary);">
+                                {{ h['date'] | strftime('%A') if h['date'] else '' }}
+                            </td>
+                            <td>
+                                {% if is_today %}
+                                <span style="background:var(--color-blue);color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;margin-right:6px;">TODAY</span>
+                                {% endif %}
+                                {{ h['name'] }}
+                            </td>
+                            <td style="text-align:center;">
+                                {% if is_today %}
+                                    <span class="att-badge present">Today</span>
+                                {% elif is_past %}
+                                    <span class="att-badge absent">Past</span>
+                                {% else %}
+                                    <span class="att-badge late">Upcoming</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align:center;">
+                                <div style="display:flex;gap:6px;justify-content:center;">
+                                    <button class="btn btn-sm" style="padding:3px 10px;font-size:11px;"
+                                        onclick="openEdit({{ h['id'] }}, '{{ h['date'] }}', '{{ h['name'] | replace("'", "\\'") }}')">Edit</button>
+                                    <form action="{{ url_for('holidays_page') }}" method="POST"
+                                        onsubmit="return confirm('Delete {{ h['name'] }}?');">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="h_id" value="{{ h['id'] }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" style="padding:3px 10px;font-size:11px;">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted);">No holidays found.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Holiday Card -->
+            <div class="card" style="margin:0;">
+                <h3 class="card-title">Add Holiday</h3>
+                <form action="{{ url_for('holidays_page') }}" method="POST" style="display:flex;flex-direction:column;gap:14px;margin-top:12px;">
+                    <input type="hidden" name="action" value="add">
+                    <div>
+                        <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:4px;">Date</label>
+                        <input type="date" id="h_date" name="h_date" class="reason-input" style="background:#fff;" required>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:4px;">Holiday Name</label>
+                        <input type="text" id="h_name" name="h_name" class="reason-input" style="background:#fff;" placeholder="e.g. Independence Day" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="padding:10px;">Add Holiday</button>
+                </form>
+
+                <div style="margin-top:24px;padding-top:16px;border-top:1px dashed var(--border-color);font-size:12px;color:var(--text-secondary);line-height:1.7;">
+                    <strong>Policy:</strong> Holidays count as off-days.<br>
+                    Working on a holiday = all hours credited as extra/compensation hours.<br>
+                    Holidays show as <span style="background:#ede9fe;color:#5b21b6;padding:1px 6px;border-radius:4px;font-size:11px;">Holiday</span> on attendance calendars.
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Edit Modal -->
+<div class="edit-modal" id="editModal">
+    <div class="edit-modal-box">
+        <h3 style="margin-bottom:16px;font-size:15px;">Edit Holiday</h3>
+        <form action="{{ url_for('holidays_page') }}" method="POST" style="display:flex;flex-direction:column;gap:12px;">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="h_id" id="edit-h-id">
+            <div>
+                <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:4px;">Date</label>
+                <input type="date" name="h_date" id="edit-h-date" class="reason-input" style="background:#fff;" required>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:4px;">Name</label>
+                <input type="text" name="h_name" id="edit-h-name" class="reason-input" style="background:#fff;" required>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <button type="submit" class="btn btn-primary btn-sm" style="flex:1;padding:10px;">Save</button>
+                <button type="button" class="btn btn-sm" style="flex:1;padding:10px;border:1px solid var(--border-color);" onclick="closeEdit()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEdit(id, date, name) {
+    document.getElementById('edit-h-id').value = id;
+    document.getElementById('edit-h-date').value = date;
+    document.getElementById('edit-h-name').value = name;
+    document.getElementById('editModal').classList.add('show');
+}
+function closeEdit() {
+    document.getElementById('editModal').classList.remove('show');
+}
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEdit();
+});
+</script>
+</body>
+</html>

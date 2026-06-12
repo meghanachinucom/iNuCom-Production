@@ -48,14 +48,14 @@ check("Leaves page loads for prabhas", r.status_code == 200, f"status={r.status_
 page_text = r.text
 check("Balance section visible", "balance" in page_text.lower() or "leave" in page_text.lower())
 
-# Apply for leave: 2026-07-15 to 2026-07-16 (2 days)
+# Apply for leave: 2026-08-15 to 2026-08-16 (2 days)
 r = s_prabhas.post(f"{BASE}/leaves", data={
-    "start_date": "2026-07-15",
-    "end_date":   "2026-07-16",
+    "start_date": "2026-08-15",
+    "end_date":   "2026-08-16",
     "reason":     "Personal work - live test"
 }, allow_redirects=True)
 check("Leave application submitted (no 500 error)", r.status_code == 200, f"status={r.status_code}")
-check("Leave appears in history or pending list", "Personal work" in r.text or "Pending" in r.text or "2026-07-15" in r.text,
+check("Leave appears in history or pending list", "Personal work" in r.text or "Pending" in r.text or "2026-08-15" in r.text,
       "Checking response text")
 
 # ─────────────────────────────────────────────────────────────
@@ -132,8 +132,8 @@ check("Leaves page loads for sana", r.status_code == 200)
 
 # Sana applies
 r = s_sana.post(f"{BASE}/leaves", data={
-    "start_date": "2026-07-20",
-    "end_date":   "2026-07-20",
+    "start_date": "2026-08-20",
+    "end_date":   "2026-08-20",
     "reason":     "Family event - live test"
 }, allow_redirects=True)
 check("Sana leave application submitted", r.status_code == 200, f"status={r.status_code}")
@@ -183,7 +183,7 @@ passed = sum(1 for _, v in results if v)
 total = len(results)
 print(f"\n  Results: {passed}/{total} checks passed")
 for name, ok in results:
-    icon = "✓" if ok else "✗"
+    icon = "[OK]" if ok else "[FAIL]"
     print(f"    {icon} {name}")
 
 if passed == total:

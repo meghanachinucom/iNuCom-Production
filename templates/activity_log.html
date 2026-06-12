@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Log - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    <style>
+        .log-action { font-weight:700; font-size:12.5px; }
+        .log-details { font-size:12px; color:var(--text-secondary); max-width:480px; word-break:break-word; }
+        .log-ts { font-family:monospace; font-size:11.5px; color:var(--text-muted); white-space:nowrap; }
+        .log-user { font-size:12px; }
+        .log-search-bar { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+        .log-search-bar input[type=search] {
+            flex:1; min-width:240px; padding:9px 14px;
+            border:1px solid var(--border-color); border-radius:8px;
+            background:var(--bg-main); font-size:13px;
+        }
+        .pagination { display:flex; gap:6px; align-items:center; margin-top:18px; flex-wrap:wrap; }
+        .pagination a, .pagination span {
+            padding:6px 12px; border-radius:6px; border:1px solid var(--border-color);
+            font-size:12.5px; text-decoration:none; color:var(--text-primary);
+        }
+        .pagination a:hover { background:var(--bg-main); }
+        .pagination .active-page { background:var(--color-blue); color:#fff; border-color:var(--color-blue); }
+        .pagination .ellipsis { border:none; color:var(--text-muted); }
+        .action-chip {
+            padding:2px 8px; border-radius:10px; font-size:10.5px; font-weight:700;
+            white-space:nowrap; background:var(--bg-main); color:var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+        </div>
+        <div class="sidebar-user">
+            <div class="user-name">{{ session['name'] }}</div>
+            <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="menu-section-title">Navigation</li>
+            <li class="menu-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+                <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a></li>
+            <li class="menu-item {% if request.endpoint=='points_page' %}active{% endif %}">
+                <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a></li>
+            <li class="menu-item {% if request.endpoint=='attendance_page' %}active{% endif %}">
+                <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a></li>
+            <li class="menu-item {% if request.endpoint=='leaves_page' %}active{% endif %}">
+                <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a></li>
+            <li class="menu-item {% if request.endpoint=='permissions_page' %}active{% endif %}">
+                <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a></li>
+            <li class="menu-item {% if request.endpoint=='compensation_page' %}active{% endif %}">
+                <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a></li>
+            <li class="menu-item {% if request.endpoint=='notifications_page' %}active{% endif %}">
+                <a href="{{ url_for('notifications_page') }}">
+                    <span>Notifications{% if unread_notif_count>0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                </a>
+            </li>
+            <li class="menu-section-title">Admin</li>
+            <li class="menu-item {% if request.endpoint=='reports_page' %}active{% endif %}">
+                <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a></li>
+            <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
+                <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
+            <li class="menu-item active">
+                <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="btn-logout"><span>Sign Out</span></a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>📋 Activity Log</h1>
+                <p>Complete audit trail of all user actions — {{ total }} entries total</p>
+            </div>
+        </header>
+
+        <!-- Search -->
+        <form method="GET" action="{{ url_for('activity_log_page') }}" class="log-search-bar">
+            <input type="search" name="q" value="{{ search }}" placeholder="Search actions, users, details…" id="log-search">
+            <button type="submit" class="btn btn-primary btn-sm" style="padding:9px 18px;">Search</button>
+            {% if search %}
+            <a href="{{ url_for('activity_log_page') }}" class="btn btn-sm" style="padding:9px 14px;border:1px solid var(--border-color);border-radius:8px;text-decoration:none;color:var(--text-secondary);">Clear</a>
+            {% endif %}
+            <span style="font-size:12px;color:var(--text-muted);">
+                {% if search %}Showing {{ logs | length }} of {{ total }} results for "{{ search }}"{% else %}Showing {{ ((page-1)*per_page)+1 }}–{{ [page*per_page, total]|min }} of {{ total }}{% endif %}
+            </span>
+        </form>
+
+        <div class="card">
+            {% if logs %}
+            <table class="scoreboard-table">
+                <thead><tr>
+                    <th style="text-align:center;width:40px;">#</th>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                </tr></thead>
+                <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td style="text-align:center;color:var(--text-muted);font-size:11px;">{{ total - ((page-1)*per_page) - loop.index0 }}</td>
+                    <td class="log-ts">{{ log['created_at'] or log['timestamp'] or '—' }}</td>
+                    <td class="log-user">
+                        {% if log['actor_name'] %}
+                        <strong>{{ log['actor_name'] }}</strong>
+                        <div style="font-size:10px;color:var(--text-muted);">@{{ log['actor_username'] }}</div>
+                        {% else %}
+                        <span style="color:var(--text-muted);font-size:11px;">System</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set action_str = (log['action'] or '') | lower %}
+                        <span class="action-chip
+                            {% if 'login' in action_str %}
+                            {% elif 'logout' in action_str %}
+                            {% elif 'leave' in action_str or 'approval' in action_str %}
+                            {% elif 'password' in action_str or 'delete' in action_str %}
+                            {% endif %}">
+                            {{ log['action'] or '—' }}
+                        </span>
+                    </td>
+                    <td class="log-details">{{ log['details'] or '—' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="?q={{ search }}&page={{ page - 1 }}">← Prev</a>
+                {% endif %}
+
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                        <a href="?q={{ search }}&page={{ p }}" class="{% if p == page %}active-page{% endif %}">{{ p }}</a>
+                    {% elif p == page - 3 or p == page + 3 %}
+                        <span class="ellipsis">…</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <a href="?q={{ search }}&page={{ page + 1 }}">Next →</a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div style="text-align:center;padding:48px;color:var(--text-muted);">
+                <div style="font-size:40px;margin-bottom:12px;">📋</div>
+                {% if search %}
+                    No log entries match "{{ search }}".
+                {% else %}
+                    No activity recorded yet.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<script>
+// Auto-focus search
+document.getElementById('log-search')?.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') { this.value=''; this.form.submit(); }
+});
+</script>
+</body>
+</html>
