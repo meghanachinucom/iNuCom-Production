@@ -134,6 +134,21 @@ WELDING_FILES = [
     {"name": "la_10x3_3_8_v_groove_butt_1p", "modeling_artist": None, "modeling_status": "Open", "texturing_status": "Pending", "rigging_status": "Pending"}
 ]
 
+SHOWCASE_FILES = [
+    {"name": "sk_ch01_sc_01", "active_stage": "Motion Graphics/3D Comp", "status": "In Progress", "assigned_username": "shiva", "points": 60},
+    {"name": "sk_ch01_sc_02", "active_stage": "Motion Graphics/3D Comp", "status": "Open", "assigned_username": "laxman", "points": 60},
+    {"name": "sk_ch01_sc_03", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned_username": "abhilash", "points": 80},
+    {"name": "sk_ch01_sc_04", "active_stage": "VFX", "status": "In Progress", "assigned_username": "tarun", "points": 80},
+    {"name": "sk_ch01_sc_05", "active_stage": "Animation", "status": "In Progress", "assigned_username": "ganesh", "points": 80},
+    {"name": "sk_ch01_sc_06", "active_stage": "Rig", "status": "In Progress", "assigned_username": "gowri", "points": 80},
+    {"name": "sk_ch01_sc_07", "active_stage": "Texturing", "status": "In Progress", "assigned_username": "rattaiah", "points": 50},
+    {"name": "sk_ch01_sc_08", "active_stage": "Modeling", "status": "In Progress", "assigned_username": "raveendra", "points": 50},
+    {"name": "sk_ch01_sc_09", "active_stage": "Modeling", "status": "Review", "assigned_username": "nagireddy", "points": 50},
+    {"name": "sk_ch01_sc_10", "active_stage": "Content", "status": "In Progress", "assigned_username": "prabhas", "points": 50},
+    {"name": "sk_ch01_vr_01", "active_stage": "VR", "status": "In Progress", "assigned_username": "agnijeet", "points": 100},
+    {"name": "sk_ch01_vr_02", "active_stage": "VR", "status": "Open", "assigned_username": "santosh", "points": 100}
+]
+
 # Attendance off-day logic
 def is_weekly_off(date_obj):
     if date_obj.weekday() == 6:  # Sunday
@@ -437,6 +452,67 @@ def init_db():
                         INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
                         VALUES (?, ?, ?, ?, ?, 'Pending')
                     """, (stage_assigned, today_str, file_id, f"{stage}: {f_weld['name']}", stage_points))
+        conn.commit()
+
+        # Seed third project: Skill Studio VR
+        print("Seeding Skill Studio VR project and chapter...")
+        cursor.execute("INSERT INTO projects (name, description, status) VALUES ('Skill Studio VR', 'Flagship VR training project', 'Active')")
+        ss_project_id = cursor.lastrowid
+        
+        cursor.execute("INSERT INTO chapters (project_id, name, description, status) VALUES (?, 'ch_01', 'Chapter 01: Core Basics', 'Active')", (ss_project_id,))
+        ss_chapter_id = cursor.lastrowid
+        conn.commit()
+
+        # Build user map
+        cursor.execute("SELECT id, username FROM users")
+        user_map = {r['username']: r['id'] for r in cursor.fetchall()}
+
+        print("Seeding Skill Studio VR files...")
+        dt_vr = datetime.datetime.now() - datetime.timedelta(seconds=14400)
+        content_released_vr = dt_vr.strftime('%Y-%m-%d %H:%M:%S')
+
+        for f_showcase in SHOWCASE_FILES:
+            cursor.execute("""
+                INSERT INTO files (chapter_id, name, description, status, content_released_at)
+                VALUES (?, ?, ?, 'Pending', ?)
+            """, (ss_chapter_id, f_showcase['name'], f"Showcase Asset: {f_showcase['name']}", content_released_vr))
+            file_id = cursor.lastrowid
+
+            active_idx = PIPELINE_STAGES.index(f_showcase['active_stage'])
+            for idx, stage in enumerate(PIPELINE_STAGES):
+                stage_status = 'Pending'
+                stage_assigned = None
+                stage_points = 0
+
+                if idx < active_idx:
+                    stage_status = 'Done'
+                    stage_points = f_showcase['points']
+                elif idx == active_idx:
+                    if f_showcase['status'] == 'Review':
+                        stage_status = 'In Progress'
+                    else:
+                        stage_status = 'In Progress' if f_showcase['status'] == 'In Progress' else 'Open'
+                    stage_assigned = user_map.get(f_showcase['assigned_username'])
+                    stage_points = f_showcase['points']
+                else:
+                    stage_status = 'Pending'
+                    stage_points = 0
+
+                cursor.execute("""
+                    INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (file_id, stage, stage_status, stage_assigned, stage_points))
+
+                if idx == active_idx and stage_assigned and stage_status == 'In Progress':
+                    submit_time = None
+                    da_status = 'Pending'
+                    if f_showcase['status'] == 'Review':
+                        submit_time = today_str + ' 12:00:00'
+                    
+                    cursor.execute("""
+                        INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status, submit_time)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (stage_assigned, today_str, file_id, f"{stage}: {f_showcase['name']}", stage_points, da_status, submit_time))
         conn.commit()
 
         # Seed targets
@@ -914,6 +990,29 @@ def dashboard():
             else:
                 overall_status_counts['Yts'] += 1
                 
+    # Calculate file counts currently active at each stage for the selected project (for Pipeline Flow visual)
+    pipeline_flow_counts = {stage: 0 for stage in PIPELINE_STAGES}
+    if selected_proj_id > 0:
+        cursor.execute("SELECT f.id, f.status FROM files f JOIN chapters c ON f.chapter_id = c.id WHERE c.project_id = ?", (selected_proj_id,))
+    else:
+        cursor.execute("SELECT id, status FROM files")
+        
+    for file_row in cursor.fetchall():
+        fid = file_row['id']
+        f_status = file_row['status']
+        if f_status != 'Completed':
+            cursor.execute("""
+                SELECT fp.step_name 
+                FROM file_pipeline fp
+                WHERE fp.file_id = ? AND fp.status != 'Done'
+                ORDER BY fp.id ASC LIMIT 1
+            """, (fid,))
+            active_step = cursor.fetchone()
+            if active_step:
+                step_name = active_step['step_name']
+                if step_name in pipeline_flow_counts:
+                    pipeline_flow_counts[step_name] += 1
+
     velocity_data = []
     try:
         today_date = datetime.datetime.strptime(today_str, '%Y-%m-%d').date()
@@ -1051,7 +1150,8 @@ def dashboard():
         performance_data=performance_data,
         artist_att_stats=artist_att_stats,
         hr_attendance_stats=hr_attendance_stats,
-        hr_leave_summary=hr_leave_summary
+        hr_leave_summary=hr_leave_summary,
+        pipeline_flow_counts=pipeline_flow_counts
     )
 
 @app.route('/file/add', methods=['POST'])

@@ -661,6 +661,51 @@
                     </div>
                 </div>
                 
+                <!-- PIPELINE FLOW VIEW -->
+                <div class="card" style="margin-bottom: 30px; padding: 24px;">
+                    <h3 class="card-title" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 8px;">🔄 Pipeline Flow Tracker</span>
+                        <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);">Current Active files per Stage</span>
+                    </h3>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <!-- Core stages flow -->
+                        <div style="display: flex; align-items: center; gap: 8px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: thin;">
+                            {% set core_stages = ['Content', 'Modeling', 'Texturing', 'Rig', 'Animation', 'VFX', 'Lighting/Rendering', 'Motion Graphics/3D Comp'] %}
+                            {% for stage in core_stages %}
+                                <div style="flex: 1; min-width: 125px; background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ stage }}">
+                                        {% if stage == 'Lighting/Rendering' %}
+                                            Lighting
+                                        {% elif stage == 'Motion Graphics/3D Comp' %}
+                                            Motion Graphics
+                                        {% else %}
+                                            {{ stage }}
+                                        {% endif %}
+                                    </div>
+                                    <div style="font-size: 24px; font-weight: 800; color: {% if pipeline_flow_counts[stage] > 0 %}var(--color-blue){% else %}var(--text-muted){% endif %};">
+                                        {{ pipeline_flow_counts[stage] }}
+                                    </div>
+                                </div>
+                                {% if not loop.last %}
+                                    <div style="font-size: 18px; color: #cbd5e1; font-weight: bold; user-select: none; padding: 0 2px;">➔</div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <!-- VR Track -->
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; width: fit-content; margin-top: 4px;">
+                            <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Separate Subsequent Track:</span>
+                            <div style="display: inline-flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                                <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase;">VR Stage</span>
+                                <span style="background: var(--color-blue); color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">
+                                    {{ pipeline_flow_counts['VR'] }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- GRAPHS SECTION -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin-bottom: 30px;">
                     <!-- 1. Pipeline stages progress chart -->
