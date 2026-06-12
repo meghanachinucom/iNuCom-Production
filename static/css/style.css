@@ -915,3 +915,12 @@ body {
     }
 }
 
+/* Color Utilities for Points */
+.pts-positive {
+    color: var(--color-green);
+}
+.pts-zero {
+    color: var(--text-muted);
+}
+
+
