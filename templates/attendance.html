@@ -45,10 +45,16 @@
                     </a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}">
-                        <span>Leaves & Approvals</span>
-                    </a>
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
                 </li>
+                <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
+                    <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
+                </li>
+                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
+                <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
+                    <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                {% endif %}
                 
                 <!-- Role-Based Menus -->
                 {% if session['role'] == 'Admin' %}

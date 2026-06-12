@@ -126,6 +126,32 @@ def init_db():
             schema_needs_update = True
             print("Schema needs update! Re-initializing database...")
 
+    # Runtime migration: ensure permission_requests table exists (Layer 6)
+    if db_exists and not schema_needs_update:
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM permission_requests LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = sqlite3.connect(DATABASE)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS permission_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    date TEXT NOT NULL,
+                    hours REAL NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT DEFAULT 'Pending',
+                    approved_by INTEGER,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+                )
+            """)
+            conn.commit()
+            conn.close()
+            print("Migrated: permission_requests table created.")
+
     if not db_exists or schema_needs_update:
         if db_exists:
             try:
@@ -1819,6 +1845,349 @@ def reject_leave(approval_id):
         flash(f"Error rejecting request: {e}", "error")
         
     return redirect(url_for('leaves_page'))
+
+# ─────────────────────────────────────────────────────────────
+# LAYER 6: PERMISSIONS + COMPENSATION
+# ─────────────────────────────────────────────────────────────
+
+import json as _json
+
+def _comp_summary(db):
+    """Return compensation summary for all employees (used by /compensation)."""
+    cursor = db.cursor()
+    cursor.execute("SELECT id, name, username, role, team FROM users ORDER BY team, name")
+    all_users = cursor.fetchall()
+
+    rows = []
+    for u in all_users:
+        uid = u['id']
+
+        # 1. Approved permission hours (formal excused absences they owe back)
+        cursor.execute("""
+            SELECT COALESCE(SUM(hours), 0) FROM permission_requests
+            WHERE user_id = ? AND status = 'Approved'
+        """, (uid,))
+        perm_hours = cursor.fetchone()[0] or 0.0
+
+        # 2. Late minutes → hours (unexcused lateness beyond grace)
+        cursor.execute("""
+            SELECT COALESCE(SUM(late_minutes), 0) FROM attendance
+            WHERE user_id = ? AND late_minutes > 0
+        """, (uid,))
+        late_mins_total = cursor.fetchone()[0] or 0
+        late_hours = late_mins_total / 60.0
+
+        # 3. Total owed
+        total_owed = perm_hours + late_hours
+
+        # 4. Extra hours banked (off-day / overtime)
+        cursor.execute("""
+            SELECT COALESCE(SUM(extra_hours), 0) FROM attendance
+            WHERE user_id = ? AND extra_hours > 0
+        """, (uid,))
+        total_extra = cursor.fetchone()[0] or 0.0
+
+        # 5. Net owed after offset
+        net_owed = max(0.0, total_owed - total_extra)
+
+        rows.append({
+            'uid': uid,
+            'name': u['name'],
+            'username': u['username'],
+            'role': u['role'],
+            'team': u['team'],
+            'perm_hours': round(perm_hours, 2),
+            'late_hours': round(late_hours, 2),
+            'total_owed': round(total_owed, 2),
+            'total_extra': round(total_extra, 2),
+            'net_owed': round(net_owed, 2),
+        })
+    return rows
+
+
+@app.route('/permissions', methods=['GET', 'POST'])
+def permissions_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    # ── POST: apply for a permission ──
+    if request.method == 'POST':
+        perm_date  = request.form.get('perm_date', '').strip()
+        hours_str  = request.form.get('hours', '').strip()
+        reason     = request.form.get('reason', '').strip()
+
+        if not perm_date or not hours_str or not reason:
+            flash("All fields are required.", "error")
+            return redirect(url_for('permissions_page'))
+
+        try:
+            perm_hours = float(hours_str)
+            if perm_hours <= 0 or perm_hours > 24:
+                raise ValueError
+        except ValueError:
+            flash("Hours must be a positive number up to 24.", "error")
+            return redirect(url_for('permissions_page'))
+
+        try:
+            datetime.datetime.strptime(perm_date, '%Y-%m-%d')
+        except ValueError:
+            flash("Invalid date format.", "error")
+            return redirect(url_for('permissions_page'))
+
+        cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+        user_info = cursor.fetchone()
+
+        try:
+            cursor.execute("""
+                INSERT INTO permission_requests (user_id, date, hours, reason, status)
+                VALUES (?, ?, ?, ?, 'Pending')
+            """, (session['user_id'], perm_date, perm_hours, reason))
+            pr_id = cursor.lastrowid
+
+            chain = get_approval_chain(db, session['user_id'], user_info['role'], user_info['reports_to'])
+
+            if not chain:
+                # Admin requesting — auto-approve
+                cursor.execute("UPDATE permission_requests SET status = 'Approved', approved_by = ? WHERE id = ?",
+                               (session['user_id'], pr_id))
+                cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Permission Request', ?)",
+                               (session['user_id'], f"Permission auto-approved: {perm_hours}h on {perm_date}."))
+                db.commit()
+                flash("Permission request auto-approved!", "success")
+            else:
+                chain_json = _json.dumps(chain)
+                details_str = f"Permission Request: {perm_hours}h on {perm_date}. Reason: {reason}"
+                cursor.execute("""
+                    INSERT INTO approvals (requester_id, type, reference_id, approval_chain, current_index, details, status)
+                    VALUES (?, 'Permission', ?, ?, 0, ?, 'Pending')
+                """, (session['user_id'], pr_id, chain_json, details_str))
+                cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Permission Request', ?)",
+                               (session['user_id'], details_str))
+                db.commit()
+                flash("Permission request submitted — pending approval chain.", "success")
+        except Exception as e:
+            db.rollback()
+            flash(f"Error submitting permission request: {e}", "error")
+
+        return redirect(url_for('permissions_page'))
+
+    # ── GET ──
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    # My permission requests with approval chain step info
+    cursor.execute("""
+        SELECT pr.*, a.id as approval_id, a.approval_chain, a.current_index, a.status as approval_status
+        FROM permission_requests pr
+        LEFT JOIN approvals a ON (pr.id = a.reference_id AND a.type = 'Permission')
+        WHERE pr.user_id = ?
+        ORDER BY pr.date DESC, pr.id DESC
+    """, (session['user_id'],))
+    my_perm_raw = cursor.fetchall()
+
+    my_permissions = []
+    for row in my_perm_raw:
+        step_info = ""
+        if row['status'] == 'Pending' and row['approval_chain']:
+            try:
+                chain = _json.loads(row['approval_chain'])
+                idx = row['current_index']
+                if idx < len(chain):
+                    cursor.execute("SELECT name, role FROM users WHERE id = ?", (chain[idx],))
+                    approver = cursor.fetchone()
+                    if approver:
+                        step_info = f"Awaiting: {approver['name']} ({approver['role']}) — Step {idx+1}/{len(chain)}"
+            except Exception:
+                step_info = "Pending in chain"
+        elif row['status'] == 'Approved':
+            step_info = "Approved"
+        elif row['status'] == 'Rejected':
+            step_info = "Rejected"
+
+        my_permissions.append({
+            'id': row['id'],
+            'date': row['date'],
+            'hours': row['hours'],
+            'reason': row['reason'],
+            'status': row['status'],
+            'step_info': step_info,
+        })
+
+    # Pending approvals where this user is the current approver
+    cursor.execute("""
+        SELECT a.id as approval_id, a.requester_id, a.type, a.reference_id,
+               a.approval_chain, a.current_index, a.details, a.status as approval_status,
+               u.name as requester_name, u.role as requester_role, u.team as requester_team
+        FROM approvals a
+        JOIN users u ON a.requester_id = u.id
+        WHERE a.status = 'Pending' AND a.type = 'Permission'
+        ORDER BY a.id ASC
+    """)
+    all_perm_approvals = cursor.fetchall()
+
+    my_pending_approvals = []
+    for app_row in all_perm_approvals:
+        try:
+            chain = _json.loads(app_row['approval_chain'])
+            idx = app_row['current_index']
+            if idx < len(chain) and chain[idx] == session['user_id']:
+                my_pending_approvals.append({
+                    'id': app_row['approval_id'],
+                    'requester_name': app_row['requester_name'],
+                    'requester_role': app_row['requester_role'],
+                    'requester_team': app_row['requester_team'],
+                    'type': app_row['type'],
+                    'details': app_row['details'],
+                    'step_info': f"Step {idx+1} of {len(chain)}",
+                })
+        except Exception:
+            pass
+
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    return render_template(
+        'permissions.html',
+        user=user_info,
+        my_permissions=my_permissions,
+        my_pending_approvals=my_pending_approvals,
+        today_str=today_str,
+    )
+
+
+@app.route('/permissions/approve/<int:approval_id>', methods=['POST'])
+def approve_permission(approval_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM approvals WHERE id = ? AND status = 'Pending' AND type = 'Permission'", (approval_id,))
+    approval = cursor.fetchone()
+
+    if not approval:
+        flash("Approval request not found or already actioned.", "error")
+        return redirect(url_for('permissions_page'))
+
+    try:
+        chain = _json.loads(approval['approval_chain'])
+        curr_idx = approval['current_index']
+    except Exception:
+        flash("Invalid approval data.", "error")
+        return redirect(url_for('permissions_page'))
+
+    if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
+        flash("Unauthorized to approve this step.", "error")
+        return redirect(url_for('permissions_page'))
+
+    next_idx = curr_idx + 1
+    try:
+        if next_idx >= len(chain):
+            # Final step — fully approved
+            cursor.execute("""
+                UPDATE approvals SET status = 'Approved', current_index = ?, actioned_by = ?, actioned_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (next_idx, session['user_id'], approval_id))
+            cursor.execute("""
+                UPDATE permission_requests SET status = 'Approved', approved_by = ? WHERE id = ?
+            """, (session['user_id'], approval['reference_id']))
+            cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Approve Permission', ?)",
+                           (session['user_id'], f"Approved Permission ID {approval['reference_id']} (Final)."))
+            flash("Permission approved and finalized!", "success")
+        else:
+            cursor.execute("UPDATE approvals SET current_index = ? WHERE id = ?", (next_idx, approval_id))
+            cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Approve Permission', ?)",
+                           (session['user_id'], f"Approved Permission ID {approval['reference_id']} — advanced to step {next_idx+1}."))
+            flash("Permission approved — advanced to next step in chain.", "success")
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        flash(f"Error approving permission: {e}", "error")
+
+    return redirect(url_for('permissions_page'))
+
+
+@app.route('/permissions/reject/<int:approval_id>', methods=['POST'])
+def reject_permission(approval_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM approvals WHERE id = ? AND status = 'Pending' AND type = 'Permission'", (approval_id,))
+    approval = cursor.fetchone()
+
+    if not approval:
+        flash("Approval request not found or already actioned.", "error")
+        return redirect(url_for('permissions_page'))
+
+    try:
+        chain = _json.loads(approval['approval_chain'])
+        curr_idx = approval['current_index']
+    except Exception:
+        flash("Invalid approval data.", "error")
+        return redirect(url_for('permissions_page'))
+
+    if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
+        flash("Unauthorized to reject this step.", "error")
+        return redirect(url_for('permissions_page'))
+
+    try:
+        cursor.execute("""
+            UPDATE approvals SET status = 'Rejected', actioned_by = ?, actioned_at = CURRENT_TIMESTAMP WHERE id = ?
+        """, (session['user_id'], approval_id))
+        cursor.execute("UPDATE permission_requests SET status = 'Rejected' WHERE id = ?", (approval['reference_id'],))
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Reject Permission', ?)",
+                       (session['user_id'], f"Rejected Permission ID {approval['reference_id']} — chain terminated."))
+        db.commit()
+        flash("Permission request rejected.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error rejecting permission: {e}", "error")
+
+    return redirect(url_for('permissions_page'))
+
+
+@app.route('/compensation')
+def compensation_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if session['role'] not in ['Admin', 'HR', 'Lead']:
+        flash("You do not have access to the Compensation view.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    all_rows = _comp_summary(db)
+
+    # Lead sees only their own team
+    if session['role'] == 'Lead':
+        all_rows = [r for r in all_rows if r['team'] == session['team']]
+
+    # Gather unique teams for the filter dropdown
+    teams = sorted(set(r['team'] for r in all_rows))
+    filter_team = request.args.get('team', '')
+    if filter_team:
+        all_rows = [r for r in all_rows if r['team'] == filter_team]
+
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    return render_template(
+        'compensation.html',
+        user=user_info,
+        comp_rows=all_rows,
+        teams=teams,
+        filter_team=filter_team,
+        today_str=today_str,
+    )
+
 
 @app.route('/logout')
 def logout():

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permissions - iNuCom Production Tracker</title>
+    <meta name="description" content="Request and manage time permissions (late arrival / early exit) with multi-step approval workflow.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+            </div>
+
+            <div class="sidebar-user">
+                <div class="user-name">{{ session['name'] }}</div>
+                {% if session['role'] == 'Admin' %}
+                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+                {% elif session['role'] == 'HR' %}
+                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
+                {% elif session['role'] == 'Lead' %}
+                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
+                {% else %}
+                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
+                {% endif %}
+            </div>
+
+            <ul class="sidebar-menu">
+                <li class="menu-section-title">Navigation</li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
+                    <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
+                    <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
+                </li>
+
+                <!-- Role-Based Menus -->
+                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
+                    <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
+                        <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                    </li>
+                {% endif %}
+
+                {% if session['role'] == 'Admin' %}
+                    <li class="menu-section-title">Admin Management</li>
+                    <li class="menu-item"><a href="#"><span>Project Setup</span></a></li>
+                    <li class="menu-item"><a href="#"><span>User Accounts</span></a></li>
+                    <li class="menu-item"><a href="#"><span>Activity Logs</span></a></li>
+                {% elif session['role'] == 'HR' %}
+                    <li class="menu-section-title">HR Management</li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Attendance Roll</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('leaves_page') }}"><span>Leave Approvals</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('compensation_page') }}"><span>Compensation Panel</span></a></li>
+                {% elif session['role'] == 'Lead' %}
+                    <li class="menu-section-title">Team Management</li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Team Overview</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('compensation_page') }}"><span>Team Compensation</span></a></li>
+                {% elif session['role'] == 'Artist' %}
+                    <li class="menu-section-title">My Workspace</li>
+                    <li class="menu-item"><a href="{{ url_for('attendance_page') }}"><span>Clock-in / Clock-out</span></a></li>
+                    <li class="menu-item"><a href="{{ url_for('points_page') }}"><span>My Points Board</span></a></li>
+                {% endif %}
+            </ul>
+
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout"><span>Sign Out</span></a>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Permissions &amp; Time Requests</h1>
+                    <p>Request formal permission for late arrival or early exit — approved hours apply to compensation offset</p>
+                </div>
+            </header>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-error" style="margin-bottom: 16px;"><span>{{ message }}</span></div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-success" style="margin-bottom: 16px;"><span>{{ message }}</span></div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="attendance-layout">
+
+                <!-- Apply Form -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 28px;">
+
+                    <!-- Info Panel -->
+                    <div class="card" style="margin: 0;">
+                        <h3 class="card-title">How Permissions Work</h3>
+                        <div style="font-size: 13px; line-height: 1.8; color: var(--text-secondary); margin-top: 8px;">
+                            <p style="margin: 0 0 10px;">A <strong>Permission</strong> is a formal request to arrive late or leave early on a specific date.</p>
+                            <div style="background: var(--bg-main); border-radius: 8px; padding: 14px; border-left: 3px solid var(--color-blue);">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Compensation Formula</div>
+                                <div style="font-family: monospace; font-size: 12px; color: var(--color-blue);">
+                                    Hours Owed = Perm Hours + Late Mins/60<br>
+                                    Net Owed = Owed − Extra Hours (off-days/OT)<br>
+                                    Net Owed = max(0, Hours Owed − Extra)
+                                </div>
+                            </div>
+                            <p style="margin: 10px 0 0;">Extra hours from weekends or holidays automatically offset your owed time.</p>
+                        </div>
+                    </div>
+
+                    <!-- Apply Card -->
+                    <div class="card" style="margin: 0;">
+                        <h3 class="card-title">Request Permission</h3>
+                        <form action="{{ url_for('permissions_page') }}" method="POST" style="display: flex; flex-direction: column; gap: 14px; margin-top: 8px;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px; color: var(--text-secondary);">Date of Permission</label>
+                                <input type="date" id="perm_date" name="perm_date" class="reason-input" style="background-color: #ffffff;" required value="{{ today_str }}">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px; color: var(--text-secondary);">Hours Requested (e.g. 2.0)</label>
+                                <input type="number" id="perm_hours" name="hours" class="reason-input" style="background-color: #ffffff;" step="0.25" min="0.25" max="12" placeholder="e.g. 2.0" required>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px; color: var(--text-secondary);">Reason</label>
+                                <input type="text" id="perm_reason" name="reason" class="reason-input" style="background-color: #ffffff;" placeholder="e.g. Late arrival due to medical appointment" required>
+                            </div>
+                            <button type="submit" id="perm_submit" class="btn btn-primary btn-sm" style="padding: 10px; margin-top: 4px;">Submit Permission Request</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Pending Approvals Queue (for Lead / Admin / HR) -->
+                {% if my_pending_approvals %}
+                    <div class="card" style="border: 1px solid var(--border-focus); background-color: var(--color-blue-light); margin-bottom: 28px;">
+                        <h3 class="card-title" style="color: var(--color-blue);">
+                            Permissions Awaiting My Approval
+                            <span style="font-size: 11px; background-color: var(--color-blue); color: #fff; border-radius: 12px; padding: 2px 8px; margin-left: 8px;">{{ my_pending_approvals|length }}</span>
+                        </h3>
+                        <table class="scoreboard-table" style="margin-top: 12px;">
+                            <thead>
+                                <tr>
+                                    <th>Requester</th>
+                                    <th>Role / Team</th>
+                                    <th>Details</th>
+                                    <th>Chain Step</th>
+                                    <th style="text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in my_pending_approvals %}
+                                    <tr>
+                                        <td><strong>{{ row['requester_name'] }}</strong></td>
+                                        <td>
+                                            <span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">
+                                                {{ row['requester_role'] }} ({{ row['requester_team'] }})
+                                            </span>
+                                        </td>
+                                        <td style="font-size: 12.5px; max-width: 280px;">{{ row['details'] }}</td>
+                                        <td style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">{{ row['step_info'] }}</td>
+                                        <td>
+                                            <div style="display: flex; gap: 8px; justify-content: center;">
+                                                <form action="{{ url_for('approve_permission', approval_id=row['id']) }}" method="POST">
+                                                    <button type="submit" class="btn btn-sm btn-primary" style="padding: 4px 12px;">Approve</button>
+                                                </form>
+                                                <form action="{{ url_for('reject_permission', approval_id=row['id']) }}" method="POST">
+                                                    <button type="submit" class="btn btn-sm btn-danger" style="padding: 4px 12px;">Reject</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                <!-- My Permissions Ledger -->
+                <div class="card">
+                    <h3 class="card-title">My Permission Requests</h3>
+                    <table class="scoreboard-table" style="margin-top: 12px;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Hours</th>
+                                <th>Reason</th>
+                                <th>Workflow Status</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if my_permissions %}
+                                {% for row in my_permissions %}
+                                    <tr>
+                                        <td><strong>{{ row['date'] }}</strong></td>
+                                        <td>
+                                            <span style="font-weight: 700; color: var(--color-blue);">{{ "%.2f"|format(row['hours']) }}h</span>
+                                        </td>
+                                        <td style="max-width: 260px; font-size: 13px;">{{ row['reason'] }}</td>
+                                        <td style="font-size: 12px; color: var(--text-secondary);">{{ row['step_info'] }}</td>
+                                        <td>
+                                            {% set sl = row['status']|lower %}
+                                            <span class="att-badge {% if sl == 'approved' %}present{% elif sl == 'rejected' %}absent{% else %}late{% endif %}">
+                                                {{ row['status'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No permission requests submitted yet.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div><!-- /.attendance-layout -->
+        </main>
+    </div>
+</body>
+</html>

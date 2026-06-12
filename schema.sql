@@ -129,6 +129,19 @@ CREATE TABLE IF NOT EXISTS permissions (
     allowed INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS permission_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    hours REAL NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT DEFAULT 'Pending',
+    approved_by INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+
 CREATE TABLE IF NOT EXISTS points (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
