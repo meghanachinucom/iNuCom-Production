@@ -355,10 +355,10 @@
                                             <td><strong>{{ row['name'] }}</strong> <span style="font-size: 11px; color: var(--text-muted);">(@{{ row['username'] }})</span></td>
                                             <td>{{ row['clock_in'] if row['clock_in'] else '--' }}</td>
                                             <td>{{ row['clock_out'] if row['clock_out'] else '--' }}</td>
-                                            <td style="color: {% if row['late_minutes'] > 0 %}var(--color-red){% else %}inherit{% endif %}; font-weight: {% if row['late_minutes'] > 0 %}600{% else %}normal{% endif %};">
+                                            <td class="{% if row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
                                                 {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
                                             </td>
-                                            <td style="color: {% if row['extra_hours'] > 0 %}var(--color-green){% else %}inherit{% endif %}; font-weight: {% if row['extra_hours'] > 0 %}600{% else %}normal{% endif %};">
+                                            <td class="{% if row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
                                                 +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
                                             </td>
                                             <td>
@@ -448,10 +448,10 @@
                                                 <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
                                                 <td>{{ row['clock_in'] if row['clock_in'] else '--' }}</td>
                                                 <td>{{ row['clock_out'] if row['clock_out'] else '--' }}</td>
-                                                <td style="color: {% if row['late_minutes'] > 0 %}var(--color-red){% else %}inherit{% endif %}; font-weight: {% if row['late_minutes'] > 0 %}600{% else %}normal{% endif %};">
+                                                <td class="{% if row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
                                                     {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
                                                 </td>
-                                                <td style="color: {% if row['extra_hours'] > 0 %}var(--color-green){% else %}inherit{% endif %}; font-weight: {% if row['extra_hours'] > 0 %}600{% else %}normal{% endif %};">
+                                                <td class="{% if row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
                                                     +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
                                                 </td>
                                                 <td>

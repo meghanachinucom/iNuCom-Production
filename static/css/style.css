@@ -1246,5 +1246,15 @@ body {
 .att-badge.off { background-color: #e2e8f0; color: #475569; }
 .att-badge.holiday { background-color: #e0f2fe; color: #0369a1; }
 
+.txt-late-highlight {
+    color: var(--color-red) !important;
+    font-weight: 600;
+}
+
+.txt-extra-highlight {
+    color: var(--color-green) !important;
+    font-weight: 600;
+}
+
 
 
