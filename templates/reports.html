@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Reports - iNuCom Production Tracker</title>
-    <meta name="description" content="Admin-only reports: morning assignments, EOD validations, login timings, and monthly points with Excel export.">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
     <style>
         /* Tab bar */
         .report-tabs { display:flex; gap:4px; margin-bottom:28px; border-bottom:2px solid var(--border-color); }
@@ -98,14 +97,27 @@
         </div>
         <div class="sidebar-user">
             <div class="user-name">{{ session['name'] }}</div>
-            <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+            <div class="user-designation">
+                {% if session['role'] == 'Admin' %}
+                    Admin
+                {% elif session['role'] == 'HR' %}
+                    HR Officer
+                {% elif session['role'] == 'Lead' %}
+                    Team Lead
+                {% else %}
+                    Creative Artist
+                {% endif %}
+            </div>
+            <div class="user-team">{{ session['team'] }} Team</div>
         </div>
         <ul class="sidebar-menu">
             <li class="menu-section-title">Navigation</li>
             <li class="menu-item {% if request.endpoint=='dashboard' %}active{% endif %}">
                 <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a></li>
-            <li class="menu-item {% if request.endpoint=='points_page' %}active{% endif %}">
+            {% if session['role'] != 'HR' %}
+            <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                 <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a></li>
+            {% endif %}
             <li class="menu-item {% if request.endpoint=='attendance_page' %}active{% endif %}">
                 <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a></li>
             <li class="menu-item {% if request.endpoint=='leaves_page' %}active{% endif %}">
@@ -114,24 +126,15 @@
                 <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a></li>
             <li class="menu-item {% if request.endpoint=='compensation_page' %}active{% endif %}">
                 <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a></li>
-            {% if unread_notif_count > 0 %}
             <li class="menu-item {% if request.endpoint=='notifications_page' %}active{% endif %}">
                 <a href="{{ url_for('notifications_page') }}">
-                    <span>Notifications <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span></span>
+                    <span>Notifications{% if unread_notif_count>0 %} <span class="sidebar-menu-badge">{{ unread_notif_count }}</span>{% endif %}</span>
                 </a>
             </li>
-            {% else %}
-            <li class="menu-item {% if request.endpoint=='notifications_page' %}active{% endif %}">
-                <a href="{{ url_for('notifications_page') }}"><span>Notifications</span></a></li>
-            {% endif %}
 
             <li class="menu-section-title">Admin</li>
             <li class="menu-item {% if request.endpoint=='reports_page' %}active{% endif %}">
                 <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a></li>
-            <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
-                <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
-            <li class="menu-item {% if request.endpoint=='activity_log_page' %}active{% endif %}">
-                <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a></li>
         </ul>
         <div class="sidebar-footer">
             <a href="{{ url_for('logout') }}" class="btn-logout"><span>Sign Out</span></a>
@@ -143,7 +146,6 @@
         <header class="page-header">
             <div>
                 <h1>Admin Reports</h1>
-                <p>Excel-style production reporting — export any tab as .xlsx</p>
             </div>
             <div class="header-actions-wrapper">
                 <!-- Notification Bell Container -->
@@ -262,6 +264,7 @@
 
             <div class="card">
                 {% if morning_rows %}
+                <div class="table-responsive">
                 <table class="scoreboard-table">
                     <thead><tr>
                         <th>Team</th><th>Artist</th><th>File / Task</th>
@@ -314,6 +317,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
                 {% else %}
                 <div class="rpt-empty">
                     <div class="rpt-empty-icon">📋</div>
@@ -360,6 +364,7 @@
 
             <div class="card">
                 {% if eod_rows %}
+                <div class="table-responsive">
                 <table class="scoreboard-table">
                     <thead><tr>
                         <th>Team</th><th>Artist</th><th>File</th>
@@ -398,6 +403,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
                 {% else %}
                 <div class="rpt-empty">
                     <div class="rpt-empty-icon">✅</div>
@@ -423,6 +429,7 @@
             <div class="card" style="margin-bottom:24px;">
                 <h3 class="card-title">Daily Login Details — {{ rdate }}</h3>
                 {% if login_day %}
+                <div class="table-responsive">
                 <table class="scoreboard-table" style="margin-top:12px;">
                     <thead><tr>
                         <th>Team</th><th>Name</th><th>Role</th>
@@ -442,8 +449,8 @@
                             <td>{{ row['team'] }}</td>
                             <td><strong>{{ row['name'] }}</strong></td>
                             <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['role'] }}</span></td>
-                            <td style="font-family:monospace;">{{ row['clock_in'] or '—' }}</td>
-                            <td style="font-family:monospace;">{{ row['clock_out'] or 'Active' }}</td>
+                            <td style="font-family:monospace;">{{ row['clock_in']|time12 if row['clock_in'] else '—' }}</td>
+                            <td style="font-family:monospace;">{{ row['clock_out']|time12 if row['clock_out'] else 'Active' }}</td>
                             <td style="text-align:right;font-weight:700;">{{ "%.2f"|format(row['total_hours'] or 0) }}h</td>
                             <td>
                                 {% set s = (row['status'] or '') | lower %}
@@ -458,6 +465,7 @@
                     {% endfor %}
                     </tbody>
                 </table>
+                </div>
                 {% else %}
                 <div class="rpt-empty">
                     <div class="rpt-empty-icon">🕐</div>

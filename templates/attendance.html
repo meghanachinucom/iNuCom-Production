@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance - iNuCom Production Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    <style>
+        .txt-pending-positive { color: var(--color-red) !important; font-weight: 700; }
+        .txt-pending-negative-or-zero { color: var(--color-green) !important; font-weight: 700; }
+        .calendar-edit-btn {
+            background: none; border: none; cursor: pointer;
+            font-size: 13px; padding: 1px 3px; border-radius: 4px;
+            opacity: 0.6; transition: opacity 0.15s;
+        }
+        .calendar-edit-btn:hover { opacity: 1; background: rgba(0,0,0,0.06); }
+        .calendar-day-header { display: flex; justify-content: space-between; align-items: center; }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -16,15 +28,18 @@
             
             <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
-                {% if session['role'] == 'Admin' %}
-                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
-                {% elif session['role'] == 'HR' %}
-                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
-                {% elif session['role'] == 'Lead' %}
-                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
-                {% else %}
-                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
-                {% endif %}
+                <div class="user-designation">
+                    {% if session['role'] == 'Admin' %}
+                        Admin
+                    {% elif session['role'] == 'HR' %}
+                        HR Officer
+                    {% elif session['role'] == 'Lead' %}
+                        Team Lead
+                    {% else %}
+                        Creative Artist
+                    {% endif %}
+                </div>
+                <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
             <ul class="sidebar-menu">
@@ -62,13 +77,16 @@
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+
                 </li>
                 {% endif %}
             </ul>
@@ -85,7 +103,6 @@
             <header class="page-header">
                 <div>
                     <h1>Attendance & Shifts Tracker</h1>
-                    <p>Manage daily clocking, shifts, and compensation hours</p>
                 </div>
                 <div class="header-actions-wrapper">
                     <!-- Notification Bell Container -->
@@ -223,46 +240,6 @@
                         </div>
                     </div>
 
-                    <!-- Developer Test override card -->
-                    <div class="card" style="margin: 0; border: 1px dashed var(--color-blue);">
-                        <h3 class="card-title" style="color: var(--color-blue);">Developer Test Panel</h3>
-                        <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 12px;">
-                            Quick-test late rules, shift logic, and compensation. Set date and time, then click clock in/out.
-                        </p>
-                        
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <div>
-                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Date</label>
-                                <input type="date" id="dev-date" class="reason-input" style="background-color: #ffffff;" value="{{ today_str }}">
-                            </div>
-                            
-                            <div>
-                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Time</label>
-                                <input type="text" id="dev-time" class="reason-input" style="background-color: #ffffff;" placeholder="e.g. 09:20">
-                            </div>
-                            
-                            <div style="display: flex; gap: 6px;">
-                                <button type="button" class="btn-control" style="font-size: 11px; padding: 4px 8px; flex-grow: 1;" onclick="setDevTime('09:20')">09:20 On-Time</button>
-                                <button type="button" class="btn-control" style="font-size: 11px; padding: 4px 8px; flex-grow: 1;" onclick="setDevTime('09:50')">09:50 Late</button>
-                                <button type="button" class="btn-control" style="font-size: 11px; padding: 4px 8px; flex-grow: 1;" onclick="setDevTime('11:30')">11:30 Half-Day</button>
-                            </div>
-                            
-                            <div style="display: flex; gap: 10px; margin-top: 6px;">
-                                <button type="button" class="btn btn-sm btn-primary" style="flex: 1;" onclick="submitDevClock('in')">Clock In</button>
-                                <button type="button" class="btn btn-sm btn-danger" style="flex: 1;" onclick="submitDevClock('out')">Clock Out</button>
-                            </div>
-                        </div>
-
-                        <!-- Forms for Developer clocking -->
-                        <form id="dev-clock-in-form" action="{{ url_for('clock_in') }}" method="POST" style="display: none;">
-                            <input type="hidden" name="custom_date" id="form-in-date">
-                            <input type="hidden" name="custom_time" id="form-in-time">
-                        </form>
-                        <form id="dev-clock-out-form" action="{{ url_for('clock_out') }}" method="POST" style="display: none;">
-                            <input type="hidden" name="custom_date" id="form-out-date">
-                            <input type="hidden" name="custom_time" id="form-out-time">
-                        </form>
-                    </div>
                 </div>
 
                 <!-- Monthly Calendar view of the target employee -->
@@ -307,31 +284,34 @@
                                 {% if day['type'] == 'padding' %}
                                     <div class="calendar-day att-padding"></div>
                                 {% else %}
+                                    {% set day_date = selected_year ~ "-" ~ "%02d"|format(selected_month) ~ "-" ~ "%02d"|format(day['day']) %}
                                     <div class="calendar-day {% if day['status'] == 'Half Day' %}att-half{% else %}att-{{ day['status']|lower }}{% endif %}">
-                                        <div class="calendar-day-number">{{ day['day'] }}</div>
-                                        
+                                        <div class="calendar-day-header">
+                                            <div class="calendar-day-number">{{ day['day'] }}</div>
+                                            {% if day['status'] != 'Future' and (session['role'] == 'Admin' or target_user['id'] == session['user_id']) %}
+                                                <button type="button" class="calendar-edit-btn" data-date="{{ day_date }}" data-in="{{ day['clock_in'] or '' }}" data-out="{{ day['clock_out'] or '' }}" onclick="openEditModal(this.dataset.date, this.dataset.in, this.dataset.out)" title="Edit Attendance">✏️</button>
+                                            {% endif %}
+                                        </div>
                                         <div class="calendar-day-info">
                                             {% if day['status'] != 'Future' %}
                                                 <span class="calendar-day-status">{{ day['status'] }}</span>
-                                                
                                                 {% if day['clock_in'] %}
-                                                    <div class="calendar-day-time">In: {{ day['clock_in'][:5] }}</div>
+                                                    <div class="calendar-day-time">In: {{ day['clock_in']|time12 }}</div>
                                                 {% endif %}
-                                                
                                                 {% if day['clock_out'] %}
-                                                    <div class="calendar-day-time">Out: {{ day['clock_out'][:5] }}</div>
+                                                    <div class="calendar-day-time">Out: {{ day['clock_out']|time12 }}</div>
                                                 {% endif %}
-                                                
                                                 {% if day['late_minutes'] > 0 %}
-                                                    <div class="calendar-day-time" style="color: var(--color-red); font-weight: 600;">Late: {{ day['late_minutes'] }}m</div>
+                                                    <div class="calendar-day-time txt-late-highlight">Late: {{ day['late_minutes'] }}m</div>
                                                 {% endif %}
-                                                
+                                                {% if day['early_minutes'] and day['early_minutes'] > 0 %}
+                                                    <div class="calendar-day-time txt-late-highlight">Early: {{ day['early_minutes'] }}m</div>
+                                                {% endif %}
                                                 {% if day['extra_hours'] > 0 %}
                                                     <div class="calendar-day-extra">+{{ "%.1f"|format(day['extra_hours']) }} hrs</div>
                                                 {% endif %}
-                                                
                                                 {% if day['label'] %}
-                                                    <div style="font-size: 8px; color: var(--color-blue); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ day['label'] }}">{{ day['label'] }}</div>
+                                                    <div class="calendar-day-label" title="{{ day['label'] }}">{{ day['label'] }}</div>
                                                 {% endif %}
                                             {% endif %}
                                         </div>
@@ -342,7 +322,7 @@
                     </div>
 
                     <!-- Calculate stats using namespace -->
-                    {% set stats = namespace(present=0, late=0, half=0, absent=0, leave=0, off=0, holiday=0, extra_hours=0.0, late_minutes=0) %}
+                    {% set stats = namespace(present=0, late=0, half=0, absent=0, leave=0, off=0, holiday=0, extra_hours=0.0, late_minutes=0, early_minutes=0) %}
                     {% for week in calendar_weeks %}
                         {% for day in week %}
                             {% if day.type == 'day' %}
@@ -355,9 +335,12 @@
                                 {% elif day.status == 'Holiday' %}{% set stats.holiday = stats.holiday + 1 %}
                                 {% endif %}
                                 {% if day.extra_hours %}{% set stats.extra_hours = stats.extra_hours + day.extra_hours %}{% endif %}
+                                {% if day.early_minutes %}{% set stats.early_minutes = stats.early_minutes + day.early_minutes %}{% endif %}
                             {% endif %}
                         {% endfor %}
                     {% endfor %}
+
+                    {% set net_pending = (stats.late_minutes + stats.early_minutes) - (stats.extra_hours * 60) | int %}
 
                     <!-- Statistics Summary boxes -->
                     <div class="attendance-stats-summary">
@@ -396,6 +379,14 @@
                         <div class="stat-box">
                             <div class="stat-box-num" style="color: var(--color-red);">{{ stats.late_minutes }}m</div>
                             <div class="stat-box-lbl">Late Minutes</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-num" style="color: var(--color-red);">{{ stats.early_minutes }}m</div>
+                            <div class="stat-box-lbl">Early Minutes</div>
+                        </div>
+                        <div class="stat-box" style="border-left: 2px solid var(--color-blue); padding-left: 12px;">
+                            <div class="stat-box-num {% if net_pending > 0 %}txt-pending-positive{% else %}txt-pending-negative-or-zero{% endif %}">{{ net_pending }}m</div>
+                            <div class="stat-box-lbl">Net Pending</div>
                         </div>
                     </div>
                 </div>
@@ -583,44 +574,58 @@
         </main>
     </div>
 
-    <!-- Live clock and dev panel scripts -->
+    <!-- Attendance Edit Modal -->
+    <div id="attendanceEditModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Edit Attendance for <span id="modal-edit-date-display"></span></h3>
+                <button type="button" class="modal-close-btn" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form action="{{ url_for('attendance_request_edit') }}" method="POST">
+                <input type="hidden" name="date" id="modal-edit-date">
+                {% if session['role'] == 'Admin' %}
+                    <input type="hidden" name="user_id" value="{{ target_user['id'] }}">
+                {% endif %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="modal-edit-clock-in">Clock In Time</label>
+                        <input type="time" name="clock_in" id="modal-edit-clock-in" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-edit-clock-out">Clock Out Time</label>
+                        <input type="time" name="clock_out" id="modal-edit-clock-out" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-edit-reason">Reason / Permission Details</label>
+                        <textarea name="reason" id="modal-edit-reason" class="form-control" placeholder="Provide reason for shift adjustment..." required style="height: 100px; resize: none;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+                        <button type="button" class="btn" style="background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary);" onclick="closeEditModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live clock script -->
     <script>
         function updateLiveClock() {
             const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
+            let hours = now.getHours();
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const hoursStr = String(hours).padStart(2, '0');
             const clockEl = document.getElementById('live-clock');
             if (clockEl) {
-                clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+                clockEl.textContent = `${hoursStr}:${minutes}:${seconds} ${ampm}`;
             }
         }
         setInterval(updateLiveClock, 1000);
         updateLiveClock();
-
-        function setDevTime(timeStr) {
-            document.getElementById('dev-time').value = timeStr;
-        }
-
-        function submitDevClock(action) {
-            const dateStr = document.getElementById('dev-date').value.trim();
-            const timeStr = document.getElementById('dev-time').value.trim();
-            
-            if (!timeStr) {
-                alert("Please specify a custom time.");
-                return;
-            }
-
-            if (action === 'in') {
-                document.getElementById('form-in-date').value = dateStr;
-                document.getElementById('form-in-time').value = timeStr;
-                document.getElementById('dev-clock-in-form').submit();
-            } else {
-                document.getElementById('form-out-date').value = dateStr;
-                document.getElementById('form-out-time').value = timeStr;
-                document.getElementById('dev-clock-out-form').submit();
-            }
-        }
     </script>
 </body>
 </html>

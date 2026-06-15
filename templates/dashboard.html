@@ -14,17 +14,20 @@
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
             </div>
             
-            <div class="sidebar-user">
+                        <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
-                {% if session['role'] == 'Admin' %}
-                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
-                {% elif session['role'] == 'HR' %}
-                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
-                {% elif session['role'] == 'Lead' %}
-                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
-                {% else %}
-                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
-                {% endif %}
+                <div class="user-designation">
+                    {% if session['role'] == 'Admin' %}
+                        Admin
+                    {% elif session['role'] == 'HR' %}
+                        HR Officer
+                    {% elif session['role'] == 'Lead' %}
+                        Team Lead
+                    {% else %}
+                        Creative Artist
+                    {% endif %}
+                </div>
+                <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
             <ul class="sidebar-menu">
@@ -62,13 +65,16 @@
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+
                 </li>
                 {% endif %}
             </ul>
@@ -85,7 +91,6 @@
             <header class="page-header">
                 <div>
                     <h1>Welcome, {{ session['name'] }}!</h1>
-                    <p>iNuCom Production Tracker LAN Node</p>
                 </div>
                 
                 <div class="header-actions-wrapper">
@@ -228,7 +233,7 @@
                     Overview Dashboard
                 </a>
                 <a href="{{ url_for('dashboard', view='pipeline', project_id=selected_project_id, chapter_id=selected_chapter_id) }}" class="tab-link {% if view_tab == 'pipeline' %}tab-active{% endif %}">
-                    Pipeline Sheet
+                    Production Sheet
                 </a>
             </div>
             {% endif %}
@@ -554,22 +559,7 @@
                             <span class="profile-label">Shift Hours</span>
                             <span class="profile-value">{{ user['shift_start'] }} - {{ user['shift_end'] }}</span>
                         </div>
-                        <div class="profile-group">
-                            <span class="profile-label">Reports To</span>
-                            <span class="profile-value">{{ user['reports_to'] if user['reports_to'] else '-' }}</span>
-                        </div>
                     </div>
-                </div>
-
-                <!-- Info Card -->
-                <div class="card">
-                    <h3 class="card-title">Production Status</h3>
-                    <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
-                        Daily tracker deadlines are active: Morning assignment deadline [10:00 AM] and EOD validation deadline [6:30 PM].
-                    </p>
-                    <p style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;">
-                        Points scoreboard records targets vs active completions. Open "Points & Targets" in the sidebar to review the scoreboard.
-                    </p>
                 </div>
 
                 <!-- Admin Audit Logs -->

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Activity Log - iNuCom Production Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
     <style>
         .log-action { font-weight:700; font-size:12.5px; }
         .log-details { font-size:12px; color:var(--text-secondary); max-width:480px; word-break:break-word; }
@@ -39,14 +39,27 @@
         </div>
         <div class="sidebar-user">
             <div class="user-name">{{ session['name'] }}</div>
-            <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
+            <div class="user-designation">
+                {% if session['role'] == 'Admin' %}
+                    Admin
+                {% elif session['role'] == 'HR' %}
+                    HR Officer
+                {% elif session['role'] == 'Lead' %}
+                    Team Lead
+                {% else %}
+                    Creative Artist
+                {% endif %}
+            </div>
+            <div class="user-team">{{ session['team'] }} Team</div>
         </div>
         <ul class="sidebar-menu">
             <li class="menu-section-title">Navigation</li>
             <li class="menu-item {% if request.endpoint=='dashboard' %}active{% endif %}">
                 <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a></li>
-            <li class="menu-item {% if request.endpoint=='points_page' %}active{% endif %}">
+            {% if session['role'] != 'HR' %}
+            <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                 <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a></li>
+            {% endif %}
             <li class="menu-item {% if request.endpoint=='attendance_page' %}active{% endif %}">
                 <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a></li>
             <li class="menu-item {% if request.endpoint=='leaves_page' %}active{% endif %}">
@@ -57,12 +70,10 @@
                 <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a></li>
             <li class="menu-item {% if request.endpoint=='notifications_page' %}active{% endif %}">
                 <a href="{{ url_for('notifications_page') }}">
-                    <span>Notifications{% if unread_notif_count>0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    <span>Notifications{% if unread_notif_count>0 %} <span class="sidebar-menu-badge">{{ unread_notif_count }}</span>{% endif %}</span>
                 </a>
             </li>
-            <li class="menu-section-title">Admin</li>
-            <li class="menu-item {% if request.endpoint=='reports_page' %}active{% endif %}">
-                <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a></li>
+            <li class="menu-section-title">HR Management</li>
             <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
                 <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
             <li class="menu-item active">
@@ -77,7 +88,6 @@
         <header class="page-header">
             <div>
                 <h1>📋 Activity Log</h1>
-                <p>Complete audit trail of all user actions — {{ total }} entries total</p>
             </div>
             <div class="header-actions-wrapper">
                 <!-- Notification Bell Container -->
@@ -162,6 +172,7 @@
 
         <div class="card">
             {% if logs %}
+            <div class="table-responsive">
             <table class="scoreboard-table">
                 <thead><tr>
                     <th style="text-align:center;width:40px;">#</th>
@@ -199,6 +210,7 @@
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
 
             <!-- Pagination -->
             {% if total_pages > 1 %}

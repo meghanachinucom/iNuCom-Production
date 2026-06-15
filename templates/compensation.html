@@ -99,17 +99,20 @@
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
             </div>
 
-            <div class="sidebar-user">
+                        <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
-                {% if session['role'] == 'Admin' %}
-                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
-                {% elif session['role'] == 'HR' %}
-                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
-                {% elif session['role'] == 'Lead' %}
-                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
-                {% else %}
-                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
-                {% endif %}
+                <div class="user-designation">
+                    {% if session['role'] == 'Admin' %}
+                        Admin
+                    {% elif session['role'] == 'HR' %}
+                        HR Officer
+                    {% elif session['role'] == 'Lead' %}
+                        Team Lead
+                    {% else %}
+                        Creative Artist
+                    {% endif %}
+                </div>
+                <div class="user-team">{{ session['team'] }} Team</div>
             </div>
 
             <ul class="sidebar-menu">
@@ -147,13 +150,16 @@
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+
                 </li>
                 {% endif %}
             </ul>
@@ -168,7 +174,6 @@
             <header class="page-header">
                 <div>
                     <h1>Compensation Overview</h1>
-                    <p>Hours owed (permissions + lateness) vs extra hours worked — net balance per employee</p>
                 </div>
                 <div class="header-actions-wrapper">
                     <!-- Notification Bell Container -->

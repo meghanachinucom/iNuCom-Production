@@ -16,17 +16,20 @@
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
             </div>
 
-            <div class="sidebar-user">
+                        <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
-                {% if session['role'] == 'Admin' %}
-                    <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
-                {% elif session['role'] == 'HR' %}
-                    <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
-                {% elif session['role'] == 'Lead' %}
-                    <span class="sidebar-user-role user-role-badge badge-lead">Team Lead</span>
-                {% else %}
-                    <span class="sidebar-user-role user-role-badge badge-artist">Creative Artist</span>
-                {% endif %}
+                <div class="user-designation">
+                    {% if session['role'] == 'Admin' %}
+                        Admin
+                    {% elif session['role'] == 'HR' %}
+                        HR Officer
+                    {% elif session['role'] == 'Lead' %}
+                        Team Lead
+                    {% else %}
+                        Creative Artist
+                    {% endif %}
+                </div>
+                <div class="user-team">{{ session['team'] }} Team</div>
             </div>
 
             <ul class="sidebar-menu">
@@ -64,13 +67,16 @@
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+
                 </li>
                 {% endif %}
             </ul>
@@ -85,7 +91,6 @@
             <header class="page-header">
                 <div>
                     <h1>Permissions &amp; Time Requests</h1>
-                    <p>Request formal permission for late arrival or early exit — approved hours apply to compensation offset</p>
                 </div>
                 <div class="header-actions-wrapper">
                     <!-- Notification Bell Container -->
@@ -181,7 +186,7 @@
                     <div class="card" style="margin: 0;">
                         <h3 class="card-title">How Permissions Work</h3>
                         <div style="font-size: 13px; line-height: 1.8; color: var(--text-secondary); margin-top: 8px;">
-                            <p style="margin: 0 0 10px;">A <strong>Permission</strong> is a formal request to arrive late or leave early on a specific date.</p>
+
                             <div style="background: var(--bg-main); border-radius: 8px; padding: 14px; border-left: 3px solid var(--color-blue);">
                                 <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Compensation Formula</div>
                                 <div style="font-family: monospace; font-size: 12px; color: var(--color-blue);">
@@ -190,7 +195,7 @@
                                     Net Owed = max(0, Hours Owed − Extra)
                                 </div>
                             </div>
-                            <p style="margin: 10px 0 0;">Extra hours from weekends or holidays automatically offset your owed time.</p>
+
                         </div>
                     </div>
 

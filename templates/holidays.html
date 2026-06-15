@@ -24,11 +24,18 @@
         </div>
         <div class="sidebar-user">
             <div class="user-name">{{ session['name'] }}</div>
-            {% if session['role']=='Admin' %}
-                <span class="sidebar-user-role user-role-badge badge-admin">Admin</span>
-            {% else %}
-                <span class="sidebar-user-role user-role-badge badge-hr">HR Officer</span>
-            {% endif %}
+            <div class="user-designation">
+                {% if session['role'] == 'Admin' %}
+                    Admin
+                {% elif session['role'] == 'HR' %}
+                    HR Officer
+                {% elif session['role'] == 'Lead' %}
+                    Team Lead
+                {% else %}
+                    Creative Artist
+                {% endif %}
+            </div>
+            <div class="user-team">{{ session['team'] }} Team</div>
         </div>
         <ul class="sidebar-menu">
             <li class="menu-section-title">Navigation</li>
@@ -51,14 +58,12 @@
             <li class="menu-section-title">Admin</li>
             <li class="menu-item {% if request.endpoint=='reports_page' %}active{% endif %}">
                 <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a></li>
-            <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
-                <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
-            <li class="menu-item {% if request.endpoint=='activity_log_page' %}active{% endif %}">
-                <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a></li>
             {% else %}
             <li class="menu-section-title">HR Management</li>
             <li class="menu-item {% if request.endpoint=='holidays_page' %}active{% endif %}">
                 <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a></li>
+            <li class="menu-item {% if request.endpoint=='activity_log_page' %}active{% endif %}">
+                <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a></li>
             {% endif %}
         </ul>
         <div class="sidebar-footer">
@@ -70,7 +75,6 @@
         <header class="page-header">
             <div>
                 <h1>Holiday Calendar — 2026</h1>
-                <p>Manage company holidays. Holidays appear on attendance calendars and count as off-days for compensation.</p>
             </div>
             <div class="header-actions-wrapper">
                 <!-- Notification Bell Container -->
