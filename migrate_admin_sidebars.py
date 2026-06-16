@@ -29,7 +29,7 @@ sidebar_replacement = """        <!-- Sidebar -->
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>🎬 Production Sheet</span></a>
+                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                     <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
@@ -67,18 +67,18 @@ sidebar_replacement = """        <!-- Sidebar -->
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-section-title">Admin</li>
                 <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>📁 Upload Project</span></a>
+                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
                 </li>
                 {% endif %}
             </ul>
