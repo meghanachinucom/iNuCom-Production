@@ -110,6 +110,30 @@ if proj_row:
             check("Pipeline Content stage is Open", pipeline.get("Content") == "Open")
             check("Pipeline Modeling stage is Pending", pipeline.get("Modeling") == "Pending")
             check("Pipeline VR stage is Pending", pipeline.get("VR") == "Pending")
+            
+            # Test inline edit file name feature for HR
+            file_id = file_row[0]
+            print(f"  {INFO} Testing file name edit route for file ID {file_id}")
+            r_edit = s_hr.post(f"{BASE}/files/edit-name/{file_id}", data={
+                "name": "File_A01_01_Renamed",
+                "project_id": proj_id,
+                "chapter_id": chap_id
+            }, allow_redirects=True)
+            check("Rename request returns 200", r_edit.status_code == 200)
+            check("Flash message shows success", "updated successfully" in r_edit.text or "updated" in r_edit.text.lower())
+            
+            # Verify database has new name
+            cursor.execute("SELECT name FROM files WHERE id = ?", (file_id,))
+            updated_file_row = cursor.fetchone()
+            check("File name updated to 'File_A01_01_Renamed' in database", updated_file_row is not None and updated_file_row[0] == 'File_A01_01_Renamed')
+
+            # Test duplicate naming block
+            r_dup = s_hr.post(f"{BASE}/files/edit-name/{file_id}", data={
+                "name": "File_A01_02",
+                "project_id": proj_id,
+                "chapter_id": chap_id
+            }, allow_redirects=True)
+            check("Duplicate rename fails/shows error flash", "already exists" in r_dup.text)
 
 # Clean up database changes
 heading("STEP 5: Clean up database changes from test upload")

@@ -1488,6 +1488,55 @@ def add_file():
         
     return redirect(url_for('dashboard', chapter_id=chapter_id))
 
+@app.route('/files/edit-name/<int:file_id>', methods=['POST'])
+def edit_file_name(file_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'HR':
+        flash("Unauthorized to edit file names.", "error")
+        return redirect(url_for('dashboard'))
+
+    new_name = request.form.get('name', '').strip()
+    project_id = request.form.get('project_id', type=int)
+    chapter_id = request.form.get('chapter_id', type=int)
+
+    if not new_name:
+        flash("File name cannot be empty.", "error")
+        return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    try:
+        # Get old file details for logging
+        cursor.execute("SELECT name, chapter_id FROM files WHERE id = ?", (file_id,))
+        file_row = cursor.fetchone()
+        if not file_row:
+            flash("File not found.", "error")
+            return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+
+        old_name = file_row['name']
+
+        # Check for duplicates in the same chapter
+        cursor.execute("SELECT id FROM files WHERE chapter_id = ? AND name = ? AND id != ?", (file_row['chapter_id'], new_name, file_id))
+        duplicate = cursor.fetchone()
+        if duplicate:
+            flash(f"A file with name '{new_name}' already exists in this chapter.", "error")
+            return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+
+        cursor.execute("UPDATE files SET name = ? WHERE id = ?", (new_name, file_id))
+        
+        # Log activity
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Edit File Name', ?)",
+                       (session['user_id'], f"Renamed file ID {file_id} from '{old_name}' to '{new_name}'."))
+        db.commit()
+        flash("File name updated successfully!", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error updating file name: {e}", "error")
+
+    return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+
 @app.route('/file/assign', methods=['POST'])
 def assign_file():
     if 'user_id' not in session:

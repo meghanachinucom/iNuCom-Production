@@ -307,7 +307,21 @@
                                 {% for file in files %}
                                     <tr>
                                         <td class="file-name-cell">
-                                            {{ file['name'] }}
+                                            {% if session['role'] == 'HR' %}
+                                                <div class="file-name-display-wrapper" id="file-display-{{ file['id'] }}" style="display: flex; align-items: center; justify-content: space-between;">
+                                                    <span class="file-name-text" style="font-weight: 600;">{{ file['name'] }}</span>
+                                                    <button type="button" class="btn-edit-filename" data-id="{{ file['id'] }}" onclick="toggleFilenameEdit(this.dataset.id)" style="background:none; border:none; cursor:pointer; font-size:12px; margin-left:4px; padding:0;" title="Edit File Name">✏️</button>
+                                                </div>
+                                                <form action="{{ url_for('edit_file_name', file_id=file['id']) }}" method="POST" class="edit-filename-form" id="file-form-{{ file['id'] }}" style="display:none; gap:6px; align-items:center; width: 100%;">
+                                                    <input type="hidden" name="chapter_id" value="{{ selected_chapter_id }}">
+                                                    <input type="hidden" name="project_id" value="{{ selected_project_id }}">
+                                                    <input type="text" name="name" class="form-input" value="{{ file['name'] }}" required style="padding: 2px 6px; font-size: 12px; flex-grow: 1; min-width: 80px; height: auto;">
+                                                    <button type="submit" class="btn btn-success btn-sm" style="padding: 2px 6px; font-size: 11px;">Save</button>
+                                                    <button type="button" class="btn btn-sm" data-id="{{ file['id'] }}" onclick="toggleFilenameEdit(this.dataset.id)" style="padding: 2px 6px; font-size: 11px; background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary);">Cancel</button>
+                                                </form>
+                                            {% else %}
+                                                {{ file['name'] }}
+                                            {% endif %}
                                             <div style="font-size: 10px; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
                                                 {{ file['description'] }}
                                             </div>
@@ -938,6 +952,20 @@
                 })();
                 </script>
             {% endif %}
+            
+            <script>
+            function toggleFilenameEdit(fileId) {
+                const display = document.getElementById('file-display-' + fileId);
+                const form = document.getElementById('file-form-' + fileId);
+                if (display.style.display === 'none') {
+                    display.style.display = 'flex';
+                    form.style.display = 'none';
+                } else {
+                    display.style.display = 'none';
+                    form.style.display = 'flex';
+                }
+            }
+            </script>
         </main>
     </div>
 </body>
