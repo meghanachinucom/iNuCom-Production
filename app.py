@@ -319,6 +319,26 @@ def init_db():
             conn.close()
             print("Migrated: permission_requests table created.")
 
+        # Runtime migration: ensure permission_requests table has clock_in and clock_out columns
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT clock_in, clock_out FROM permission_requests LIMIT 1")
+            conn.close()
+        except sqlite3.OperationalError:
+            conn = sqlite3.connect(DATABASE)
+            try:
+                conn.execute("ALTER TABLE permission_requests ADD COLUMN clock_in TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE permission_requests ADD COLUMN clock_out TEXT")
+            except sqlite3.OperationalError:
+                pass
+            conn.commit()
+            conn.close()
+            print("Migrated: permission_requests clock_in and clock_out columns added.")
+
         # Runtime migration: ensure notifications table exists (Layer 10)
         try:
             conn = sqlite3.connect(DATABASE)
@@ -2502,6 +2522,8 @@ def attendance_request_edit():
 def leaves_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if session['role'] == 'Admin':
+        return redirect(url_for('system_approvals_page'))
         
     db = get_db()
     cursor = db.cursor()
@@ -2631,7 +2653,7 @@ def leaves_page():
                     VALUES (?, 'Leave Request', ?)
                 """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} ({requested_days} days) - Pending approval chain {chain_json}"))
                 
-                _push_notification(db, chain[0], "Pending Approval Waiting", f"Leave request from {session['name']} needs your approval.", "approval", link=url_for('leaves'))
+                _push_notification(db, chain[0], "Pending Approval Waiting", f"Leave request from {session['name']} needs your approval.", "approval", link=url_for('leaves_page'))
                 db.commit()
                 flash("Leave request submitted successfully, pending approval chain.", "success")
                 
@@ -2642,6 +2664,8 @@ def leaves_page():
         return redirect(url_for('leaves_page'))
         
     # 2. HANDLE GET
+    my_permissions = []
+    comp_rows = []
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
     user_info = cursor.fetchone()
     
@@ -2735,7 +2759,48 @@ def leaves_page():
                 })
         except Exception as e:
             pass
+    if session['role'] in ['Artist', 'Lead', 'HR']:
+        import json
+        # Fetch Artist's own permissions requests
+        cursor.execute("""
+            SELECT pr.*, a.id as approval_id, a.approval_chain, a.current_index, a.status as approval_status
+            FROM permission_requests pr
+            LEFT JOIN approvals a ON (pr.id = a.reference_id AND a.type = 'Permission')
+            WHERE pr.user_id = ?
+            ORDER BY pr.date DESC, pr.id DESC
+        """, (session['user_id'],))
+        my_perm_raw = cursor.fetchall()
+        for row in my_perm_raw:
+            step_info = ""
+            if row['status'] == 'Pending' and row['approval_chain']:
+                try:
+                    chain = json.loads(row['approval_chain'])
+                    idx = row['current_index']
+                    if idx < len(chain):
+                        cursor.execute("SELECT name, role FROM users WHERE id = ?", (chain[idx],))
+                        approver = cursor.fetchone()
+                        if approver:
+                            step_info = f"Awaiting: {approver['name']} ({approver['role']}) — Step {idx+1}/{len(chain)}"
+                except Exception:
+                    step_info = "Pending in chain"
+            elif row['status'] == 'Approved':
+                step_info = "Approved"
+            elif row['status'] == 'Rejected':
+                step_info = "Rejected"
+
+            my_permissions.append({
+                'id': row['id'],
+                'date': row['date'],
+                'hours': row['hours'],
+                'reason': row['reason'],
+                'status': row['status'],
+                'step_info': step_info,
+            })
             
+        # Fetch Artist's own compensation row
+        all_comp = _comp_summary(db)
+        comp_rows = [r for r in all_comp if r['uid'] == session['user_id']]
+
     return render_template(
         'leaves.html',
         user=user_info,
@@ -2744,6 +2809,8 @@ def leaves_page():
         remaining_balance=remaining_balance,
         my_leaves=my_leaves,
         my_pending_approvals=my_pending_approvals,
+        my_permissions=my_permissions,
+        comp_rows=comp_rows,
         today_str=datetime.date.today().strftime('%Y-%m-%d')
     )
 
@@ -2753,7 +2820,7 @@ def approve_leave(approval_id):
         return redirect(url_for('login'))
     if session['role'] == 'HR':
         flash("HR is not authorized to approve leaves.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     db = get_db()
     cursor = db.cursor()
@@ -2763,7 +2830,7 @@ def approve_leave(approval_id):
     
     if not approval:
         flash("Approval request not found or already actioned.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     import json
     try:
@@ -2771,11 +2838,11 @@ def approve_leave(approval_id):
         curr_idx = approval['current_index']
     except Exception as e:
         flash("Invalid approval request data.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
         flash("Unauthorized to approve this step.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     next_idx = curr_idx + 1
     
@@ -2793,7 +2860,7 @@ def approve_leave(approval_id):
                     SET status = 'Approved', approved_by = ?
                     WHERE id = ?
                 """, (session['user_id'], approval['reference_id']))
-                _push_notification(db, approval['requester_id'], "Leave Approved", f"Your leave request has been approved.", "leave", link=url_for('leaves'))
+                _push_notification(db, approval['requester_id'], "Leave Approved", f"Your leave request has been approved.", "leave", link=url_for('leaves_page'))
                 
             cursor.execute("""
                 INSERT INTO activity_log (user_id, action, details)
@@ -2813,7 +2880,7 @@ def approve_leave(approval_id):
                 VALUES (?, 'Approve Request', ?)
             """, (session['user_id'], f"Approved {approval['type']} ID {approval['reference_id']} (Advanced to step {next_idx + 1})."))
             
-            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Leave request needs your approval.", "approval", link=url_for('leaves'))
+            _push_notification(db, chain[next_idx], "Pending Approval Waiting", f"Leave request needs your approval.", "approval", link=url_for('leaves_page'))
             flash("Request approved and advanced to next step in the chain.", "success")
             
         db.commit()
@@ -2821,7 +2888,7 @@ def approve_leave(approval_id):
         db.rollback()
         flash(f"Error actioning approval: {e}", "error")
         
-    return redirect(url_for('leaves_page'))
+    return redirect(request.referrer or url_for('leaves_page'))
 
 @app.route('/leaves/reject/<int:approval_id>', methods=['POST'])
 def reject_leave(approval_id):
@@ -2829,7 +2896,7 @@ def reject_leave(approval_id):
         return redirect(url_for('login'))
     if session['role'] == 'HR':
         flash("HR is not authorized to reject leaves.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     db = get_db()
     cursor = db.cursor()
@@ -2839,7 +2906,7 @@ def reject_leave(approval_id):
     
     if not approval:
         flash("Approval request not found or already actioned.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     import json
     try:
@@ -2847,11 +2914,11 @@ def reject_leave(approval_id):
         curr_idx = approval['current_index']
     except Exception as e:
         flash("Invalid approval request data.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
         flash("Unauthorized to reject this step.", "error")
-        return redirect(url_for('leaves_page'))
+        return redirect(request.referrer or url_for('leaves_page'))
         
     try:
         cursor.execute("""
@@ -2866,7 +2933,7 @@ def reject_leave(approval_id):
                 SET status = 'Rejected'
                 WHERE id = ?
             """, (approval['reference_id'],))
-            _push_notification(db, approval['requester_id'], "Leave Rejected", f"Your leave request has been rejected.", "leave", link=url_for('leaves'))
+            _push_notification(db, approval['requester_id'], "Leave Rejected", f"Your leave request has been rejected.", "leave", link=url_for('leaves_page'))
             
         cursor.execute("""
             INSERT INTO activity_log (user_id, action, details)
@@ -2879,7 +2946,7 @@ def reject_leave(approval_id):
         db.rollback()
         flash(f"Error rejecting request: {e}", "error")
         
-    return redirect(url_for('leaves_page'))
+    return redirect(request.referrer or url_for('leaves_page'))
 
 # ─────────────────────────────────────────────────────────────
 # LAYER 6: PERMISSIONS + COMPENSATION
@@ -3011,6 +3078,10 @@ def permissions_page():
         return redirect(url_for('permissions_page'))
 
     # ── GET ──
+    if session['role'] in ['Artist', 'Lead', 'HR']:
+        return redirect(url_for('leaves_page'))
+    if session['role'] == 'Admin':
+        return redirect(url_for('system_approvals_page'))
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
     user_info = cursor.fetchone()
 
@@ -3098,7 +3169,7 @@ def approve_permission(approval_id):
         return redirect(url_for('login'))
     if session['role'] == 'HR':
         flash("HR is not authorized to approve permissions.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     db = get_db()
     cursor = db.cursor()
@@ -3108,18 +3179,18 @@ def approve_permission(approval_id):
 
     if not approval:
         flash("Approval request not found or already actioned.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     try:
         chain = _json.loads(approval['approval_chain'])
         curr_idx = approval['current_index']
     except Exception:
         flash("Invalid approval data.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
         flash("Unauthorized to approve this step.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     next_idx = curr_idx + 1
     try:
@@ -3136,7 +3207,7 @@ def approve_permission(approval_id):
             # Fetch the permission request details to see if this is an attendance adjustment
             cursor.execute("SELECT * FROM permission_requests WHERE id = ?", (approval['reference_id'],))
             pr_req = cursor.fetchone()
-            if pr_req and pr_req['clock_in'] and pr_req['clock_out']:
+            if pr_req and 'clock_in' in pr_req.keys() and 'clock_out' in pr_req.keys() and pr_req['clock_in'] and pr_req['clock_out']:
                 clock_in_val = pr_req['clock_in']
                 clock_out_val = pr_req['clock_out']
                 target_date = pr_req['date']
@@ -3174,7 +3245,7 @@ def approve_permission(approval_id):
         db.rollback()
         flash(f"Error approving permission: {e}", "error")
 
-    return redirect(url_for('permissions_page'))
+    return redirect(request.referrer or url_for('permissions_page'))
 
 
 @app.route('/permissions/reject/<int:approval_id>', methods=['POST'])
@@ -3183,7 +3254,7 @@ def reject_permission(approval_id):
         return redirect(url_for('login'))
     if session['role'] == 'HR':
         flash("HR is not authorized to reject permissions.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     db = get_db()
     cursor = db.cursor()
@@ -3193,18 +3264,18 @@ def reject_permission(approval_id):
 
     if not approval:
         flash("Approval request not found or already actioned.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     try:
         chain = _json.loads(approval['approval_chain'])
         curr_idx = approval['current_index']
     except Exception:
         flash("Invalid approval data.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     if curr_idx >= len(chain) or chain[curr_idx] != session['user_id']:
         flash("Unauthorized to reject this step.", "error")
-        return redirect(url_for('permissions_page'))
+        return redirect(request.referrer or url_for('permissions_page'))
 
     try:
         cursor.execute("""
@@ -3220,13 +3291,15 @@ def reject_permission(approval_id):
         db.rollback()
         flash(f"Error rejecting permission: {e}", "error")
 
-    return redirect(url_for('permissions_page'))
+    return redirect(request.referrer or url_for('permissions_page'))
 
 
 @app.route('/compensation')
 def compensation_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if session['role'] in ['Artist', 'Lead', 'HR']:
+        return redirect(url_for('leaves_page'))
 
     db = get_db()
     cursor = db.cursor()
@@ -3256,6 +3329,346 @@ def compensation_page():
         teams=teams,
         filter_team=filter_team,
         today_str=today_str,
+    )
+
+
+@app.route('/team-approvals')
+def team_approvals_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] not in ['Lead', 'Admin']:
+        flash("Unauthorized to access Team Approvals.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT a.id as approval_id, a.requester_id, a.type, a.reference_id, a.approval_chain, a.current_index, a.details, a.status as approval_status,
+               u.name as requester_name, u.role as requester_role, u.team as requester_team
+        FROM approvals a
+        JOIN users u ON a.requester_id = u.id
+        WHERE a.status = 'Pending'
+        ORDER BY a.id ASC
+    """)
+    all_pending_approvals = cursor.fetchall()
+
+    my_pending_leaves = []
+    my_pending_permissions = []
+    
+    import json
+    for app_row in all_pending_approvals:
+        try:
+            chain = json.loads(app_row['approval_chain'])
+            curr_idx = app_row['current_index']
+            if curr_idx < len(chain) and chain[curr_idx] == session['user_id']:
+                item = {
+                    'id': app_row['approval_id'],
+                    'requester_name': app_row['requester_name'],
+                    'requester_role': app_row['requester_role'],
+                    'requester_team': app_row['requester_team'],
+                    'type': app_row['type'],
+                    'details': app_row['details'],
+                    'step_info': f"Step {curr_idx + 1} of {len(chain)}"
+                }
+                if app_row['type'] == 'Leave':
+                    my_pending_leaves.append(item)
+                elif app_row['type'] == 'Permission':
+                    my_pending_permissions.append(item)
+        except Exception:
+            pass
+
+    return render_template(
+        'team_approvals.html',
+        user=user_info,
+        my_pending_leaves=my_pending_leaves,
+        my_pending_permissions=my_pending_permissions
+    )
+
+
+@app.route('/system-approvals')
+def system_approvals_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'Admin':
+        flash("Access restricted to Admin.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    # Get user profile
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    # Query all pending approvals
+    cursor.execute("""
+        SELECT a.id as approval_id, a.requester_id, a.type, a.reference_id, a.approval_chain, a.current_index, a.details, a.status as approval_status,
+               u.name as requester_name, u.role as requester_role, u.team as requester_team
+        FROM approvals a
+        JOIN users u ON a.requester_id = u.id
+        WHERE a.status = 'Pending'
+        ORDER BY a.id ASC
+    """)
+    all_pending_approvals = cursor.fetchall()
+
+    import json
+    my_pending_leaves = []
+    my_pending_permissions = []
+
+    for app_row in all_pending_approvals:
+        try:
+            chain = json.loads(app_row['approval_chain'])
+            curr_idx = app_row['current_index']
+            if curr_idx < len(chain) and chain[curr_idx] == session['user_id']:
+                item = {
+                    'id': app_row['approval_id'],
+                    'requester_name': app_row['requester_name'],
+                    'requester_role': app_row['requester_role'],
+                    'requester_team': app_row['requester_team'],
+                    'type': app_row['type'],
+                    'details': app_row['details'],
+                    'step_info': f"Step {curr_idx + 1} of {len(chain)}"
+                }
+                if app_row['type'] == 'Leave':
+                    my_pending_leaves.append(item)
+                elif app_row['type'] == 'Permission':
+                    my_pending_permissions.append(item)
+        except Exception:
+            pass
+
+    return render_template(
+        'system_approvals.html',
+        user=user_info,
+        my_pending_leaves=my_pending_leaves,
+        my_pending_permissions=my_pending_permissions
+    )
+
+
+@app.route('/attendance/api/calendar/<int:employee_id>')
+def attendance_calendar_api(employee_id):
+    from flask import jsonify
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    if session['role'] not in ['Admin', 'HR', 'Lead']:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (employee_id,))
+    target_user = cursor.fetchone()
+    if not target_user:
+        return jsonify({'error': 'Employee not found'}), 404
+
+    # Lead can only inspect their team
+    if session['role'] == 'Lead' and target_user['team'] != session['team']:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    year = request.args.get('year', default=datetime.date.today().year, type=int)
+    month = request.args.get('month', default=datetime.date.today().month, type=int)
+
+    month_prefix = f"{year}-{month:02d}"
+    first_weekday, num_days = calendar.monthrange(year, month)
+
+    cursor.execute("""
+        SELECT * FROM attendance 
+        WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+    """, (employee_id, month_prefix))
+    att_list = {row['date']: dict(row) for row in cursor.fetchall()}
+
+    cursor.execute("""
+        SELECT * FROM leaves 
+        WHERE user_id = ? AND status = 'Approved' 
+          AND (strftime('%Y-%m', start_date) = ? OR strftime('%Y-%m', end_date) = ?)
+    """, (employee_id, month_prefix, month_prefix))
+    leaves_list = [dict(row) for row in cursor.fetchall()]
+
+    cursor.execute("SELECT * FROM holidays WHERE strftime('%Y-%m', date) = ?", (month_prefix,))
+    holidays_list = {row['date']: row['name'] for row in cursor.fetchall()}
+
+    calendar_days = []
+    # Padding cells before first day of month
+    for p in range(first_weekday):
+        calendar_days.append({'type': 'padding'})
+
+    today_date = datetime.date.today()
+    for day in range(1, num_days + 1):
+        day_date = datetime.date(year, month, day)
+        day_str = day_date.strftime('%Y-%m-%d')
+
+        status = 'Future'
+        clock_in = None
+        clock_out = None
+        late_minutes = 0
+        extra_hours = 0.0
+        label = ""
+
+        if day_str in att_list:
+            status = att_list[day_str]['status']
+            clock_in = att_list[day_str]['clock_in']
+            clock_out = att_list[day_str]['clock_out']
+            late_minutes = att_list[day_str]['late_minutes']
+            extra_hours = att_list[day_str]['extra_hours']
+        else:
+            is_leave = False
+            for leave in leaves_list:
+                s_date = datetime.datetime.strptime(leave['start_date'], '%Y-%m-%d').date()
+                e_date = datetime.datetime.strptime(leave['end_date'], '%Y-%m-%d').date()
+                if s_date <= day_date <= e_date:
+                    is_leave = True
+                    break
+
+            if is_leave:
+                status = 'Leave'
+            elif is_weekly_off(day_date):
+                status = 'Off'
+            elif day_str in holidays_list:
+                status = 'Holiday'
+                label = holidays_list[day_str]
+            else:
+                if day_date > today_date:
+                    status = 'Future'
+                elif day_date == today_date:
+                    status = 'Absent'
+                else:
+                    status = 'Absent'
+
+        calendar_days.append({
+            'type': 'day',
+            'day': day,
+            'date': day_str,
+            'status': status,
+            'clock_in': clock_in,
+            'clock_out': clock_out,
+            'late_minutes': late_minutes,
+            'extra_hours': extra_hours,
+            'label': label
+        })
+
+    return jsonify({
+        'employee_name': target_user['name'],
+        'employee_id': employee_id,
+        'year': year,
+        'month': month,
+        'days': calendar_days
+    })
+
+
+@app.route('/upload-project', methods=['GET', 'POST'])
+def upload_project_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'HR':
+        flash("Unauthorized to access Project Upload.", "error")
+        return redirect(url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+    user_info = cursor.fetchone()
+
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash("No file part in the request.", "error")
+            return redirect(url_for('upload_project_page'))
+        file = request.files['file']
+        if file.filename == '':
+            flash("No selected file.", "error")
+            return redirect(url_for('upload_project_page'))
+
+        if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+            import openpyxl
+            try:
+                wb = openpyxl.load_workbook(file, read_only=True)
+                sheet = wb.active
+                
+                rows_processed = 0
+                files_created = 0
+                
+                for row_idx, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+                    if not row or len(row) < 3:
+                        continue
+                        
+                    proj_name = str(row[0] or '').strip()
+                    chap_name = str(row[1] or '').strip()
+                    file_name = str(row[2] or '').strip()
+                    file_desc = str(row[3] or '').strip() if len(row) > 3 and row[3] is not None else ''
+
+                    # Skip header row if it contains header-like words in the first row
+                    if row_idx == 1:
+                        val_a = proj_name.lower()
+                        val_c = file_name.lower()
+                        if 'project' in val_a or 'file' in val_c:
+                            continue
+
+                    if not proj_name or not chap_name or not file_name:
+                        continue
+
+                    # 1. Get or Create Project
+                    cursor.execute("SELECT id FROM projects WHERE name = ?", (proj_name,))
+                    proj_row = cursor.fetchone()
+                    if proj_row:
+                        proj_id = proj_row['id']
+                    else:
+                        cursor.execute("INSERT INTO projects (name, description, status) VALUES (?, 'Imported Project', 'Active')", (proj_name,))
+                        proj_id = cursor.lastrowid
+
+                    # 2. Get or Create Chapter
+                    cursor.execute("SELECT id FROM chapters WHERE project_id = ? AND name = ?", (proj_id, chap_name))
+                    chap_row = cursor.fetchone()
+                    if chap_row:
+                        chap_id = chap_row['id']
+                    else:
+                        cursor.execute("INSERT INTO chapters (project_id, name, description, status) VALUES (?, ?, 'Imported Chapter', 'Active')", (proj_id, chap_name))
+                        chap_id = cursor.lastrowid
+
+                    # 3. Check if file already exists in this chapter to prevent duplicate imports
+                    cursor.execute("SELECT id FROM files WHERE chapter_id = ? AND name = ?", (chap_id, file_name))
+                    existing_file = cursor.fetchone()
+                    if existing_file:
+                        continue
+
+                    # 4. Insert File
+                    cursor.execute("""
+                        INSERT INTO files (chapter_id, name, description, status)
+                        VALUES (?, ?, ?, 'Pending')
+                    """, (chap_id, file_name, file_desc))
+                    file_id = cursor.lastrowid
+                    files_created += 1
+
+                    # 5. Initialize the pipeline stages for this file
+                    for stage in PIPELINE_STAGES:
+                        status = 'Open' if stage == 'Content' else 'Pending'
+                        cursor.execute("""
+                            INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
+                            VALUES (?, ?, ?, NULL, 0)
+                        """, (file_id, stage, status))
+
+                    rows_processed += 1
+
+                db.commit()
+                flash(f"Successfully processed Excel sheet! Created {files_created} new files across projects.", "success")
+                cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Upload Project Excel', ?)",
+                               (session['user_id'], f"Uploaded excel file '{file.filename}' creating {files_created} files."))
+                db.commit()
+                
+            except Exception as e:
+                db.rollback()
+                flash(f"Error reading Excel file: {e}", "error")
+                
+            return redirect(url_for('upload_project_page'))
+        else:
+            flash("Invalid file format. Please upload an Excel (.xlsx or .xls) file.", "error")
+            return redirect(url_for('upload_project_page'))
+
+    return render_template(
+        'upload_project.html',
+        user=user_info
     )
 
 
@@ -3640,8 +4053,8 @@ def _seed_holidays(db):
 def holidays_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] not in ['Admin', 'HR']:
-        flash("Access restricted to HR and Admin.", "error")
+    if session['role'] != 'HR':
+        flash("Access restricted to HR.", "error")
         return redirect(url_for('dashboard'))
 
     db = get_db()

@@ -20,7 +20,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <!-- Sidebar -->
+                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -32,11 +32,11 @@
                     {% if session['role'] == 'Admin' %}
                         Admin
                     {% elif session['role'] == 'HR' %}
-                        HR Officer
+                        HR
                     {% elif session['role'] == 'Lead' %}
-                        Team Lead
+                        Lead
                     {% else %}
-                        Creative Artist
+                        Artist
                     {% endif %}
                 </div>
                 <div class="user-team">{{ session['team'] }} Team</div>
@@ -44,8 +44,11 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>🎬 Production Sheet</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                     <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
@@ -53,13 +56,24 @@
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
+                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
-                    <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
+                {% if session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
+                {% endif %}
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                </li>
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
@@ -74,19 +88,16 @@
                 <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
                     <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>📁 Upload Project</span></a>
+                </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-
                     <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-
                 </li>
                 {% endif %}
             </ul>
@@ -198,6 +209,7 @@
                 <!-- Clock Widget / Dev Test Panel Row -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
                     <!-- Check-in / Check-out Panel -->
+                    {% if session['role'] != 'Admin' %}
                     <div class="card" style="margin: 0;">
                         <h3 class="card-title">Clock Panel</h3>
                         <div style="text-align: center; padding: 20px 0;">
@@ -239,10 +251,12 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                 </div>
 
                 <!-- Monthly Calendar view of the target employee -->
+                {% if session['role'] != 'Admin' %}
                 <div class="calendar-card">
                     <!-- If viewing someone else -->
                     {% if target_user['id'] != session['user_id'] %}
@@ -301,13 +315,13 @@
                                                 {% if day['clock_out'] %}
                                                     <div class="calendar-day-time">Out: {{ day['clock_out']|time12 }}</div>
                                                 {% endif %}
-                                                {% if day['late_minutes'] > 0 %}
+                                                {% if day['late_minutes'] and day['late_minutes'] > 0 %}
                                                     <div class="calendar-day-time txt-late-highlight">Late: {{ day['late_minutes'] }}m</div>
                                                 {% endif %}
                                                 {% if day['early_minutes'] and day['early_minutes'] > 0 %}
                                                     <div class="calendar-day-time txt-late-highlight">Early: {{ day['early_minutes'] }}m</div>
                                                 {% endif %}
-                                                {% if day['extra_hours'] > 0 %}
+                                                {% if day['extra_hours'] and day['extra_hours'] > 0 %}
                                                     <div class="calendar-day-extra">+{{ "%.1f"|format(day['extra_hours']) }} hrs</div>
                                                 {% endif %}
                                                 {% if day['label'] %}
@@ -390,6 +404,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Role Based Views: Lead (Team Summary) -->
                 {% if session['role'] == 'Lead' %}
@@ -413,10 +428,10 @@
                                             <td><strong>{{ row['name'] }}</strong> <span style="font-size: 11px; color: var(--text-muted);">(@{{ row['username'] }})</span></td>
                                             <td>{{ row['clock_in'] if row['clock_in'] else '--' }}</td>
                                             <td>{{ row['clock_out'] if row['clock_out'] else '--' }}</td>
-                                            <td class="{% if row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
+                                            <td class="{% if row['late_minutes'] and row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
                                                 {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
                                             </td>
-                                            <td class="{% if row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
+                                            <td class="{% if row['extra_hours'] and row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
                                                 +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
                                             </td>
                                             <td>
@@ -506,10 +521,10 @@
                                                 <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
                                                 <td>{{ row['clock_in'] if row['clock_in'] else '--' }}</td>
                                                 <td>{{ row['clock_out'] if row['clock_out'] else '--' }}</td>
-                                                <td class="{% if row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
+                                                <td class="{% if row['late_minutes'] and row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
                                                     {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
                                                 </td>
-                                                <td class="{% if row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
+                                                <td class="{% if row['extra_hours'] and row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
                                                     +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
                                                 </td>
                                                 <td>
@@ -560,7 +575,11 @@
                                                 <td style="color: var(--color-red); font-weight: 600;">{{ row['late_minutes'] }}m</td>
                                                 <td style="color: var(--color-green); font-weight: 600;">+{{ "%.1f"|format(row['extra_hours']) }}h</td>
                                                 <td>
-                                                    <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
+                                                    {% if session['role'] == 'Admin' %}
+                                                        <button type="button" class="btn btn-primary btn-sm" data-id="{{ row['id'] }}" data-name="{{ row['name'] }}" onclick="openCalendarModal(this.dataset.id, this.dataset.name)" style="font-size: 11px; padding: 4px 8px; border: none; cursor: pointer;">View Calendar</button>
+                                                    {% else %}
+                                                        <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
+                                                    {% endif %}
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -607,6 +626,147 @@
             </form>
         </div>
     </div>
+
+    <!-- Employee Calendar Modal -->
+    <div id="employeeCalendarModal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 900px; width: 90%;">
+            <div class="modal-header">
+                <h3>Attendance Calendar — <span id="modal-employee-name-display"></span></h3>
+                <button type="button" class="modal-close-btn" onclick="closeCalendarModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="calendar-controls" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="shiftPopupMonth(-1)">&larr; Previous Month</button>
+                    <span id="modal-calendar-month-display" style="font-weight: 700; font-size: 16px; color: var(--color-blue);"></span>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="shiftPopupMonth(1)">Next Month &rarr;</button>
+                </div>
+                <div id="modal-calendar-container" class="calendar-card" style="border: 0; box-shadow: none; padding: 0;">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPopupEmployeeId = null;
+        let currentPopupYear = null;
+        let currentPopupMonth = null;
+
+        function openCalendarModal(employeeId, employeeName) {
+            currentPopupEmployeeId = employeeId;
+            const today = new Date();
+            currentPopupYear = today.getFullYear();
+            currentPopupMonth = today.getMonth() + 1; // 1-indexed
+            
+            document.getElementById('modal-employee-name-display').textContent = employeeName;
+            document.getElementById('employeeCalendarModal').classList.add('active');
+            
+            fetchCalendarData();
+        }
+
+        function closeCalendarModal() {
+            document.getElementById('employeeCalendarModal').classList.remove('active');
+        }
+
+        function shiftPopupMonth(offset) {
+            currentPopupMonth += offset;
+            if (currentPopupMonth < 1) {
+                currentPopupMonth = 12;
+                currentPopupYear -= 1;
+            } else if (currentPopupMonth > 12) {
+                currentPopupMonth = 1;
+                currentPopupYear += 1;
+            }
+            fetchCalendarData();
+        }
+
+        function fetchCalendarData() {
+            const container = document.getElementById('modal-calendar-container');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Loading calendar data...</div>';
+            
+            const monthNames = [
+                "January", "February", "March", "April", "May", "June", 
+                "July", "August", "September", "October", "November", "December"
+            ];
+            document.getElementById('modal-calendar-month-display').textContent = `${monthNames[currentPopupMonth - 1]} ${currentPopupYear}`;
+            
+            fetch(`/attendance/api/calendar/${currentPopupEmployeeId}?year=${currentPopupYear}&month=${currentPopupMonth}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--color-red);">${data.error}</div>`;
+                        return;
+                    }
+                    
+                    let html = `
+                        <div class="calendar-header">
+                            <div class="calendar-header-day">Mon</div>
+                            <div class="calendar-header-day">Tue</div>
+                            <div class="calendar-header-day">Wed</div>
+                            <div class="calendar-header-day">Thu</div>
+                            <div class="calendar-header-day">Fri</div>
+                            <div class="calendar-header-day">Sat</div>
+                            <div class="calendar-header-day">Sun</div>
+                        </div>
+                        <div class="calendar-grid">
+                    `;
+                    
+                    data.days.forEach(day => {
+                        if (day.type === 'padding') {
+                            html += `<div class="calendar-day att-padding"></div>`;
+                        } else {
+                            let statusClass = 'att-future';
+                            let displayStatus = day.status;
+                            
+                            if (day.status === 'Present') statusClass = 'att-present';
+                            else if (day.status === 'Late') statusClass = 'att-late';
+                            else if (day.status === 'Half Day') statusClass = 'att-half';
+                            else if (day.status === 'Absent') statusClass = 'att-absent';
+                            else if (day.status === 'Leave') statusClass = 'att-leave';
+                            else if (day.status === 'Off') statusClass = 'att-off';
+                            else if (day.status === 'Holiday') statusClass = 'att-holiday';
+                            
+                            html += `
+                                <div class="calendar-day ${statusClass}">
+                                    <div class="calendar-day-header">
+                                        <span class="calendar-day-number">${day.day}</span>
+                                    </div>
+                                    <div class="calendar-day-info">
+                                        <div class="calendar-day-status">${displayStatus}</div>
+                            `;
+                            
+                            if (day.clock_in) {
+                                let inTime = day.clock_in.substring(0, 5);
+                                html += `<div class="calendar-day-time">In: ${inTime}</div>`;
+                            }
+                            if (day.clock_out) {
+                                let outTime = day.clock_out.substring(0, 5);
+                                html += `<div class="calendar-day-time">Out: ${outTime}</div>`;
+                            }
+                            if (day.extra_hours > 0) {
+                                html += `<div class="calendar-day-extra">+${day.extra_hours.toFixed(1)}h</div>`;
+                            }
+                            if (day.label) {
+                                html += `<div style="font-size: 8.5px; margin-top: 2px; color: var(--color-blue);">${day.label}</div>`;
+                            }
+                            
+                            html += `
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                    
+                    html += `</div>`;
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--color-red);">Error loading calendar data: ${err}</div>`;
+                });
+        }
+    </script>
+    
+    <div style="display: none;">
 
     <!-- Live clock script -->
     <script>

@@ -39,6 +39,19 @@ def heading(title):
 
 import re
 
+# Clean up database from previous runs
+import sqlite3
+try:
+    conn = sqlite3.connect("production.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM approvals WHERE details LIKE '%live test%' OR details LIKE '%live-test%'")
+    cursor.execute("DELETE FROM permission_requests WHERE reason LIKE '%live test%' OR reason LIKE '%live-test%'")
+    conn.commit()
+    conn.close()
+    print("Database test records cleaned up.")
+except Exception as e:
+    print(f"Cleanup failed: {e}")
+
 # ─────────────────────────────────────────────────────────────
 heading("STEP 1: prabhas (Artist) applies for 2-hour permission")
 s_prabhas = session_for("prabhas")
@@ -58,8 +71,13 @@ check("Permission appears in ledger", "2026-06-15" in r.text or "Pending" in r.t
 # ─────────────────────────────────────────────────────────────
 heading("STEP 2: pooja (Lead) approves prabhas's permission")
 s_pooja = session_for("pooja")
-r = s_pooja.get(f"{BASE}/permissions")
-check("Permissions page loads for pooja", r.status_code == 200)
+
+# Verify permissions redirect for Lead
+r_redir = s_pooja.get(f"{BASE}/permissions", allow_redirects=False)
+check("Pooja (Lead) is redirected from /permissions", r_redir.status_code == 302 and "/leaves" in r_redir.headers.get("Location", ""))
+
+r = s_pooja.get(f"{BASE}/team-approvals")
+check("Team approvals page loads for pooja", r.status_code == 200)
 check("Pooja sees pending approvals", "Approve" in r.text)
 
 approve_ids = re.findall(r'/permissions/approve/(\d+)', r.text)
@@ -158,10 +176,9 @@ check("Compensation page reloads after DB update", r.status_code == 200)
 check("Prabhas net owed is now Clear (extra offsets perm)", "Clear" in r.text,
       "net_owed should be 0.0 after 3h extra offsets 2h permission")
 
-# Check that Lead can also see the compensation view
-r = s_pooja.get(f"{BASE}/compensation")
-check("Compensation page loads for pooja (Lead)", r.status_code == 200)
-check("Lead sees only their team", "Content" in r.text or "Prabhas" in r.text)
+# Check that Lead is redirected from the standalone compensation view
+r = s_pooja.get(f"{BASE}/compensation", allow_redirects=False)
+check("Pooja (Lead) is redirected from /compensation", r.status_code == 302 and "/leaves" in r.headers.get("Location", ""))
 
 # ─────────────────────────────────────────────────────────────
 heading("FINAL SUMMARY")

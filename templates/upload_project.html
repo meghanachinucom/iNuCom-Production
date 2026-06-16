@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Project - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    <style>
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: var(--bg-card);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 24px;
+        }
+        .upload-area:hover {
+            border-color: var(--color-blue);
+            background: var(--color-blue-light);
+        }
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+        .upload-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .upload-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+        .guidelines-card {
+            background: #f8fafc;
+            border-left: 4px solid var(--color-blue);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        .guidelines-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: var(--color-blue);
+        }
+        .guidelines-list {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .file-input {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+                                        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+            </div>
+            
+            <div class="sidebar-user">
+                <div class="user-name">{{ session['name'] }}</div>
+                <div class="user-designation">
+                    {% if session['role'] == 'Admin' %}
+                        Admin
+                    {% elif session['role'] == 'HR' %}
+                        HR
+                    {% elif session['role'] == 'Lead' %}
+                        Lead
+                    {% else %}
+                        Artist
+                    {% endif %}
+                </div>
+                <div class="user-team">{{ session['team'] }} Team</div>
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li class="menu-section-title">Navigation</li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>🎬 Production Sheet</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
+                    <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
+                </li>
+                {% if session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
+                </li>
+                {% endif %}
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                </li>
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
+                    <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                {% endif %}
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-section-title">Admin</li>
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
+                </li>
+                {% elif session['role'] == 'HR' %}
+                <li class="menu-section-title">HR Management</li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>📁 Upload Project</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                    <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
+                </li>
+                {% endif %}
+            </ul>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout">
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Main Panel -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Upload Project Spreadsheet</h1>
+                </div>
+                <div class="header-actions-wrapper">
+                    <!-- Notification Bell Container -->
+                    <div class="notifications-bell-container" id="notifBellContainer">
+                        <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
+                            <span class="bell-icon">🔔</span>
+                            {% if unread_notif_count > 0 %}
+                                <span class="bell-badge">{{ unread_notif_count }}</span>
+                            {% endif %}
+                        </button>
+                        <div class="notif-dropdown" id="notifDropdown">
+                            <div class="notif-header">
+                                <h3>Notifications</h3>
+                                <button onclick="readAllNotifications(event)" class="btn-clear-all">Mark all read</button>
+                            </div>
+                            <div class="notif-list">
+                                {% if recent_notifications %}
+                                    {% for n in recent_notifications %}
+                                        <a href="{{ url_for('click_notification', nid=n.id) }}" class="notif-item {% if not n.is_read %}unread{% endif %}">
+                                            <div class="notif-icon-wrapper">
+                                                {% if n.type == 'task' %}
+                                                    📝
+                                                {% elif n.type == 'leave' or n.type == 'approval' %}
+                                                    ⏳
+                                                {% elif n.type == 'reminder' %}
+                                                    ⏰
+                                                {% else %}
+                                                    ℹ️
+                                                {% endif %}
+                                            </div>
+                                            <div class="notif-content">
+                                                <div class="notif-title">{{ n.title }}</div>
+                                                <div class="notif-body">{{ n.body }}</div>
+                                                <div class="notif-time">{{ n.created_at }}</div>
+                                            </div>
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="notif-empty">No notifications</div>
+                                {% endif %}
+                            </div>
+                            <div class="notif-footer">
+                                <a href="{{ url_for('notifications_page') }}">View All History</a>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    function toggleNotifDropdown(event) {
+                        event.stopPropagation();
+                        const dropdown = document.getElementById('notifDropdown');
+                        dropdown.classList.toggle('show');
+                    }
+                    window.addEventListener('click', function(event) {
+                        const dropdown = document.getElementById('notifDropdown');
+                        if (dropdown && !dropdown.contains(event.target) && !event.target.closest('#bellBtn')) {
+                            dropdown.classList.remove('show');
+                        }
+                    });
+                    function readAllNotifications(event) {
+                        event.stopPropagation();
+                        fetch("{{ url_for('read_all_notifications') }}", {
+                            method: "POST"
+                        }).then(response => {
+                            window.location.reload();
+                        });
+                    }
+                    </script>
+                </div>
+            </header>
+
+            <!-- Alerts Block -->
+            {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-error" style="margin-bottom: 20px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-success" style="margin-bottom: 20px;">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h3 class="card-title">Select Excel File</h3>
+                
+                <form action="{{ url_for('upload_project_page') }}" method="POST" enctype="multipart/form-data">
+                    <div class="upload-area" onclick="document.getElementById('excel_file').click()">
+                        <span class="upload-icon">📁</span>
+                        <div class="upload-title" id="file-title">Click to browse or drop your Excel file here</div>
+                        <div class="upload-subtitle">Supports .xlsx and .xls formats</div>
+                        
+                        <div class="file-input-wrapper">
+                            <button type="button" class="btn btn-secondary btn-sm">Choose File</button>
+                            <input type="file" name="file" id="excel_file" class="file-input" accept=".xlsx, .xls" required onchange="updateFileName(this)">
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: right;">
+                        <button type="submit" class="btn btn-primary">Upload &amp; Initialize Project</button>
+                    </div>
+                </form>
+                
+                <div class="guidelines-card">
+                    <div class="guidelines-title">Spreadsheet Format Guidelines</div>
+                    <ul class="guidelines-list">
+                        <li>The Excel sheet should contain the following columns from left to right:
+                            <br><strong>Column A:</strong> Project Name &nbsp;|&nbsp; 
+                            <strong>Column B:</strong> Chapter Name &nbsp;|&nbsp; 
+                            <strong>Column C:</strong> File Name &nbsp;|&nbsp; 
+                            <strong>Column D:</strong> Description (Optional)
+                        </li>
+                        <li>The first row is automatically treated as a header and skipped if it contains terms like "Project" or "File".</li>
+                        <li>Existing projects and chapters will be matched automatically by name. New projects/chapters will be created if they do not exist.</li>
+                        <li>Each imported file will have its full pipeline stage board initialized (Content stage starts as <strong>Open</strong>, other stages start as <strong>Pending</strong>) and will instantly be visible in all artist, lead, and admin trackers.</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        function updateFileName(input) {
+            const label = document.getElementById('file-title');
+            if (input.files && input.files.length > 0) {
+                label.innerHTML = "Selected file: <strong>" + input.files[0].name + "</strong>";
+            } else {
+                label.innerHTML = "Click to browse or drop your Excel file here";
+            }
+        }
+    </script>
+</body>
+</html>

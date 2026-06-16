@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     clock_out TEXT,
     status TEXT DEFAULT 'Absent',
     late_minutes INTEGER DEFAULT 0,
+    early_minutes INTEGER DEFAULT 0,
     total_hours REAL DEFAULT 0.0,
     extra_hours REAL DEFAULT 0.0,
     device_id TEXT,

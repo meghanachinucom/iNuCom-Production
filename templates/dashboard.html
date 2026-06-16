@@ -8,23 +8,23 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <!-- Sidebar -->
+                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
             </div>
             
-                        <div class="sidebar-user">
+            <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
                 <div class="user-designation">
                     {% if session['role'] == 'Admin' %}
                         Admin
                     {% elif session['role'] == 'HR' %}
-                        HR Officer
+                        HR
                     {% elif session['role'] == 'Lead' %}
-                        Team Lead
+                        Lead
                     {% else %}
-                        Creative Artist
+                        Artist
                     {% endif %}
                 </div>
                 <div class="user-team">{{ session['team'] }} Team</div>
@@ -32,8 +32,11 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>🎬 Production Sheet</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                     <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
@@ -41,13 +44,24 @@
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
+                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
-                    <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
+                {% if session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
+                {% endif %}
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                </li>
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
@@ -62,19 +76,16 @@
                 <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
                     <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>📁 Upload Project</span></a>
+                </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-
                     <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-
                 </li>
                 {% endif %}
             </ul>
@@ -183,7 +194,7 @@
             </header>
 
             <!-- Deadline Warning Banners -->
-            {% if late_assignment_flag %}
+            {% if session['role'] == 'Lead' and late_assignment_flag %}
                 <div class="deadline-warning-banner">
                     <span>⚠️ <strong>LATE ASSIGNMENT FLAG:</strong> Unassigned active files exist in the pipeline after the 10:00 AM morning assignment deadline. Please allocate them immediately.</span>
                 </div>
@@ -226,19 +237,7 @@
                 {% endif %}
             {% endwith %}
             
-            <!-- View Mode Switcher Tab -->
-            {% if session['role'] != 'HR' %}
-            <div class="view-switcher-tabs" style="margin-bottom: 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 16px;">
-                <a href="{{ url_for('dashboard', view='overview', project_id=selected_project_id) }}" class="tab-link {% if view_tab == 'overview' %}tab-active{% endif %}">
-                    Overview Dashboard
-                </a>
-                <a href="{{ url_for('dashboard', view='pipeline', project_id=selected_project_id, chapter_id=selected_chapter_id) }}" class="tab-link {% if view_tab == 'pipeline' %}tab-active{% endif %}">
-                    Production Sheet
-                </a>
-            </div>
-            {% endif %}
-
-            {% if view_tab == 'pipeline' and session['role'] != 'HR' %}
+            {% if view_tab == 'pipeline' %}
             <!-- Project / Chapter Filter Bar -->
             <div class="filter-bar">
                 <form action="{{ url_for('dashboard') }}" method="GET" class="filter-form">
@@ -275,7 +274,7 @@
                 </form>
                 
                 <!-- Content Lead & Admin - Quick Add File Panel -->
-                {% if session['role'] == 'Admin' or (session['role'] == 'Lead' and session['team'] == 'Content') %}
+                {% if session['role'] == 'Lead' and session['team'] == 'Content' %}
                     {% if selected_chapter_id %}
                     <div>
                         <form action="{{ url_for('add_file') }}" method="POST" style="display: flex; gap: 8px; align-items: center;">
@@ -289,248 +288,65 @@
                 {% endif %}
             </div>
 
-            <!-- Lead & Admin View (Pipeline Status Matrix & Control Queue) -->
-            {% if session['role'] in ['Lead', 'Admin'] %}
-                <!-- Pipeline Status Matrix -->
-                {% if selected_chapter_id %}
-                <div class="card" style="padding: 16px; margin-bottom: 30px;">
-                    <h3 class="card-title" style="margin-bottom: 12px; padding-bottom: 8px;">Pipeline Tracker - {{ selected_chapter_name }}</h3>
-                    <div class="matrix-wrapper">
-                        <table class="matrix-table">
-                            <thead>
-                                <tr>
-                                    <th>File Name</th>
-                                    {% for stage in stages %}
-                                        <th>{{ stage }}</th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if files %}
-                                    {% for file in files %}
-                                        <tr>
-                                            <td class="file-name-cell">
-                                                {{ file['name'] }}
-                                                <div style="font-size: 10px; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
-                                                    {{ file['description'] }}
-                                                </div>
-                                            </td>
-                                            {% for stage in stages %}
-                                                {% set cell = matrix[file['id']][stage] %}
-                                                <td>
-                                                    {% if cell %}
-                                                        {% if cell['status'] == 'Pending' %}
-                                                            <div class="status-pill status-pending">Pending</div>
-                                                        {% elif cell['status'] == 'Open' %}
-                                                            <div class="status-pill status-open">Open</div>
-                                                        {% elif cell['status'] == 'In Progress' %}
-                                                            <div class="status-pill status-progress">
-                                                                <span>In Progress</span>
-                                                                <span class="artist-badge-name" title="{{ cell['artist_name'] }}">@{{ cell['artist_username'] }}</span>
-                                                                <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
-                                                            </div>
-                                                        {% elif cell['status'] == 'Done' %}
-                                                            <div class="status-pill status-done">Done</div>
-                                                        {% endif %}
-                                                    {% else %}
-                                                        <div class="status-pill status-pending">-</div>
-                                                    {% endif %}
-                                                </td>
-                                            {% endfor %}
-                                        </tr>
-                                    {% endfor %}
-                                {% else %}
+            <!-- Pipeline Tracker Matrix (visible to all roles except HR) -->
+            {% if selected_chapter_id %}
+            <div class="card" style="padding: 16px; margin-bottom: 30px;">
+                <h3 class="card-title" style="margin-bottom: 12px; padding-bottom: 8px;">Pipeline Tracker - {{ selected_chapter_name }}</h3>
+                <div class="matrix-wrapper">
+                    <table class="matrix-table">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                {% for stage in stages %}
+                                    <th>{{ stage }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if files %}
+                                {% for file in files %}
                                     <tr>
-                                        <td colspan="{{ stages|length + 1 }}" style="text-align: center; color: var(--text-muted); padding: 24px;">
-                                            No files tracked in this chapter yet.
+                                        <td class="file-name-cell">
+                                            {{ file['name'] }}
+                                            <div style="font-size: 10px; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
+                                                {{ file['description'] }}
+                                            </div>
                                         </td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- EOD Validation Panel Card (Leads / Admins) -->
-                <div class="card" style="margin-bottom: 30px;">
-                    <div class="queue-section-header">
-                        <div class="queue-stage-title">EOD Daily Assignment Validations</div>
-                        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">
-                            {{ validation_list|length }} pending validations
-                        </span>
-                    </div>
-                    {% if validation_list %}
-                        <div class="queue-grid">
-                            {% for val in validation_list %}
-                                <div class="task-card" style="border-left: 4px solid var(--color-blue);">
-                                    <div>
-                                        <div class="task-card-name">{{ val['file_name'] }}</div>
-                                        <div class="task-card-desc"><strong>Task:</strong> {{ val['task_description'] }}</div>
-                                        <div style="font-size: 12px; margin-top: 6px; color: var(--text-secondary);">
-                                            <strong>Artist:</strong> {{ val['artist_name'] }} (@{{ val['artist_username'] }})
-                                        </div>
-                                        <div style="font-size: 12px; margin-top: 4px; color: #b45309; font-weight: 600;">
-                                            <strong>Complexity Points:</strong> {{ val['points'] }} pts
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="validation-card-actions">
-                                        <!-- Form to mark Done -->
-                                        <form action="{{ url_for('validate_assignment') }}" method="POST" style="display: inline;">
-                                            <input type="hidden" name="assignment_id" value="{{ val['assignment_id'] }}">
-                                            <input type="hidden" name="validation_status" value="Done">
-                                            <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">✓ Validate Done (Award {{ val['points'] }} pts)</button>
-                                        </form>
-                                        
-                                        <!-- Form to mark Pending (Requires reason) -->
-                                        <form action="{{ url_for('validate_assignment') }}" method="POST" style="display: flex; flex-direction: column; gap: 6px;">
-                                            <input type="hidden" name="assignment_id" value="{{ val['assignment_id'] }}">
-                                            <input type="hidden" name="validation_status" value="Pending">
-                                            <textarea name="remarks" class="reason-input" placeholder="Type rollover reason (required)..." required></textarea>
-                                            <button type="submit" class="btn btn-outline btn-sm" style="background-color: var(--color-red-light); color: var(--color-red); width: 100%;">✗ Mark Pending & Carry Forward</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13.5px; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-                            No daily assignments awaiting validation for today.
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Lead Control Queue Board -->
-                <div class="card" style="margin-bottom: 30px;">
-                    <div class="queue-section-header">
-                        <div class="queue-stage-title">
-                            {% if session['role'] == 'Admin' %}
-                                <form action="{{ url_for('dashboard') }}" method="GET" style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="hidden" name="project_id" value="{{ selected_project_id }}">
-                                    <input type="hidden" name="chapter_id" value="{{ selected_chapter_id }}">
-                                    <span>Manage Stage Queue:</span>
-                                    <select name="queue_stage" class="select-input" onchange="this.form.submit()">
                                         {% for stage in stages %}
-                                            <option value="{{ stage }}" {% if stage == queue_stage %}selected{% endif %}>{{ stage }}</option>
+                                            {% set cell = matrix[file['id']][stage] %}
+                                            <td>
+                                                {% if cell %}
+                                                    {% if cell['status'] == 'Pending' %}
+                                                        <div class="status-pill status-pending">Pending</div>
+                                                    {% elif cell['status'] == 'Open' %}
+                                                        <div class="status-pill status-open">Open</div>
+                                                    {% elif cell['status'] == 'In Progress' %}
+                                                        <div class="status-pill status-progress">
+                                                            <span>In Progress</span>
+                                                            <span class="artist-badge-name" title="{{ cell['artist_name'] }}">@{{ cell['artist_username'] }}</span>
+                                                            <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
+                                                        </div>
+                                                    {% elif cell['status'] == 'Done' %}
+                                                        <div class="status-pill status-done">Done</div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <div class="status-pill status-pending">-</div>
+                                                {% endif %}
+                                            </td>
                                         {% endfor %}
-                                    </select>
-                                </form>
+                                    </tr>
+                                {% endfor %}
                             {% else %}
-                                Active Stage Queue: <span class="blue">{{ queue_stage }}</span>
+                                <tr>
+                                    <td colspan="{{ stages|length + 1 }}" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                        No files tracked in this chapter yet.
+                                    </td>
+                                </tr>
                             {% endif %}
-                        </div>
-                        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">
-                            {{ lead_queue|length }} active items
-                        </span>
-                    </div>
-
-                    {% if lead_queue %}
-                        <div class="queue-grid">
-                            {% for item in lead_queue %}
-                                <div class="task-card">
-                                    <div class="task-card-header">
-                                        <div class="task-card-name">{{ item['file_name'] }}</div>
-                                        <div class="task-card-desc">{{ item['file_desc'] }}</div>
-                                        <div class="task-card-meta">
-                                            <span>Stage Status:</span>
-                                            {% if item['step_status'] == 'Open' %}
-                                                <span class="status-pill status-open" style="padding: 2px 6px; font-size: 10px; min-width: auto; display: inline-flex;">Open</span>
-                                            {% else %}
-                                                <span class="status-pill status-progress" style="padding: 2px 6px; font-size: 10px; min-width: auto; display: inline-flex;">In Progress ({{ item['points'] }} pts)</span>
-                                            {% endif %}
-                                        </div>
-                                        {% if item['content_released_at'] %}
-                                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
-                                            Released by Content: {{ item['content_released_at'] }}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-
-                                    <div class="task-card-actions">
-                                        <!-- Assignment & Points Form -->
-                                        <form action="{{ url_for('assign_file') }}" method="POST" class="form-card-inline">
-                                            <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
-                                            <input type="hidden" name="step_name" value="{{ queue_stage }}">
-                                            
-                                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                                <label style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">ASSIGN TO:</label>
-                                                <select name="artist_id" class="select-input" style="font-size: 12.5px; padding: 6px 10px;">
-                                                    <option value="">-- Unassigned --</option>
-                                                    {% for artist in artists %}
-                                                        <option value="{{ artist['id'] }}" {% if item['step_assigned_to'] == artist['id'] %}selected{% endif %}>
-                                                            {{ artist['name'] }} (@{{ artist['username'] }})
-                                                        </option>
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-
-                                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                                <label style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">COMPLEXITY POINTS:</label>
-                                                <input type="number" name="points" class="form-input" value="{{ item['points'] if item['points'] else 50 }}" min="1" max="1000" style="padding: 6px 10px; font-size: 12.5px;" required>
-                                            </div>
-                                            
-                                            <button type="submit" class="btn btn-outline btn-sm" style="width: 100%; font-size: 13px;">Save Assignment & Points</button>
-                                        </form>
-                                        
-                                        <!-- Direct Mark Done Option for Lead/Admin -->
-                                        <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%; margin-top: 8px;">
-                                            <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
-                                            <input type="hidden" name="step_name" value="{{ queue_stage }}">
-                                            <input type="hidden" name="status" value="Done">
-                                            <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Direct Mark Stage Done ✓</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-                            No open files awaiting action at the <strong class="blue">{{ queue_stage }}</strong> stage.
-                        </div>
-                    {% endif %}
+                        </tbody>
+                    </table>
                 </div>
-            {% endif %}
-
-            <!-- Artist View: Personal Assigned Tasks Queue -->
-            {% if session['role'] == 'Artist' %}
-                <div class="card" style="margin-bottom: 30px;">
-                    <h3 class="card-title">My Tasks (Today's Assignments)</h3>
-                    {% if artist_tasks %}
-                        <div class="queue-grid">
-                            {% for task in artist_tasks %}
-                                <div class="task-card" style="border-left: 4px solid var(--color-blue);">
-                                    <div class="task-card-header">
-                                        <div style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--color-blue); margin-bottom: 4px;">
-                                            {{ task['project_name'] }} ➔ {{ task['chapter_name'] }}
-                                        </div>
-                                        <div class="task-card-name">{{ task['file_name'] }}</div>
-                                        <div class="task-card-desc"><strong>Today's Task:</strong> {{ task['task_description'] }}</div>
-                                        <div style="font-size: 13px; font-weight: 700; color: #b45309; margin-top: 8px;">
-                                            Complexity Points: {{ task['points'] }} pts
-                                        </div>
-                                    </div>
-
-                                    <div class="task-card-actions">
-                                        <!-- Complete Daily Task (sets status pending/validation ready) -->
-                                        {% if task['assignment_status'] == 'Pending' %}
-                                            <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%;">
-                                                <input type="hidden" name="file_id" value="{{ task['file_id'] }}">
-                                                <input type="hidden" name="step_name" value="{{ task['step_name'] }}">
-                                                <input type="hidden" name="status" value="Done">
-                                                <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Complete Task ✓ (Awaiting EOD Validation)</button>
-                                            </form>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-                            No daily assignments found for today. Verify with your Lead or enjoy your clean desk!
-                        </div>
-                    {% endif %}
-                </div>
+            </div>
             {% endif %}
 
             <!-- Profile and Info Panels Row -->
@@ -562,27 +378,10 @@
                     </div>
                 </div>
 
-                <!-- Admin Audit Logs -->
-                {% if session['role'] == 'Admin' %}
-                <div class="card" style="grid-column: 1 / -1;">
-                    <h3 class="card-title">Recent System Activity Logs</h3>
-                    <ul class="log-list">
-                        {% for log in logs %}
-                        <li class="log-item">
-                            <span class="log-time">{{ log['timestamp'] }}</span>
-                            <span class="log-desc">
-                                <strong>{{ log['user_name'] if log['user_name'] else 'System' }}</strong>: 
-                                {{ log['action'] }} - {{ log['details'] }}
-                            </span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
             </div>
             {% endif %}
 
-            {% if view_tab == 'overview' or session['role'] == 'HR' %}
+            {% if view_tab == 'overview' %}
                 <!-- Zoho Projects Style Dashboard Overview -->
                 
                 <!-- Project Switcher for Admin (All Projects + individual projects switcher) -->
@@ -651,6 +450,189 @@
                     </div>
                 </div>
                 
+                <!-- ROLE SPECIFIC ACTION QUEUES (FIRST BEFORE CHARTS) -->
+                {% if session['role'] == 'Lead' %}
+                    <!-- EOD Daily Assignment Validations (Leads / Admins) -->
+                    <div class="card" style="margin-bottom: 30px;">
+                        <div class="queue-section-header">
+                            <div class="queue-stage-title">EOD Daily Assignment Validations</div>
+                            <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">
+                                {{ validation_list|length }} pending validations
+                            </span>
+                        </div>
+                        {% if validation_list %}
+                            <div class="queue-grid">
+                                {% for val in validation_list %}
+                                    <div class="task-card" style="border-left: 4px solid var(--color-blue);">
+                                        <div>
+                                            <div class="task-card-name">{{ val['file_name'] }}</div>
+                                            <div class="task-card-desc"><strong>Task:</strong> {{ val['task_description'] }}</div>
+                                            <div style="font-size: 12px; margin-top: 6px; color: var(--text-secondary);">
+                                                <strong>Artist:</strong> {{ val['artist_name'] }} (@{{ val['artist_username'] }})
+                                            </div>
+                                            <div style="font-size: 12px; margin-top: 4px; color: #b45309; font-weight: 600;">
+                                                <strong>Complexity Points:</strong> {{ val['points'] }} pts
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="validation-card-actions">
+                                            <!-- Form to mark Done -->
+                                            <form action="{{ url_for('validate_assignment') }}" method="POST" style="display: inline;">
+                                                <input type="hidden" name="assignment_id" value="{{ val['assignment_id'] }}">
+                                                <input type="hidden" name="validation_status" value="Done">
+                                                <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">✓ Validate Done (Award {{ val['points'] }} pts)</button>
+                                            </form>
+                                            
+                                            <!-- Form to mark Pending (Requires reason) -->
+                                            <form action="{{ url_for('validate_assignment') }}" method="POST" style="display: flex; flex-direction: column; gap: 6px;">
+                                                <input type="hidden" name="assignment_id" value="{{ val['assignment_id'] }}">
+                                                <input type="hidden" name="validation_status" value="Pending">
+                                                <textarea name="remarks" class="reason-input" placeholder="Type rollover reason (required)..." required></textarea>
+                                                <button type="submit" class="btn btn-outline btn-sm" style="background-color: var(--color-red-light); color: var(--color-red); width: 100%;">✗ Mark Pending & Carry Forward</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13.5px; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+                                No daily assignments awaiting validation for today.
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Lead Control Queue Board (Leads / Admins) -->
+                    <div class="card" style="margin-bottom: 30px;">
+                        <div class="queue-section-header">
+                            <div class="queue-stage-title">
+                                {% if session['role'] == 'Admin' %}
+                                    <form action="{{ url_for('dashboard') }}" method="GET" style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="hidden" name="project_id" value="{{ selected_project_id }}">
+                                        <input type="hidden" name="chapter_id" value="{{ selected_chapter_id }}">
+                                        <span>Manage Stage Queue:</span>
+                                        <select name="queue_stage" class="select-input" onchange="this.form.submit()">
+                                            {% for stage in stages %}
+                                                <option value="{{ stage }}" {% if stage == queue_stage %}selected{% endif %}>{{ stage }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </form>
+                                {% else %}
+                                    Active Stage Queue: <span class="blue">{{ queue_stage }}</span>
+                                {% endif %}
+                            </div>
+                            <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">
+                                {{ lead_queue|length }} active items
+                            </span>
+                        </div>
+
+                        {% if lead_queue %}
+                            <div class="queue-grid">
+                                {% for item in lead_queue %}
+                                    <div class="task-card">
+                                        <div class="task-card-header">
+                                            <div class="task-card-name">{{ item['file_name'] }}</div>
+                                            <div class="task-card-desc">{{ item['file_desc'] }}</div>
+                                            <div class="task-card-meta">
+                                                <span>Stage Status:</span>
+                                                {% if item['step_status'] == 'Open' %}
+                                                    <span class="status-pill status-open" style="padding: 2px 6px; font-size: 10px; min-width: auto; display: inline-flex;">Open</span>
+                                                {% else %}
+                                                    <span class="status-pill status-progress" style="padding: 2px 6px; font-size: 10px; min-width: auto; display: inline-flex;">In Progress ({{ item['points'] }} pts)</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if item['content_released_at'] %}
+                                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                                                Released by Content: {{ item['content_released_at'] }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="task-card-actions">
+                                            <!-- Assignment & Points Form -->
+                                            <form action="{{ url_for('assign_file') }}" method="POST" class="form-card-inline">
+                                                <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
+                                                <input type="hidden" name="step_name" value="{{ queue_stage }}">
+                                                
+                                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                    <label style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">ASSIGN TO:</label>
+                                                    <select name="artist_id" class="select-input" style="font-size: 12.5px; padding: 6px 10px;">
+                                                        <option value="">-- Unassigned --</option>
+                                                        {% for artist in artists %}
+                                                            <option value="{{ artist['id'] }}" {% if item['step_assigned_to'] == artist['id'] %}selected{% endif %}>
+                                                                {{ artist['name'] }} (@{{ artist['username'] }})
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                    <label style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">COMPLEXITY POINTS:</label>
+                                                    <input type="number" name="points" class="form-input" value="{{ item['points'] if item['points'] else 50 }}" min="1" max="1000" style="padding: 6px 10px; font-size: 12.5px;" required>
+                                                </div>
+                                                
+                                                <button type="submit" class="btn btn-outline btn-sm" style="width: 100%; font-size: 13px;">Save Assignment & Points</button>
+                                            </form>
+                                            
+                                            <!-- Direct Mark Done Option for Lead/Admin -->
+                                            <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%; margin-top: 8px;">
+                                                <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
+                                                <input type="hidden" name="step_name" value="{{ queue_stage }}">
+                                                <input type="hidden" name="status" value="Done">
+                                                <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Direct Mark Stage Done ✓</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+                                No open files awaiting action at the <strong class="blue">{{ queue_stage }}</strong> stage.
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {% if session['role'] == 'Artist' %}
+                    <!-- Artist View: Personal Assigned Tasks Queue -->
+                    <div class="card" style="margin-bottom: 30px;">
+                        <h3 class="card-title">My Tasks (Today's Assignments)</h3>
+                        {% if artist_tasks %}
+                            <div class="queue-grid">
+                                {% for task in artist_tasks %}
+                                    <div class="task-card" style="border-left: 4px solid var(--color-blue);">
+                                        <div class="task-card-header">
+                                            <div style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--color-blue); margin-bottom: 4px;">
+                                                {{ task['project_name'] }} ➔ {{ task['chapter_name'] }}
+                                            </div>
+                                            <div class="task-card-name">{{ task['file_name'] }}</div>
+                                            <div class="task-card-desc"><strong>Today's Task:</strong> {{ task['task_description'] }}</div>
+                                            <div style="font-size: 13px; font-weight: 700; color: #b45309; margin-top: 8px;">
+                                                Complexity Points: {{ task['points'] }} pts
+                                            </div>
+                                        </div>
+
+                                        <div class="task-card-actions">
+                                            <!-- Complete Daily Task (sets status pending/validation ready) -->
+                                            {% if task['assignment_status'] == 'Pending' %}
+                                                <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%;">
+                                                    <input type="hidden" name="file_id" value="{{ task['file_id'] }}">
+                                                    <input type="hidden" name="step_name" value="{{ task['step_name'] }}">
+                                                    <input type="hidden" name="status" value="Done">
+                                                    <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Complete Task ✓ (Awaiting EOD Validation)</button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+                                No daily assignments found for today. Verify with your Lead or enjoy your clean desk!
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
                 <!-- PIPELINE FLOW VIEW -->
                 <div class="card" style="margin-bottom: 30px; padding: 24px;">
                     <h3 class="card-title" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
@@ -757,24 +739,6 @@
                             </div>
                         </div>
                         
-                        <div class="card">
-                            <h3 class="card-title">My Pending Daily Assignments</h3>
-                            {% if artist_tasks %}
-                                <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px;">
-                                    {% for t in artist_tasks %}
-                                        <li style="padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
-                                            <div>
-                                                <strong class="blue" style="font-size: 13px;">{{ t['file_name'] }}</strong>
-                                                <div style="font-size: 12px; color: var(--text-secondary);">{{ t['task_description'] }}</div>
-                                            </div>
-                                            <span style="font-size: 12px; font-weight: 700; color: #b45309;">{{ t['points'] }} pts</span>
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">No pending assignments today!</div>
-                            {% endif %}
-                        </div>
                     {% endif %}
                     
                     {% if session['role'] == 'HR' %}

@@ -8,23 +8,23 @@
 </head>
 <body>
     <div class="dashboard-layout">
-        <!-- Sidebar -->
+                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
             </div>
             
-                        <div class="sidebar-user">
+            <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
                 <div class="user-designation">
                     {% if session['role'] == 'Admin' %}
                         Admin
                     {% elif session['role'] == 'HR' %}
-                        HR Officer
+                        HR
                     {% elif session['role'] == 'Lead' %}
-                        Team Lead
+                        Lead
                     {% else %}
-                        Creative Artist
+                        Artist
                     {% endif %}
                 </div>
                 <div class="user-team">{{ session['team'] }} Team</div>
@@ -32,8 +32,11 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>🎬 Production Sheet</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                     <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
@@ -41,13 +44,24 @@
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
+                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
-                    <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
+                {% if session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
+                {% endif %}
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                </li>
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
@@ -62,19 +76,16 @@
                 <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
                     <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>📁 Upload Project</span></a>
+                </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-
                     <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-
                 </li>
                 {% endif %}
             </ul>
@@ -182,6 +193,7 @@
                 {% endif %}
             {% endwith %}
 
+            {% if session['role'] != 'Admin' %}
             <div class="score-grid">
                 <!-- Personal Target Progress Card -->
                 <div class="card" style="grid-column: span 2;">
@@ -232,6 +244,7 @@
                     </table>
                 </div>
             </div>
+            {% endif %}
 
             <!-- Lead Team Scoreboard View -->
             {% if session['role'] == 'Lead' %}

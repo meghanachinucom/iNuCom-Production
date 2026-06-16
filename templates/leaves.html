@@ -3,28 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaves & Approvals - iNuCom Production Tracker</title>
+    <title>{% if session['role'] in ['Artist', 'Lead', 'HR'] %}Leaves and Permissions{% else %}Leaves &amp; Approvals{% endif %} - iNuCom Production Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
+    <style>
+        .comp-net-clear {
+            color: var(--color-green);
+            font-weight: 700;
+        }
+        .comp-net-owed {
+            color: var(--color-red);
+            font-weight: 700;
+        }
+        .comp-net-minor {
+            color: var(--color-orange, #f59e0b);
+            font-weight: 700;
+        }
+        .comp-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+        }
+        .comp-bar {
+            height: 6px;
+            border-radius: 3px;
+            flex: 1;
+            background: var(--bg-card-hover, #f1f5f9);
+        }
+        .comp-bar-fill {
+            height: 6px;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+        .comp-bar-fill.owed { background: var(--color-red); }
+        .comp-bar-fill.extra { background: var(--color-green); }
+        .summary-chips {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        .comp-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 22px;
+            min-width: 140px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+        .comp-chip-val {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .comp-chip-lbl {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+        .txt-owed-chip  { color: var(--color-red); }
+        .txt-clear-chip { color: var(--color-green); }
+    </style>
+    {% endif %}
 </head>
 <body>
     <div class="dashboard-layout">
-        <!-- Sidebar -->
+                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
             </div>
             
-                        <div class="sidebar-user">
+            <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
                 <div class="user-designation">
                     {% if session['role'] == 'Admin' %}
                         Admin
                     {% elif session['role'] == 'HR' %}
-                        HR Officer
+                        HR
                     {% elif session['role'] == 'Lead' %}
-                        Team Lead
+                        Lead
                     {% else %}
-                        Creative Artist
+                        Artist
                     {% endif %}
                 </div>
                 <div class="user-team">{{ session['team'] }} Team</div>
@@ -32,8 +96,11 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>🎬 Production Sheet</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
                     <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
@@ -41,13 +108,24 @@
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
+                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves &amp; Approvals</span></a>
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
-                    <a href="{{ url_for('permissions_page') }}"><span>Permissions</span></a>
+                {% if session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
+                {% endif %}
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                </li>
+                {% endif %}
+                
+                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
@@ -62,19 +140,16 @@
                 <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
                     <a href="{{ url_for('reports_page') }}"><span>📊 Reports</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>🗓 Holidays</span></a>
                 </li>
-
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>📁 Upload Project</span></a>
+                </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-
                     <a href="{{ url_for('activity_log_page') }}"><span>📋 Activity Log</span></a>
-
                 </li>
                 {% endif %}
             </ul>
@@ -90,7 +165,7 @@
         <main class="main-content">
             <header class="page-header">
                 <div>
-                    <h1>Leaves & Approval Workflow</h1>
+                    <h1>{% if session['role'] in ['Artist', 'Lead', 'HR'] %}Leaves and Permissions{% else %}Leaves &amp; Approval Workflow{% endif %}</h1>
                 </div>
                 <div class="header-actions-wrapper">
                     <!-- Notification Bell Container -->
@@ -234,7 +309,7 @@
                 </div>
 
                 <!-- Reusable Actionable Pending Approvals Box (Lead/Admin/HR) -->
-                {% if my_pending_approvals %}
+                {% if session['role'] not in ['Lead', 'HR'] and my_pending_approvals %}
                     <div class="card" style="border: 1px solid var(--border-focus); background-color: var(--color-blue-light);">
                         <h3 class="card-title" style="color: var(--color-blue);">Requests Requiring My Approval</h3>
                         <table class="scoreboard-table">
@@ -314,8 +389,232 @@
                         </tbody>
                     </table>
                 </div>
+
+                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
+                <!-- Section Header for Permissions -->
+                <div style="margin-top: 40px; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;">
+                    <h2 style="font-size: 20px; color: var(--color-blue); display: flex; align-items: center; gap: 8px;">
+                        🔑 Permissions &amp; Time Requests
+                    </h2>
+                </div>
+
+                <!-- Summary & Form Row for Permissions -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                    <!-- How Permissions Work Info Panel -->
+                    <div class="card" style="margin: 0;">
+                        <h3 class="card-title">How Permissions Work</h3>
+                        <div style="font-size: 13px; line-height: 1.8; color: var(--text-secondary); margin-top: 8px;">
+                            <div style="background: var(--bg-main); border-radius: 8px; padding: 14px; border-left: 3px solid var(--color-blue);">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Compensation Formula</div>
+                                <div style="font-family: monospace; font-size: 12px; color: var(--color-blue);">
+                                    Hours Owed = Perm Hours + Late Mins/60<br>
+                                    Net Owed = Owed − Extra Hours (off-days/OT)<br>
+                                    Net Owed = max(0, Hours Owed − Extra)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Apply Card for Permission -->
+                    <div class="card" style="margin: 0;">
+                        <h3 class="card-title">Request Permission</h3>
+                        <form action="{{ url_for('permissions_page') }}" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Date of Permission</label>
+                                <input type="date" name="perm_date" class="reason-input" style="background-color: #ffffff;" required value="{{ today_str }}">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Hours Requested (e.g. 2.0)</label>
+                                <input type="number" name="hours" class="reason-input" style="background-color: #ffffff;" step="0.25" min="0.25" max="12" placeholder="e.g. 2.0" required>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Reason</label>
+                                <input type="text" name="reason" class="reason-input" style="background-color: #ffffff;" placeholder="e.g. Late arrival due to medical appointment" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 6px; padding: 10px;">Submit Permission Request</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- My Permissions Ledger -->
+                <div class="card" style="margin-top: 24px;">
+                    <h3 class="card-title">My Permission Requests</h3>
+                    <table class="scoreboard-table" style="margin-top: 12px;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Hours</th>
+                                <th>Reason</th>
+                                <th>Workflow Status</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if my_permissions %}
+                                {% for row in my_permissions %}
+                                    <tr>
+                                        <td><strong>{{ row['date'] }}</strong></td>
+                                        <td>
+                                            <span style="font-weight: 700; color: var(--color-blue);">{{ "%.2f"|format(row['hours']) }}h</span>
+                                        </td>
+                                        <td style="max-width: 260px; font-size: 13px;">{{ row['reason'] }}</td>
+                                        <td style="font-size: 12px; color: var(--text-secondary);">{{ row['step_info'] }}</td>
+                                        <td>
+                                            {% set sl = row['status']|lower %}
+                                            <span class="att-badge {% if sl == 'approved' %}present{% elif sl == 'rejected' %}absent{% else %}late{% endif %}">
+                                                {{ row['status'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No permission requests submitted yet.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Section Header for Compensation -->
+                <div style="margin-top: 40px; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;">
+                    <h2 style="font-size: 20px; color: var(--color-blue); display: flex; align-items: center; gap: 8px;">
+                        💰 Compensation Status
+                    </h2>
+                </div>
+
+                <!-- Summary Chips for Compensation -->
+                {% set total_owed_sum = comp_rows | sum(attribute='total_owed') %}
+                {% set total_extra_sum = comp_rows | sum(attribute='total_extra') %}
+                {% set net_owed_sum = comp_rows | sum(attribute='net_owed') %}
+
+                <div class="summary-chips">
+                    <div class="comp-chip">
+                        <div class="comp-chip-val" style="color: var(--color-red);">{{ "%.1f"|format(total_owed_sum) }}h</div>
+                        <div class="comp-chip-lbl">Total Hours Owed</div>
+                    </div>
+                    <div class="comp-chip">
+                        <div class="comp-chip-val" style="color: var(--color-green);">{{ "%.1f"|format(total_extra_sum) }}h</div>
+                        <div class="comp-chip-lbl">Total Extra Hours Banked</div>
+                    </div>
+                    <div class="comp-chip">
+                        <div class="comp-chip-val {% if net_owed_sum > 0 %}txt-owed-chip{% else %}txt-clear-chip{% endif %}">{{ "%.1f"|format(net_owed_sum) }}h</div>
+                        <div class="comp-chip-lbl">Net Hours Still Owed</div>
+                    </div>
+                </div>
+
+                <!-- My Compensation Ledger -->
+                <div class="card" style="margin-top: 24px;">
+                    <h3 class="card-title">My Compensation Ledger</h3>
+                    <table class="scoreboard-table" style="margin-top: 14px;">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Role / Team</th>
+                                <th style="text-align: right;">Perm Hrs Owed</th>
+                                <th style="text-align: right;">Late Hrs Owed</th>
+                                <th style="text-align: right;">Total Owed</th>
+                                <th style="text-align: right;">Extra Hrs Banked</th>
+                                <th style="text-align: center;">Visual Balance</th>
+                                <th style="text-align: right;">Net Owed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if comp_rows %}
+                                {% for row in comp_rows %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ row['name'] }}</strong>
+                                            <div style="font-size: 11px; color: var(--text-muted);">@{{ row['username'] }}</div>
+                                        </td>
+                                        <td>
+                                            <span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">
+                                                {{ row['role'] }}
+                                            </span>
+                                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">{{ row['team'] }}</div>
+                                        </td>
+                                        <td style="text-align: right; font-size: 13px;">
+                                            {% if row['perm_hours'] > 0 %}
+                                                <span style="color: var(--color-red);">{{ "%.2f"|format(row['perm_hours']) }}h</span>
+                                            {% else %}
+                                                <span style="color: var(--text-muted);">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right; font-size: 13px;">
+                                            {% if row['late_hours'] > 0 %}
+                                                <span style="color: var(--color-orange, #f59e0b);">{{ "%.2f"|format(row['late_hours']) }}h</span>
+                                            {% else %}
+                                                <span style="color: var(--text-muted);">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right; font-weight: 700;">
+                                            {% if row['total_owed'] > 0 %}
+                                                <span style="color: var(--color-red);">{{ "%.2f"|format(row['total_owed']) }}h</span>
+                                            {% else %}
+                                                <span style="color: var(--text-muted);">0.00h</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right; font-weight: 700;">
+                                            {% if row['total_extra'] > 0 %}
+                                                <span style="color: var(--color-green);">+{{ "%.2f"|format(row['total_extra']) }}h</span>
+                                            {% else %}
+                                                <span style="color: var(--text-muted);">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set max_val = [row['total_owed'], row['total_extra'], 0.01] | max %}
+                                            <div class="comp-bar-wrap">
+                                                <div class="comp-bar">
+                                                    <div class="comp-bar-fill owed" data-width="{{ [(row['total_owed'] / max_val * 100) | int, 100] | min }}"></div>
+                                                </div>
+                                                <div class="comp-bar" style="margin-left: 2px;">
+                                                    <div class="comp-bar-fill extra" data-width="{{ [(row['total_extra'] / max_val * 100) | int, 100] | min }}"></div>
+                                                </div>
+                                            </div>
+                                            <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 6px;">
+                                                <span style="color: var(--color-red);">■ Owed</span>
+                                                <span style="color: var(--color-green);">■ Extra</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            {% if row['net_owed'] <= 0 %}
+                                                <span class="comp-net-clear">Clear ✓</span>
+                                            {% elif row['net_owed'] <= 1.0 %}
+                                                <span class="comp-net-minor">{{ "%.2f"|format(row['net_owed']) }}h</span>
+                                            {% else %}
+                                                <span class="comp-net-owed">{{ "%.2f"|format(row['net_owed']) }}h</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No compensation data found.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                    
+                    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border-color); font-size: 11.5px; color: var(--text-secondary); line-height: 1.8;">
+                        <strong>How to read:</strong>
+                        &nbsp;|&nbsp; <strong style="color: var(--color-red);">Perm Hrs</strong> = Approved permission hours owed back &nbsp;|&nbsp;
+                        <strong style="color: #f59e0b;">Late Hrs</strong> = Late minutes ÷ 60 &nbsp;|&nbsp;
+                        <strong style="color: var(--color-green);">Extra Hrs</strong> = Weekend / OT hours banked &nbsp;|&nbsp;
+                        <strong>Net Owed</strong> = max(0, Total Owed − Extra Banked)
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </main>
     </div>
+    {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
+    <script>
+        /* Apply data-width values to .comp-bar-fill elements (bar charts in compensation table) */
+        document.querySelectorAll('.comp-bar-fill[data-width]').forEach(function(el) {
+            var w = Math.min(parseInt(el.getAttribute('data-width') || '0', 10), 100);
+            el.style.width = w + '%';
+        });
+    </script>
+    {% endif %}
 </body>
 </html>

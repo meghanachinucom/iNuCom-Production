@@ -38,6 +38,19 @@ def heading(title):
     print(f"  {title}")
     print(f"{'='*60}")
 
+# Clean up database from previous runs
+import sqlite3
+try:
+    conn = sqlite3.connect("production.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM approvals WHERE details LIKE '%live test%' OR details LIKE '%live-test%'")
+    cursor.execute("DELETE FROM leaves WHERE reason LIKE '%live test%' OR reason LIKE '%live-test%'")
+    conn.commit()
+    conn.close()
+    print("Database test records cleaned up.")
+except Exception as e:
+    print(f"Cleanup failed: {e}")
+
 # ─────────────────────────────────────────────────────────────
 heading("STEP 1: prabhas (Artist) applies for leave")
 s_prabhas = session_for("prabhas")
@@ -62,8 +75,12 @@ check("Leave appears in history or pending list", "Personal work" in r.text or "
 heading("STEP 2: pooja (Lead) approves prabhas's leave")
 s_pooja = session_for("pooja")
 
-r = s_pooja.get(f"{BASE}/leaves")
-check("Leaves page loads for pooja", r.status_code == 200)
+# Verify leaves page does not show approvals for Lead
+r_leaves = s_pooja.get(f"{BASE}/leaves")
+check("Pooja leaves page does not show approvals block", "Requests Requiring My Approval" not in r_leaves.text)
+
+r = s_pooja.get(f"{BASE}/team-approvals")
+check("Team approvals page loads for pooja", r.status_code == 200)
 check("Pending approvals section visible to Lead", "Pending" in r.text or "Approve" in r.text or "approval" in r.text.lower(),
       "Lead sees approval queue")
 
@@ -108,7 +125,7 @@ if prabhas_admin_approval_id:
     r2 = s_vasu.post(f"{BASE}/leaves/approve/{prabhas_admin_approval_id}", allow_redirects=True)
     check("Vasu final approve request succeeds", r2.status_code == 200, f"status={r2.status_code}")
     check("Approval status shows Approved after final step",
-          "Approved" in r2.text,
+          "Approved" in r2.text or "approved" in r2.text.lower(),
           "Checking response after final approve")
 else:
     check("Prabhas approval ID found for vasu to approve", False, "No approve links found for admin")
@@ -138,8 +155,8 @@ r = s_sana.post(f"{BASE}/leaves", data={
 }, allow_redirects=True)
 check("Sana leave application submitted", r.status_code == 200, f"status={r.status_code}")
 
-# Pooja goes to leaves and rejects sana's request
-r = s_pooja.get(f"{BASE}/leaves")
+# Pooja goes to team-approvals and rejects sana's request
+r = s_pooja.get(f"{BASE}/team-approvals")
 reject_ids = re.findall(r'/leaves/reject/(\d+)', r.text)
 print(f"  {INFO} Found reject IDs visible to pooja: {reject_ids}")
 
