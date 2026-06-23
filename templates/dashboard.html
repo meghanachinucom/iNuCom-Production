@@ -238,130 +238,116 @@
             {% endwith %}
             
             {% if view_tab == 'pipeline' %}
-            <!-- Project / Chapter Filter Bar -->
-            <div class="filter-bar">
-                <form action="{{ url_for('dashboard') }}" method="GET" class="filter-form">
-                    <input type="hidden" name="view" value="pipeline">
-                    {% if session['role'] == 'Admin' and queue_stage %}
-                        <input type="hidden" name="queue_stage" value="{{ queue_stage }}">
-                    {% endif %}
-                    
-                    <div class="filter-group">
-                        <label for="project_id">Project:</label>
-                        <select name="project_id" id="project_id" class="select-input" onchange="this.form.submit()">
-                            {% for project in projects %}
-                                <option value="{{ project['id'] }}" {% if project['id'] == selected_project_id %}selected{% endif %}>
-                                    {{ project['name'] }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label for="chapter_id">Chapter:</label>
-                        <select name="chapter_id" id="chapter_id" class="select-input" onchange="this.form.submit()">
-                            {% if chapters %}
-                                {% for chapter in chapters %}
-                                    <option value="{{ chapter['id'] }}" {% if chapter['id'] == selected_chapter_id %}selected{% endif %}>
-                                        {{ chapter['name'] }}
-                                    </option>
-                                {% endfor %}
-                            {% else %}
-                                <option value="">No Chapters Available</option>
-                            {% endif %}
-                        </select>
-                    </div>
-                </form>
-                
-                <!-- Content Lead & Admin - Quick Add File Panel -->
-                {% if session['role'] == 'Lead' and session['team'] == 'Content' %}
-                    {% if selected_chapter_id %}
-                    <div>
-                        <form action="{{ url_for('add_file') }}" method="POST" style="display: flex; gap: 8px; align-items: center;">
-                            <input type="hidden" name="chapter_id" value="{{ selected_chapter_id }}">
-                            <input type="text" name="name" class="form-input" placeholder="New File Name (e.g. FW_12_09)" required style="padding: 6px 12px; font-size: 13px; max-width: 200px;">
-                            <input type="text" name="description" class="form-input" placeholder="Description..." style="padding: 6px 12px; font-size: 13px; max-width: 200px;">
-                            <button type="submit" class="btn btn-primary btn-sm">+ Add File</button>
-                        </form>
-                    </div>
-                    {% endif %}
-                {% endif %}
+            <!-- Sub Tab Bar (Assets / Scenes) -->
+            <div class="report-tabs" style="margin-bottom: 24px;">
+                <a href="{{ url_for('dashboard', view='pipeline', sub_tab='assets') }}" class="report-tab-btn {% if sub_tab == 'assets' %}active{% endif %}" style="text-decoration: none; display: inline-block; text-align: center;">
+                    📦 Assets Pipeline
+                </a>
+                <a href="{{ url_for('dashboard', view='pipeline', sub_tab='scenes') }}" class="report-tab-btn {% if sub_tab == 'scenes' %}active{% endif %}" style="text-decoration: none; display: inline-block; text-align: center;">
+                    🎬 Scenes Pipeline
+                </a>
             </div>
 
-            <!-- Pipeline Tracker Matrix (visible to all roles except HR) -->
-            {% if selected_chapter_id %}
-            <div class="card" style="padding: 16px; margin-bottom: 30px;">
-                <h3 class="card-title" style="margin-bottom: 12px; padding-bottom: 8px;">Pipeline Tracker - {{ selected_chapter_name }}</h3>
-                <div class="matrix-wrapper">
-                    <table class="matrix-table">
-                        <thead>
-                            <tr>
-                                <th>File Name</th>
-                                {% for stage in stages %}
-                                    <th>{{ stage }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if files %}
-                                {% for file in files %}
+            <!-- Display tables for each project and its chapters -->
+            {% for project in active_projects_list %}
+                <div style="margin-top: 32px; margin-bottom: 12px;">
+                    <h2 style="font-size: 19px; font-weight: 800; color: var(--color-blue); border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px;">
+                        📁 Project: {{ project['name'] }}
+                    </h2>
+                </div>
+                
+                {% for chapter in project_chapters_map[project['id']] %}
+                    <div class="card" style="padding: 16px; margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; flex-wrap: wrap; gap: 12px;">
+                            <h3 class="card-title" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">
+                                📖 {{ chapter['name'] }} <span style="font-weight: normal; font-size: 13px; color: var(--text-secondary);">({{ chapter['description'] }})</span>
+                            </h3>
+                            
+                            <!-- Add File form for this chapter (only Content Lead or Admin) -->
+                            {% if session['role'] == 'Admin' or (session['role'] == 'Lead' and session['team'] == 'Content') %}
+                                <form action="{{ url_for('add_file') }}" method="POST" style="display: inline-flex; gap: 8px; align-items: center;">
+                                    <input type="hidden" name="chapter_id" value="{{ chapter['id'] }}">
+                                    <input type="hidden" name="sub_tab" value="{{ sub_tab }}">
+                                    <input type="text" name="name" class="form-input form-input-sm" placeholder="New File Name..." required style="padding: 4px 8px; font-size: 12px; width: 180px; height: 30px; margin: 0;">
+                                    <input type="text" name="description" class="form-input form-input-sm" placeholder="Description..." style="padding: 4px 8px; font-size: 12px; width: 150px; height: 30px; margin: 0;">
+                                    <button type="submit" class="btn btn-primary btn-sm" style="height: 30px; padding: 0 12px; font-size: 12px; margin: 0;">+ Add File</button>
+                                </form>
+                            {% endif %}
+                        </div>
+
+                        <div class="matrix-wrapper">
+                            <table class="matrix-table">
+                                <thead>
                                     <tr>
-                                        <td class="file-name-cell">
-                                            {% if session['role'] == 'HR' %}
-                                                <div class="file-name-display-wrapper" id="file-display-{{ file['id'] }}" style="display: flex; align-items: center; justify-content: space-between;">
-                                                    <span class="file-name-text" style="font-weight: 600;">{{ file['name'] }}</span>
-                                                    <button type="button" class="btn-edit-filename" data-id="{{ file['id'] }}" onclick="toggleFilenameEdit(this.dataset.id)" style="background:none; border:none; cursor:pointer; font-size:12px; margin-left:4px; padding:0;" title="Edit File Name">✏️</button>
-                                                </div>
-                                                <form action="{{ url_for('edit_file_name', file_id=file['id']) }}" method="POST" class="edit-filename-form" id="file-form-{{ file['id'] }}" style="display:none; gap:6px; align-items:center; width: 100%;">
-                                                    <input type="hidden" name="chapter_id" value="{{ selected_chapter_id }}">
-                                                    <input type="hidden" name="project_id" value="{{ selected_project_id }}">
-                                                    <input type="text" name="name" class="form-input" value="{{ file['name'] }}" required style="padding: 2px 6px; font-size: 12px; flex-grow: 1; min-width: 80px; height: auto;">
-                                                    <button type="submit" class="btn btn-success btn-sm" style="padding: 2px 6px; font-size: 11px;">Save</button>
-                                                    <button type="button" class="btn btn-sm" data-id="{{ file['id'] }}" onclick="toggleFilenameEdit(this.dataset.id)" style="padding: 2px 6px; font-size: 11px; background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary);">Cancel</button>
-                                                </form>
-                                            {% else %}
-                                                {{ file['name'] }}
-                                            {% endif %}
-                                            <div style="font-size: 10px; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
-                                                {{ file['description'] }}
-                                            </div>
-                                        </td>
+                                        <th>File Name</th>
                                         {% for stage in stages %}
-                                            {% set cell = matrix[file['id']][stage] %}
-                                            <td>
-                                                {% if cell %}
-                                                    {% if cell['status'] == 'Pending' %}
-                                                        <div class="status-pill status-pending">Pending</div>
-                                                    {% elif cell['status'] == 'Open' %}
-                                                        <div class="status-pill status-open">Open</div>
-                                                    {% elif cell['status'] == 'In Progress' %}
-                                                        <div class="status-pill status-progress">
-                                                            <span>In Progress</span>
-                                                            <span class="artist-badge-name" title="{{ cell['artist_name'] }}">@{{ cell['artist_username'] }}</span>
-                                                            <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
-                                                        </div>
-                                                    {% elif cell['status'] == 'Done' %}
-                                                        <div class="status-pill status-done">Done</div>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <div class="status-pill status-pending">-</div>
-                                                {% endif %}
-                                            </td>
+                                            <th>{{ stage }}</th>
                                         {% endfor %}
                                     </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="{{ stages|length + 1 }}" style="text-align: center; color: var(--text-muted); padding: 24px;">
-                                        No files tracked in this chapter yet.
-                                    </td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {% endif %}
+                                </thead>
+                                <tbody>
+                                    {% set chapter_files = chapter_files_map[chapter['id']] %}
+                                    {% if chapter_files %}
+                                        {% for file in chapter_files %}
+                                            <tr>
+                                                <td class="file-name-cell">
+                                                    {% if session['role'] == 'HR' %}
+                                                        <div class="file-name-display-wrapper" id="file-display-{{ file['id'] }}" style="display: flex; align-items: center; justify-content: space-between;">
+                                                            <span class="file-name-text" style="font-weight: 600;">{{ file['name'] }}</span>
+                                                            <button type="button" class="btn-edit-filename" data-id="{{ file['id'] }}" onclick="toggleFilenameEdit(this.dataset.id)" style="background:none; border:none; cursor:pointer; font-size:12px; margin-left:4px; padding:0;" title="Edit File Name">✏️</button>
+                                                        </div>
+                                                        <form action="{{ url_for('edit_file_name', file_id=file['id']) }}" method="POST" class="edit-filename-form" id="file-form-{{ file['id'] }}" style="display:none; gap:6px; align-items:center; width: 100%;">
+                                                            <input type="hidden" name="chapter_id" value="{{ chapter['id'] }}">
+                                                            <input type="hidden" name="project_id" value="{{ project['id'] }}">
+                                                            <input type="hidden" name="sub_tab" value="{{ sub_tab }}">
+                                                            <input type="text" name="name" class="form-input" value="{{ file['name'] }}" required style="padding: 2px 6px; font-size: 12px; flex-grow: 1; min-width: 80px; height: auto;">
+                                                            <button type="submit" class="btn btn-success btn-sm" style="padding: 2px 6px; font-size: 11px;">Save</button>
+                                                            <button type="button" class="btn btn-sm" data-id="{{ file['id'] }}" onclick="toggleFilenameEdit(this.dataset.id)" style="padding: 2px 6px; font-size: 11px; background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary);">Cancel</button>
+                                                        </form>
+                                                    {% else %}
+                                                        {{ file['name'] }}
+                                                    {% endif %}
+                                                    <div style="font-size: 10px; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
+                                                        {{ file['description'] }}
+                                                    </div>
+                                                </td>
+                                                {% for stage in stages %}
+                                                    {% set cell = matrix[file['id']][stage] if file['id'] in matrix else None %}
+                                                    <td>
+                                                        {% if cell %}
+                                                            {% if cell['status'] == 'Pending' %}
+                                                                <div class="status-pill status-pending">Pending</div>
+                                                            {% elif cell['status'] == 'Open' %}
+                                                                <div class="status-pill status-open">Open</div>
+                                                            {% elif cell['status'] == 'In Progress' %}
+                                                                <div class="status-pill status-progress">
+                                                                    <span>In Progress</span>
+                                                                    <span class="artist-badge-name" title="{{ cell['artist_name'] }}">@{{ cell['artist_username'] }}</span>
+                                                                    <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
+                                                                </div>
+                                                            {% elif cell['status'] == 'Done' %}
+                                                                <div class="status-pill status-done">Done</div>
+                                                            {% endif %}
+                                                        {% else %}
+                                                            <div class="status-pill status-pending">-</div>
+                                                        {% endif %}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="{{ stages|length + 1 }}" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                                No files tracked in this chapter yet.
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
 
             <!-- Profile and Info Panels Row -->
             <div class="dashboard-grid">
@@ -525,7 +511,7 @@
                                         <input type="hidden" name="chapter_id" value="{{ selected_chapter_id }}">
                                         <span>Manage Stage Queue:</span>
                                         <select name="queue_stage" class="select-input" onchange="this.form.submit()">
-                                            {% for stage in stages %}
+                                            {% for stage in all_stages %}
                                                 <option value="{{ stage }}" {% if stage == queue_stage %}selected{% endif %}>{{ stage }}</option>
                                             {% endfor %}
                                         </select>

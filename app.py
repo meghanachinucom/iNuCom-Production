@@ -828,21 +828,40 @@ def dashboard():
             if ch['id'] == chapter_id:
                 selected_chapter_name = ch['name']
                 break
+
+    # Sub-tab parsing & stages split
+    sub_tab = request.args.get('sub_tab', 'assets')
+    if sub_tab not in ['assets', 'scenes']:
+        sub_tab = 'assets'
         
-    files = []
-    if chapter_id:
-        cursor.execute("SELECT * FROM files WHERE chapter_id = ? ORDER BY id", (chapter_id,))
-        files = cursor.fetchall()
-        
+    if sub_tab == 'assets':
+        stages_list = ['Content', 'Modeling', 'Texturing', 'Rig']
+    else:
+        stages_list = ['Animation', 'VFX', 'Lighting/Rendering', 'Motion Graphics/3D Comp', 'VR']
+
+    active_projects_list = []
+    project_chapters_map = {}
+    chapter_files_map = {}
     matrix = {}
-    if chapter_id:
+    
+    view_tab = request.args.get('view', 'overview')
+    if view_tab == 'pipeline':
+        active_projects_list = projects
+        for proj in active_projects_list:
+            pid = proj['id']
+            cursor.execute("SELECT * FROM chapters WHERE project_id = ? AND status = 'Active'", (pid,))
+            chaps = cursor.fetchall()
+            project_chapters_map[pid] = chaps
+            for chap in chaps:
+                cid = chap['id']
+                cursor.execute("SELECT * FROM files WHERE chapter_id = ? ORDER BY id", (cid,))
+                chapter_files_map[cid] = cursor.fetchall()
+                
         cursor.execute("""
             SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username 
             FROM file_pipeline fp
-            JOIN files f ON fp.file_id = f.id
             LEFT JOIN users u ON fp.assigned_to = u.id
-            WHERE f.chapter_id = ?
-        """, (chapter_id,))
+        """)
         rows = cursor.fetchall()
         for row in rows:
             f_id = row['file_id']
@@ -854,6 +873,33 @@ def dashboard():
                 'artist_name': row['artist_name'],
                 'artist_username': row['artist_username']
             }
+        # Populate files list as flat list of all files for backward compatibility
+        files = []
+        for cid, flist in chapter_files_map.items():
+            files.extend(flist)
+    else:
+        files = []
+        if chapter_id:
+            cursor.execute("SELECT * FROM files WHERE chapter_id = ? ORDER BY id", (chapter_id,))
+            files = cursor.fetchall()
+            cursor.execute("""
+                SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username 
+                FROM file_pipeline fp
+                JOIN files f ON fp.file_id = f.id
+                LEFT JOIN users u ON fp.assigned_to = u.id
+                WHERE f.chapter_id = ?
+            """, (chapter_id,))
+            rows = cursor.fetchall()
+            for row in rows:
+                f_id = row['file_id']
+                if f_id not in matrix:
+                    matrix[f_id] = {}
+                matrix[f_id][row['step_name']] = {
+                    'status': row['status'],
+                    'points': row['points'],
+                    'artist_name': row['artist_name'],
+                    'artist_username': row['artist_username']
+                }
             
     lead_queue = []
     queue_stage = None
@@ -1417,7 +1463,12 @@ def dashboard():
         selected_chapter_name=selected_chapter_name,
         files=files,
         matrix=matrix,
-        stages=PIPELINE_STAGES,
+        stages=stages_list,
+        all_stages=PIPELINE_STAGES,
+        active_projects_list=active_projects_list,
+        project_chapters_map=project_chapters_map,
+        chapter_files_map=chapter_files_map,
+        sub_tab=sub_tab,
         lead_queue=lead_queue,
         queue_stage=queue_stage,
         artists=artists,
@@ -1451,7 +1502,7 @@ def add_file():
         
     if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == 'Content'):
         flash("Unauthorized to add files.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     chapter_id = request.form.get('chapter_id', type=int)
     name = request.form.get('name', '').strip()
@@ -1459,7 +1510,7 @@ def add_file():
     
     if not chapter_id or not name:
         flash("File name and chapter are required.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     db = get_db()
     cursor = db.cursor()
@@ -1486,7 +1537,7 @@ def add_file():
         db.rollback()
         flash(f"Error creating file: {e}", "error")
         
-    return redirect(url_for('dashboard', chapter_id=chapter_id))
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/files/edit-name/<int:file_id>', methods=['POST'])
 def edit_file_name(file_id):
@@ -1502,7 +1553,7 @@ def edit_file_name(file_id):
 
     if not new_name:
         flash("File name cannot be empty.", "error")
-        return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+        return redirect(request.referrer or url_for('dashboard'))
 
     db = get_db()
     cursor = db.cursor()
@@ -1513,7 +1564,7 @@ def edit_file_name(file_id):
         file_row = cursor.fetchone()
         if not file_row:
             flash("File not found.", "error")
-            return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+            return redirect(request.referrer or url_for('dashboard'))
 
         old_name = file_row['name']
 
@@ -1522,7 +1573,7 @@ def edit_file_name(file_id):
         duplicate = cursor.fetchone()
         if duplicate:
             flash(f"A file with name '{new_name}' already exists in this chapter.", "error")
-            return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+            return redirect(request.referrer or url_for('dashboard'))
 
         cursor.execute("UPDATE files SET name = ? WHERE id = ?", (new_name, file_id))
         
@@ -1535,7 +1586,7 @@ def edit_file_name(file_id):
         db.rollback()
         flash(f"Error updating file name: {e}", "error")
 
-    return redirect(url_for('dashboard', view='pipeline', project_id=project_id, chapter_id=chapter_id))
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/file/assign', methods=['POST'])
 def assign_file():
@@ -1554,16 +1605,16 @@ def assign_file():
         
     if not file_id or not step_name:
         flash("Invalid assignment request.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     target_team = STAGE_TEAMS.get(step_name)
     if not target_team:
         flash("Invalid pipeline stage.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     if session['role'] != 'Lead' or session['team'] != target_team:
         flash("Unauthorized to assign files for this stage. Only the respective Lead can assign files.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     db = get_db()
     cursor = db.cursor()
@@ -1573,7 +1624,7 @@ def assign_file():
         artist = cursor.fetchone()
         if not artist or artist['role'] != 'Artist' or artist['team'] != target_team:
             flash("Selected user is not an Artist of this team.", "error")
-            return redirect(url_for('dashboard'))
+            return redirect(request.referrer or url_for('dashboard'))
         artist_name = artist['name']
         new_status = 'In Progress'
     else:
@@ -1622,7 +1673,7 @@ def assign_file():
         db.rollback()
         flash(f"Error assigning file: {e}", "error")
         
-    return redirect(url_for('dashboard', chapter_id=f_info['chapter_id'] if artist_id else None))
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/file/status', methods=['POST'])
 def update_status():
@@ -1635,7 +1686,7 @@ def update_status():
     
     if not file_id or not step_name or status not in ['In Progress', 'Done']:
         flash("Invalid status update parameters.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     db = get_db()
     cursor = db.cursor()
@@ -1650,7 +1701,7 @@ def update_status():
     
     if not pipeline_step:
         flash("Pipeline step not found.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     target_team = STAGE_TEAMS.get(step_name)
     
@@ -1660,7 +1711,7 @@ def update_status():
     
     if not (is_assigned or is_lead or is_admin):
         flash("Unauthorized to update status for this stage.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     cursor.execute("""
@@ -1725,7 +1776,7 @@ def update_status():
     db.commit()
     
     flash(f"Status updated for '{pipeline_step['file_name']}' [{step_name}] to '{status}'.", "success")
-    return redirect(url_for('dashboard', chapter_id=pipeline_step['chapter_id']))
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/assignment/validate', methods=['POST'])
 def validate_assignment():
@@ -1738,7 +1789,7 @@ def validate_assignment():
     
     if not assignment_id or validation_status not in ['Done', 'Pending']:
         flash("Invalid validation parameters.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     db = get_db()
     cursor = db.cursor()
@@ -1754,11 +1805,11 @@ def validate_assignment():
     
     if not da:
         flash("Assignment record not found.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == da['team']):
         flash("Unauthorized to validate assignments for this team.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(request.referrer or url_for('dashboard'))
         
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     
@@ -1815,7 +1866,7 @@ def validate_assignment():
     elif validation_status == 'Pending':
         if not remarks:
             flash("A typed reason is required to mark a task as Pending.", "error")
-            return redirect(url_for('dashboard'))
+            return redirect(request.referrer or url_for('dashboard'))
             
         cursor.execute("UPDATE daily_assignments SET status = 'Pending', remarks = ? WHERE id = ?", (remarks, assignment_id))
         
@@ -1833,7 +1884,7 @@ def validate_assignment():
         db.commit()
         flash(f"Task for {da['artist_name']} marked pending and carried forward to tomorrow.", "info")
         
-    return redirect(url_for('dashboard'))
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/target/set', methods=['POST'])
 def set_monthly_target():
@@ -1966,6 +2017,44 @@ def points_page():
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
     user_profile = cursor.fetchone()
 
+    selected_employee = None
+    points_transactions = []
+    selected_target = 0
+    selected_earned = 0
+    selected_pct = 0
+    selected_month = request.args.get('month', default=current_month)
+    
+    import re
+    if not selected_month or not re.match(r'^\d{4}-\d{2}$', selected_month):
+        selected_month = current_month
+        
+    selected_employee_id = request.args.get('employee_id', type=int)
+    if session['role'] == 'Admin' and selected_employee_id:
+        cursor.execute("SELECT id, name, username, team, role FROM users WHERE id = ? AND role IN ('Artist', 'Lead')", (selected_employee_id,))
+        selected_employee = cursor.fetchone()
+        if selected_employee:
+            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (selected_employee['id'], selected_month))
+            t_res = cursor.fetchone()
+            selected_target = t_res['target_points'] if t_res else 500
+            
+            cursor.execute("""
+                SELECT SUM(points) FROM points 
+                WHERE user_id = ? AND strftime('%Y-%m', date) = ?
+            """, (selected_employee['id'], selected_month))
+            e_res = cursor.fetchone()
+            selected_earned = e_res[0] if e_res and e_res[0] is not None else 0
+            
+            selected_pct = int((selected_earned / selected_target) * 100) if selected_target > 0 else 0
+            
+            cursor.execute("""
+                SELECT p.date, p.points, p.reason, u.name as awarded_by_name
+                FROM points p
+                LEFT JOIN users u ON p.awarded_by = u.id
+                WHERE p.user_id = ? AND strftime('%Y-%m', p.date) = ?
+                ORDER BY p.date DESC, p.id DESC
+            """, (selected_employee['id'], selected_month))
+            points_transactions = cursor.fetchall()
+
     return render_template(
         'points.html',
         user=user_profile,
@@ -1976,7 +2065,13 @@ def points_page():
         team_scoreboard=team_scoreboard,
         global_scoreboard=global_scoreboard,
         target_artists=target_artists,
-        current_month=current_month
+        current_month=current_month,
+        selected_employee=selected_employee,
+        points_transactions=points_transactions,
+        selected_target=selected_target,
+        selected_earned=selected_earned,
+        selected_pct=selected_pct,
+        selected_month=selected_month
     )
 
 # LAYER 4 - ATTENDANCE ROUTES

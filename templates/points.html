@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Points & Targets - iNuCom Production Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .txt-green { color: var(--color-green); }
+        .txt-red { color: var(--color-red); }
+        .txt-blue { color: var(--color-blue); }
+        .txt-muted { color: var(--text-muted); }
+    </style>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -318,6 +324,104 @@
 
             <!-- Admin Global Scoreboard View -->
             {% if session['role'] == 'Admin' %}
+                <!-- Individual Work Report Card -->
+                <div id="individual-report" class="card" style="margin-bottom: 24px;">
+                    <h3 class="card-title">Individual Work Report</h3>
+                    
+                    <form action="{{ url_for('points_page') }}" method="GET" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 200px;">
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT EMPLOYEE:</label>
+                            <select name="employee_id" class="select-input" onchange="this.form.submit()" required>
+                                <option value="">-- Choose Employee --</option>
+                                {% for artist in target_artists %}
+                                    <option value="{{ artist['id'] }}" {% if selected_employee and selected_employee['id'] == artist['id'] %}selected{% endif %}>
+                                        {{ artist['name'] }}{% if artist['role']|default('') == 'Lead' %} [Lead]{% endif %} (@{{ artist['username'] }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 150px;">
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT MONTH:</label>
+                            <input type="month" name="month" class="form-input" value="{{ selected_month }}" onchange="this.form.submit()" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" style="padding: 7.5px 16px; height: 38px;">View Report</button>
+                        {% if selected_employee %}
+                            <a href="{{ url_for('points_page') }}" class="btn btn-outline" style="padding: 7.5px 16px; height: 38px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Clear</a>
+                        {% endif %}
+                    </form>
+                    
+                    {% if selected_employee %}
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                                    {{ selected_employee['name'] }}'s Report
+                                </h4>
+                                <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
+                                    Role: <strong>{{ selected_employee['role'] }}</strong> | Team: <strong>{{ selected_employee['team'] }}</strong> | Month: <strong>{{ selected_month }}</strong>
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 16px;">
+                                <div style="text-align: right; background: var(--bg-main); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <div style="font-size: 20px; font-weight: 700; color: var(--color-blue);">{{ selected_earned }} <span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">pts</span></div>
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;">Earned</div>
+                                </div>
+                                <div style="text-align: right; background: var(--bg-main); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">{{ selected_target }} <span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">pts</span></div>
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;">Target</div>
+                                </div>
+                                <div style="text-align: right; background: var(--bg-main); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <div class="{% if selected_pct >= 100 %}txt-green{% else %}txt-blue{% endif %}" style="font-size: 20px; font-weight: 700;">{{ selected_pct }}%</div>
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 2px;">Progress</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar-container" style="margin-bottom: 24px; height: 10px;">
+                            <div class="progress-bar-fill {% if selected_pct >= 80 %}high-prog{% endif %}" data-width="{{ selected_pct }}"></div>
+                        </div>
+                        
+                        <h4 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;">Work Done & Points Credited</h4>
+                        {% if points_transactions %}
+                            <div class="table-responsive">
+                                <table class="scoreboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 15%;">Date</th>
+                                            <th style="width: 55%;">Work Done / Reason</th>
+                                            <th style="width: 15%;">Awarded By</th>
+                                            <th style="width: 15%; text-align: right;">Points</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for txn in points_transactions %}
+                                            <tr>
+                                                <td>{{ txn['date'] }}</td>
+                                                <td><strong>{{ txn['reason'] }}</strong></td>
+                                                <td>{{ txn['awarded_by_name'] or 'System' }}</td>
+                                                <td class="{% if txn['points'] >= 0 %}txt-green{% else %}txt-red{% endif %}" style="text-align: right; font-weight: 700;">
+                                                    {% if txn['points'] >= 0 %}+{% endif %}{{ txn['points'] }} pts
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; padding: 32px; color: var(--text-muted); background: var(--bg-main); border-radius: 8px; border: 1px dashed var(--border-color);">
+                                No completed tasks or points records found for {{ selected_employee['name'] }} in {{ selected_month }}.
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div style="text-align: center; padding: 40px; color: var(--text-muted); background: var(--bg-main); border-radius: 8px; border: 1px dashed var(--border-color);">
+                            💡 Select an employee from the dropdown above or click on their name in the Global Scoreboard to view their detailed work report.
+                        </div>
+                    {% endif %}
+                </div>
+
                 <div class="score-grid">
                     <!-- Global Scoreboard list -->
                     <div class="card" style="grid-column: span 2;">
@@ -339,7 +443,7 @@
                                         </thead>
                                         <tbody>
                                             {% for row in rows %}
-                                                <tr>
+                                                <tr data-href="{{ url_for('points_page', employee_id=row['id'], month=current_month) }}#individual-report" onclick="window.location.href=this.dataset.href" style="cursor: pointer;" title="Click to view work report">
                                                     <td>
                                                         <strong>{{ row['name'] }}</strong>
                                                         {% if row['role']|default('') == 'Lead' %}
