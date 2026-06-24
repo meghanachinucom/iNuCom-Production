@@ -858,7 +858,7 @@ def dashboard():
                 chapter_files_map[cid] = cursor.fetchall()
                 
         cursor.execute("""
-            SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username 
+            SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username, u.reports_to as artist_lead
             FROM file_pipeline fp
             LEFT JOIN users u ON fp.assigned_to = u.id
         """)
@@ -871,7 +871,8 @@ def dashboard():
                 'status': row['status'],
                 'points': row['points'],
                 'artist_name': row['artist_name'],
-                'artist_username': row['artist_username']
+                'artist_username': row['artist_username'],
+                'artist_lead': row['artist_lead']
             }
         # Populate files list as flat list of all files for backward compatibility
         files = []
@@ -883,7 +884,7 @@ def dashboard():
             cursor.execute("SELECT * FROM files WHERE chapter_id = ? ORDER BY id", (chapter_id,))
             files = cursor.fetchall()
             cursor.execute("""
-                SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username 
+                SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username, u.reports_to as artist_lead
                 FROM file_pipeline fp
                 JOIN files f ON fp.file_id = f.id
                 LEFT JOIN users u ON fp.assigned_to = u.id
@@ -898,7 +899,8 @@ def dashboard():
                     'status': row['status'],
                     'points': row['points'],
                     'artist_name': row['artist_name'],
-                    'artist_username': row['artist_username']
+                    'artist_username': row['artist_username'],
+                    'artist_lead': row['artist_lead']
                 }
             
     lead_queue = []
@@ -1465,6 +1467,7 @@ def dashboard():
         matrix=matrix,
         stages=stages_list,
         all_stages=PIPELINE_STAGES,
+        STAGE_TEAMS=STAGE_TEAMS,
         active_projects_list=active_projects_list,
         project_chapters_map=project_chapters_map,
         chapter_files_map=chapter_files_map,

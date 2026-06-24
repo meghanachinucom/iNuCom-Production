@@ -180,12 +180,12 @@
                             </form>
                         {% elif not attendance_today['clock_out'] %}
                             <form action="{{ url_for('clock_out') }}" method="POST" class="clock-form">
-                                <span class="clock-status-dot online"></span> Checked In: <strong class="ml-1">{{ attendance_today['clock_in'] }}</strong>
+                                <span class="clock-status-dot online"></span> Checked In: <strong class="ml-1">{{ attendance_today['clock_in']|time12 }}</strong>
                                 <button type="submit" class="btn btn-sm btn-danger ml-3">Check Out</button>
                             </form>
                         {% else %}
                             <div class="clock-form">
-                                <span class="clock-status-dot completed"></span> Clocked Out: <strong class="ml-1">{{ attendance_today['clock_out'] }}</strong>
+                                <span class="clock-status-dot completed"></span> Clocked Out: <strong class="ml-1">{{ attendance_today['clock_out']|time12 }}</strong>
                                 <span class="att-badge {% if attendance_today['status'] == 'Present' %}present{% elif attendance_today['status'] == 'Late' %}late{% else %}half{% endif %} ml-3" style="padding: 4px 10px; border-radius: 12px; font-size: 11px;">{{ attendance_today['status'] }}</span>
                             </div>
                         {% endif %}
@@ -323,7 +323,11 @@
                                                                 <div class="status-pill status-progress">
                                                                     <span>In Progress</span>
                                                                     <span class="artist-badge-name" title="{{ cell['artist_name'] }}">@{{ cell['artist_username'] }}</span>
-                                                                    <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
+                                                                    {% if session['role'] in ['Admin', 'HR'] or
+                                                                          (session['role'] == 'Artist' and session['username'] == cell['artist_username']) or
+                                                                          (session['role'] == 'Lead' and (session['username'] == cell['artist_lead'] or session['team'] == STAGE_TEAMS.get(stage))) %}
+                                                                        <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
+                                                                    {% endif %}
                                                                 </div>
                                                             {% elif cell['status'] == 'Done' %}
                                                                 <div class="status-pill status-done">Done</div>
@@ -373,7 +377,7 @@
                         </div>
                         <div class="profile-group">
                             <span class="profile-label">Shift Hours</span>
-                            <span class="profile-value">{{ user['shift_start'] }} - {{ user['shift_end'] }}</span>
+                            <span class="profile-value">{{ user['shift_start']|time12 if user['shift_start'] else '—' }} - {{ user['shift_end']|time12 if user['shift_end'] else '—' }}</span>
                         </div>
                     </div>
                 </div>
