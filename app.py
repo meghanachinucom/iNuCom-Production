@@ -43,9 +43,12 @@ PIPELINE_STAGES = [
     'Texturing',
     'Rig',
     'Animation',
+    'FBX export',
     'VFX',
-    'Lighting/Rendering',
-    'Motion Graphics/3D Comp',
+    'Lightning',
+    'Rendering',
+    '3D Comp',
+    'Motion graphics',
     'VR'
 ]
 
@@ -55,9 +58,12 @@ STAGE_TEAMS = {
     'Texturing': 'Texturing',
     'Rig': 'Rig',
     'Animation': 'Animation',
+    'FBX export': 'FBX export',
     'VFX': 'VFX',
-    'Lighting/Rendering': 'Lighting',
-    'Motion Graphics/3D Comp': 'Motion Graphics',
+    'Lightning': 'Lightning',
+    'Rendering': 'Rendering',
+    '3D Comp': '3D Comp',
+    'Motion graphics': 'Motion graphics',
     'VR': 'VR'
 }
 
@@ -82,12 +88,12 @@ SEEDED_USERS = [
     {"name": "Anil Kumar. K", "username": "anilkumar", "role": "Artist", "team": "Animation", "reports_to": "anilboda"},
     {"name": "Narayana. G", "username": "narayana", "role": "Artist", "team": "Animation", "reports_to": "anilboda"},
     {"name": "Tarun Suraram", "username": "tarun", "role": "Lead", "team": "VFX", "reports_to": "vasu"},
-    {"name": "Pavan Kalyan. I", "username": "pavan", "role": "Lead", "team": "Lighting", "reports_to": "vasu"},
-    {"name": "Abhilash. A", "username": "abhilash", "role": "Artist", "team": "Lighting", "reports_to": "pavan"},
-    {"name": "Spandana. K", "username": "spandana", "role": "Lead", "team": "Motion Graphics", "reports_to": "vasu"},
-    {"name": "L. Shiva Kumar", "username": "shiva", "role": "Artist", "team": "Motion Graphics", "reports_to": "spandana"},
-    {"name": "Laxman. G", "username": "laxman", "role": "Artist", "team": "Motion Graphics", "reports_to": "spandana"},
-    {"name": "Prashanth. M", "username": "prashanth", "role": "Artist", "team": "Motion Graphics", "reports_to": "spandana"},
+    {"name": "Pavan Kalyan. I", "username": "pavan", "role": "Lead", "team": "Lightning", "reports_to": "vasu"},
+    {"name": "Abhilash. A", "username": "abhilash", "role": "Artist", "team": "Lightning", "reports_to": "pavan"},
+    {"name": "Spandana. K", "username": "spandana", "role": "Lead", "team": "Motion graphics", "reports_to": "vasu"},
+    {"name": "L. Shiva Kumar", "username": "shiva", "role": "Artist", "team": "Motion graphics", "reports_to": "spandana"},
+    {"name": "Laxman. G", "username": "laxman", "role": "Artist", "team": "Motion graphics", "reports_to": "spandana"},
+    {"name": "Prashanth. M", "username": "prashanth", "role": "Artist", "team": "Motion graphics", "reports_to": "spandana"},
     {"name": "Santosh Kedari", "username": "santosh", "role": "Lead", "team": "VR", "reports_to": "vasu"},
     {"name": "Agnijeet", "username": "agnijeet", "role": "Artist", "team": "VR", "reports_to": "santosh"}
 ]
@@ -111,7 +117,7 @@ DEMO_FILES = [
     {"chapter_name": "ch_13", "name": "FW_13_05_StallTexture", "description": "Stylized texturing for the market structures", "active_stage": "Texturing", "status": "In Progress", "assigned": "rattaiah", "content_released_offset": 10800},
     {"chapter_name": "ch_13", "name": "FW_13_06_HeroWalk", "description": "Walk cycle animation for main character", "active_stage": "Animation", "status": "In Progress", "assigned": "bhavani", "content_released_offset": 14400},
     {"chapter_name": "ch_13", "name": "FW_13_07_DustFX", "description": "Wind and dust particle FX simulation", "active_stage": "VFX", "status": "Open", "assigned": None, "content_released_offset": 18000},
-    {"chapter_name": "ch_13", "name": "FW_13_08_SunLight", "description": "Sunlight dynamic lighting setup", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned": "abhilash", "content_released_offset": 21600}
+    {"chapter_name": "ch_13", "name": "FW_13_08_SunLight", "description": "Sunlight dynamic lighting setup", "active_stage": "Lightning", "status": "In Progress", "assigned": "abhilash", "content_released_offset": 21600}
 ]
 
 WELDING_FILES = [
@@ -152,9 +158,9 @@ WELDING_FILES = [
 ]
 
 SHOWCASE_FILES = [
-    {"name": "sk_ch01_sc_01", "active_stage": "Motion Graphics/3D Comp", "status": "In Progress", "assigned_username": "shiva", "points": 60},
-    {"name": "sk_ch01_sc_02", "active_stage": "Motion Graphics/3D Comp", "status": "Open", "assigned_username": "laxman", "points": 60},
-    {"name": "sk_ch01_sc_03", "active_stage": "Lighting/Rendering", "status": "In Progress", "assigned_username": "abhilash", "points": 80},
+    {"name": "sk_ch01_sc_01", "active_stage": "Motion graphics", "status": "In Progress", "assigned_username": "shiva", "points": 60},
+    {"name": "sk_ch01_sc_02", "active_stage": "Motion graphics", "status": "Open", "assigned_username": "laxman", "points": 60},
+    {"name": "sk_ch01_sc_03", "active_stage": "Lightning", "status": "In Progress", "assigned_username": "abhilash", "points": 80},
     {"name": "sk_ch01_sc_04", "active_stage": "VFX", "status": "In Progress", "assigned_username": "tarun", "points": 80},
     {"name": "sk_ch01_sc_05", "active_stage": "Animation", "status": "In Progress", "assigned_username": "ganesh", "points": 80},
     {"name": "sk_ch01_sc_06", "active_stage": "Rig", "status": "In Progress", "assigned_username": "gowri", "points": 80},
@@ -278,6 +284,93 @@ def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
+
+def recalculate_file_metadata(db, file_id):
+    cursor = db.cursor()
+    
+    # 1. Fetch file's current review statuses
+    cursor.execute("""
+        SELECT internal_lead_status, internal_content_status, final_review_status 
+        FROM files WHERE id = ?
+    """, (file_id,))
+    file_row = cursor.fetchone()
+    if not file_row:
+        return
+        
+    # 2. Query all pipeline steps for this file
+    cursor.execute("""
+        SELECT step_name, status, assigned_to, start_date, end_date, remarks
+        FROM file_pipeline
+        WHERE file_id = ?
+    """, (file_id,))
+    steps = [dict(r) for r in cursor.fetchall()]
+    steps_map = {s['step_name']: s for s in steps}
+    
+    # Order stages by PIPELINE_STAGES
+    ordered_steps = []
+    for stage in PIPELINE_STAGES:
+        if stage in steps_map:
+            ordered_steps.append(steps_map[stage])
+            
+    # Calculate values
+    # a. Assigned Artist: first step in order that is 'In Progress' or 'Open'
+    active_artist_id = None
+    for step in ordered_steps:
+        if step['status'] in ['In Progress', 'Open']:
+            active_artist_id = step['assigned_to']
+            break
+            
+    # b. Start and End Dates
+    start_dates = []
+    end_dates = []
+    for step in ordered_steps:
+        if step['start_date']:
+            try:
+                d = datetime.datetime.strptime(step['start_date'].strip(), '%Y-%m-%d').date()
+                start_dates.append(d)
+            except ValueError:
+                pass
+        if step['end_date']:
+            try:
+                d = datetime.datetime.strptime(step['end_date'].strip(), '%Y-%m-%d').date()
+                end_dates.append(d)
+            except ValueError:
+                pass
+                
+    calc_start_date = min(start_dates).strftime('%Y-%m-%d') if start_dates else None
+    calc_end_date = max(end_dates).strftime('%Y-%m-%d') if end_dates else None
+    
+    # c. Overall Status
+    all_done = all(s['status'] == 'Done' for s in ordered_steps) if ordered_steps else False
+    any_progress = any(s['status'] == 'In Progress' for s in ordered_steps)
+    any_open = any(s['status'] == 'Open' for s in ordered_steps)
+    
+    if file_row['final_review_status'] == 'Approved':
+        calc_status = 'Done'
+    elif all_done:
+        calc_status = 'Review'
+    elif any_progress:
+        calc_status = 'In Progress'
+    elif any_open:
+        calc_status = 'Open'
+    else:
+        calc_status = 'Pending'
+        
+    # d. Remarks
+    remarks_list = []
+    for step in ordered_steps:
+        if step['remarks']:
+            remarks_list.append(f"{step['step_name']}: {step['remarks']}")
+    calc_remarks = "\n".join(remarks_list) if remarks_list else None
+    
+    # Update files table
+    cursor.execute("""
+        UPDATE files
+        SET assigned_to = ?, start_date = ?, end_date = ?, status = ?, remarks = ?
+        WHERE id = ?
+    """, (active_artist_id, calc_start_date, calc_end_date, calc_status, calc_remarks, file_id))
+    db.commit()
+
 
 def init_db():
     db_exists = os.path.exists(DATABASE)
@@ -429,6 +522,77 @@ def init_db():
             print("Migrated: ensured all artists and leads have targets for the current month.")
         except Exception as e:
             print(f"Error checking/migrating monthly targets: {e}")
+
+        # Runtime migration: ensure files table has review and metadata columns
+        try:
+            conn = sqlite3.connect(DATABASE)
+            cursor = conn.cursor()
+            new_cols = [
+                ("start_date", "TEXT"),
+                ("end_date", "TEXT"),
+                ("remarks", "TEXT"),
+                ("final_approval_date", "TEXT"),
+                ("internal_lead_status", "TEXT DEFAULT 'Pending'"),
+                ("internal_content_status", "TEXT DEFAULT 'Pending'"),
+                ("final_review_status", "TEXT DEFAULT 'Pending'")
+            ]
+            for col_name, col_type in new_cols:
+                try:
+                    cursor.execute(f"ALTER TABLE files ADD COLUMN {col_name} {col_type}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+            
+            # Update user teams (Lighting -> Lightning, Motion Graphics -> Motion graphics)
+            cursor.execute("UPDATE users SET team = 'Lightning' WHERE team = 'Lighting'")
+            cursor.execute("UPDATE users SET team = 'Motion graphics' WHERE team = 'Motion Graphics'")
+            conn.commit()
+            
+            # Migrate file pipeline stages
+            # Ensure every file has all pipeline stages
+            cursor.execute("SELECT id FROM files")
+            files_list = cursor.fetchall()
+            for f_row in files_list:
+                fid = f_row[0]
+                # Fetch existing stages
+                cursor.execute("SELECT step_name, status, assigned_to, points, start_date, end_date, remarks FROM file_pipeline WHERE file_id = ?", (fid,))
+                existing_pipeline = {r[0]: dict(zip(['status', 'assigned_to', 'points', 'start_date', 'end_date', 'remarks'], r[1:])) for r in cursor.fetchall()}
+                
+                # Check for old stages to migrate
+                old_mapping = {
+                    'Lighting/Rendering': 'Lightning',
+                    'Motion Graphics/3D Comp': 'Motion graphics'
+                }
+                for old_st, new_st in old_mapping.items():
+                    if old_st in existing_pipeline and new_st not in existing_pipeline:
+                        # Copy old stage values to new stage
+                        old_data = existing_pipeline[old_st]
+                        cursor.execute("""
+                            INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points, start_date, end_date, remarks)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (fid, new_st, old_data['status'], old_data['assigned_to'], old_data['points'], old_data['start_date'], old_data['end_date'], old_data['remarks']))
+                        conn.commit()
+                        existing_pipeline[new_st] = old_data
+                
+                # Ensure all current pipeline stages exist for this file
+                for stage in PIPELINE_STAGES:
+                    if stage not in existing_pipeline:
+                        status = 'Open' if stage == 'Content' else 'Pending'
+                        cursor.execute("""
+                            INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
+                            VALUES (?, ?, ?, NULL, 0)
+                        """, (fid, stage, status))
+                        conn.commit()
+                        
+                # Clean up old stages from database
+                cursor.execute("DELETE FROM file_pipeline WHERE file_id = ? AND step_name IN ('Lighting/Rendering', 'Motion Graphics/3D Comp')", (fid,))
+                conn.commit()
+                
+            conn.close()
+            print("Migrated: file details, team names, and file pipeline stages.")
+        except Exception as e:
+            print(f"Error executing schema and team migration: {e}")
+
 
     if not db_exists or schema_needs_update:
         if db_exists:
@@ -837,7 +1001,7 @@ def dashboard():
     if sub_tab == 'assets':
         stages_list = ['Content', 'Modeling', 'Texturing', 'Rig']
     else:
-        stages_list = ['Animation', 'VFX', 'Lighting/Rendering', 'Motion Graphics/3D Comp', 'VR']
+        stages_list = ['Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp', 'Motion graphics']
 
     active_projects_list = []
     project_chapters_map = {}
@@ -1177,7 +1341,7 @@ def dashboard():
     else:
         chart_stages = [
             'Content', 'Modeling', 'Texturing', 'Rig', 'Animation', 
-            'VFX', 'Lighting/Rendering', 'Motion Graphics/3D Comp'
+            'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp', 'Motion graphics'
         ]
     
     stage_completion_data = []
@@ -1518,6 +1682,8 @@ def add_file():
     db = get_db()
     cursor = db.cursor()
     
+    sub_tab = request.form.get('sub_tab', 'assets')
+    
     try:
         cursor.execute("""
             INSERT INTO files (chapter_id, name, description, status)
@@ -1526,7 +1692,10 @@ def add_file():
         file_id = cursor.lastrowid
         
         for stage in PIPELINE_STAGES:
-            status = 'Open' if stage == 'Content' else 'Pending'
+            if sub_tab == 'scenes':
+                status = 'Open' if stage == 'Animation' else 'Pending'
+            else:
+                status = 'Open' if stage == 'Content' else 'Pending'
             cursor.execute("""
                 INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points)
                 VALUES (?, ?, ?, NULL, 0)
@@ -1591,6 +1760,192 @@ def edit_file_name(file_id):
 
     return redirect(request.referrer or url_for('dashboard'))
 
+@app.route('/files/<int:file_id>/details', methods=['GET'])
+def get_file_details(file_id):
+    if 'user_id' not in session:
+        return {'error': 'Unauthorized'}, 401
+    if session['role'] not in ['Admin', 'HR', 'Lead']:
+        return {'error': 'Forbidden'}, 403
+
+    db = get_db()
+    
+    # Recalculate dynamic metadata on get details request
+    recalculate_file_metadata(db, file_id)
+    
+    cursor = db.cursor()
+    # Query file details
+    cursor.execute("""
+        SELECT f.id, f.name, f.description, f.chapter_id, f.assigned_to, f.start_date, f.end_date, f.remarks, f.final_approval_date,
+               f.internal_lead_status, f.internal_content_status, f.final_review_status, f.status,
+               p.name as project_name, c.name as chapter_name
+        FROM files f
+        JOIN chapters c ON f.chapter_id = c.id
+        JOIN projects p ON c.project_id = p.id
+        WHERE f.id = ?
+    """, (file_id,))
+    file_row = cursor.fetchone()
+    if not file_row:
+        return {'error': 'File not found'}, 404
+        
+    file_data = dict(file_row)
+    
+    # Fetch active artist name and username if assigned
+    artist_name = ""
+    artist_username = ""
+    artist_lead = ""
+    artist_team = ""
+    if file_data['assigned_to']:
+        cursor.execute("SELECT name, username, reports_to, team FROM users WHERE id = ?", (file_data['assigned_to'],))
+        artist_row = cursor.fetchone()
+        if artist_row:
+            artist_name = artist_row['name']
+            artist_username = artist_row['username']
+            artist_lead = artist_row['reports_to']
+            artist_team = artist_row['team']
+            
+    file_data['artist_name'] = artist_name
+    file_data['artist_username'] = artist_username
+    file_data['artist_lead'] = artist_lead
+    file_data['artist_team'] = artist_team
+    
+    # Fetch all pipeline steps for this file
+    cursor.execute("""
+        SELECT fp.step_name, fp.status, fp.assigned_to, fp.points, fp.start_date, fp.end_date, fp.remarks,
+               u.name as artist_name, u.username as artist_username, u.team as artist_team
+        FROM file_pipeline fp
+        LEFT JOIN users u ON fp.assigned_to = u.id
+        WHERE fp.file_id = ?
+    """, (file_id,))
+    pipeline_steps = [dict(r) for r in cursor.fetchall()]
+    
+    # Sort steps by PIPELINE_STAGES order
+    steps_map = {s['step_name']: s for s in pipeline_steps}
+    sorted_steps = []
+    for stage in PIPELINE_STAGES:
+        if stage in steps_map:
+            sorted_steps.append(steps_map[stage])
+    
+    # Fetch all artists for dropdown selection
+    cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY name")
+    artists_list = [dict(r) for r in cursor.fetchall()]
+    
+    # Return everything including metadata about the current user and the pipeline steps
+    return {
+        'file': file_data,
+        'pipeline_steps': sorted_steps,
+        'artists': artists_list,
+        'current_user': {
+            'username': session['username'],
+            'role': session['role'],
+            'team': session['team']
+        }
+    }
+
+
+@app.route('/files/<int:file_id>/update-details', methods=['POST'])
+def update_file_details(file_id):
+    if 'user_id' not in session:
+        return {'error': 'Unauthorized'}, 401
+    if session['role'] not in ['Admin', 'HR', 'Lead']:
+        return {'error': 'Forbidden'}, 403
+
+    db = get_db()
+    cursor = db.cursor()
+    
+    # Get current file info
+    cursor.execute("SELECT * FROM files WHERE id = ?", (file_id,))
+    file_row = cursor.fetchone()
+    if not file_row:
+        return {'error': 'File not found'}, 404
+        
+    # Read inputs
+    final_approval_date = request.form.get('final_approval_date', '').strip() or None
+    
+    # Review action inputs
+    lead_review_action = request.form.get('lead_review_action', '') # 'Approve', 'Reject', 'Reset'
+    content_review_action = request.form.get('content_review_action', '')
+    final_review_action = request.form.get('final_review_action', '')
+    
+    # Determine artist's lead based on currently calculated assigned artist
+    assigned_to_id = file_row['assigned_to']
+    artist_lead = None
+    if assigned_to_id:
+        cursor.execute("SELECT reports_to FROM users WHERE id = ?", (assigned_to_id,))
+        artist_user_row = cursor.fetchone()
+        if artist_user_row:
+            artist_lead = artist_user_row['reports_to']
+            
+    try:
+        # HR and Admin can update the final approval date manually
+        if session['role'] in ['Admin', 'HR']:
+            cursor.execute("UPDATE files SET final_approval_date = ? WHERE id = ?", (final_approval_date, file_id))
+            db.commit()
+            
+        # Review actions updates
+        # 1. Respective team lead review
+        if lead_review_action:
+            # Respective team lead or Admin can approve/reject
+            if session['role'] == 'Admin' or (session['role'] == 'Lead' and artist_lead == session['username']):
+                new_lead_status = 'Approved' if lead_review_action == 'Approve' else ('Rejected' if lead_review_action == 'Reject' else 'Pending')
+                cursor.execute("UPDATE files SET internal_lead_status = ? WHERE id = ?", (new_lead_status, file_id))
+                db.commit()
+                # Log action
+                cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Review Action', ?)",
+                               (session['user_id'], f"Team Lead set Lead Review for file ID {file_id} to '{new_lead_status}'"))
+                db.commit()
+                
+        # 2. Content lead review
+        if content_review_action:
+            # Pooja (Content Lead) or Admin can approve/reject
+            if session['role'] == 'Admin' or (session['role'] == 'Lead' and session['username'] == 'pooja'):
+                new_content_status = 'Approved' if content_review_action == 'Approve' else ('Rejected' if content_review_action == 'Reject' else 'Pending')
+                cursor.execute("UPDATE files SET internal_content_status = ? WHERE id = ?", (new_content_status, file_id))
+                db.commit()
+                # Log action
+                cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Review Action', ?)",
+                               (session['user_id'], f"Content Lead set Content Review for file ID {file_id} to '{new_content_status}'"))
+                db.commit()
+                
+        # 3. Final review
+        if final_review_action:
+            # Only Admin (Vasu) can approve/reject
+            if session['role'] == 'Admin':
+                new_final_status = 'Approved' if final_review_action == 'Approve' else ('Rejected' if final_review_action == 'Reject' else 'Pending')
+                
+                # If final review is approved, automatically set final_approval_date to today if not set, and set overall status to 'Done'
+                if new_final_status == 'Approved':
+                    if not final_approval_date:
+                        today_str = datetime.date.today().strftime('%Y-%m-%d')
+                        cursor.execute("""
+                            UPDATE files 
+                            SET final_review_status = ?, status = 'Done', final_approval_date = ? 
+                            WHERE id = ?
+                        """, (new_final_status, today_str, file_id))
+                    else:
+                        cursor.execute("""
+                            UPDATE files 
+                            SET final_review_status = ?, status = 'Done' 
+                            WHERE id = ?
+                        """, (new_final_status, file_id))
+                else:
+                    cursor.execute("UPDATE files SET final_review_status = ? WHERE id = ?", (new_final_status, file_id))
+                    
+                db.commit()
+                # Log action
+                cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Review Action', ?)",
+                               (session['user_id'], f"Admin set Final Review for file ID {file_id} to '{new_final_status}'"))
+                db.commit()
+                
+        # Recalculate file metadata at the end to keep status in sync
+        recalculate_file_metadata(db, file_id)
+        
+        return {'success': True}
+    except Exception as e:
+        db.rollback()
+        return {'error': str(e)}, 500
+
+
+
 @app.route('/file/assign', methods=['POST'])
 def assign_file():
     if 'user_id' not in session:
@@ -1636,17 +1991,24 @@ def assign_file():
         points = 0
         
     try:
-        cursor.execute("""
-            UPDATE file_pipeline 
-            SET assigned_to = ?, status = ?, points = ?
-            WHERE file_id = ? AND step_name = ?
-        """, (artist_id, new_status, points, file_id, step_name))
+        today_str = datetime.date.today().strftime('%Y-%m-%d')
+        if artist_id:
+            cursor.execute("""
+                UPDATE file_pipeline 
+                SET assigned_to = ?, status = ?, points = ?, start_date = COALESCE(start_date, ?)
+                WHERE file_id = ? AND step_name = ?
+            """, (artist_id, new_status, points, today_str, file_id, step_name))
+        else:
+            cursor.execute("""
+                UPDATE file_pipeline 
+                SET assigned_to = ?, status = ?, points = ?
+                WHERE file_id = ? AND step_name = ?
+            """, (artist_id, new_status, points, file_id, step_name))
         
         cursor.execute("SELECT name, chapter_id FROM files WHERE id = ?", (file_id,))
         f_info = cursor.fetchone()
         
         if artist_id:
-            today_str = datetime.date.today().strftime('%Y-%m-%d')
             cursor.execute("""
                 SELECT id FROM daily_assignments 
                 WHERE user_id = ? AND date = ? AND file_id = ?
@@ -1671,7 +2033,12 @@ def assign_file():
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Assign File', ?)",
                        (session['user_id'], f"Assigned '{f_info['name']}' [{step_name}] to {artist_name} (Points: {points})"))
         db.commit()
+        
+        # Recalculate file metadata
+        recalculate_file_metadata(db, file_id)
+        
         flash(f"File updated: {f_info['name']} assigned to {artist_name} with {points} complexity points.", "success")
+
     except Exception as e:
         db.rollback()
         flash(f"Error assigning file: {e}", "error")
@@ -1717,11 +2084,19 @@ def update_status():
         return redirect(request.referrer or url_for('dashboard'))
         
     today_str = datetime.date.today().strftime('%Y-%m-%d')
-    cursor.execute("""
-        UPDATE file_pipeline 
-        SET status = ? 
-        WHERE file_id = ? AND step_name = ?
-    """, (status, file_id, step_name))
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    if status == 'In Progress':
+        cursor.execute("""
+            UPDATE file_pipeline 
+            SET status = ?, start_date = COALESCE(start_date, ?) 
+            WHERE file_id = ? AND step_name = ?
+        """, (status, today_str, file_id, step_name))
+    elif status == 'Done':
+        cursor.execute("""
+            UPDATE file_pipeline 
+            SET status = ?, end_date = COALESCE(end_date, ?) 
+            WHERE file_id = ? AND step_name = ?
+        """, (status, today_str, file_id, step_name))
     
     submit_time_val = None
     if status == 'Done':
@@ -1778,7 +2153,11 @@ def update_status():
                    (session['user_id'], 'Pipeline Update', log_details))
     db.commit()
     
+    # Recalculate file metadata
+    recalculate_file_metadata(db, file_id)
+    
     flash(f"Status updated for '{pipeline_step['file_name']}' [{step_name}] to '{status}'.", "success")
+
     return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/assignment/validate', methods=['POST'])
@@ -1830,9 +2209,10 @@ def validate_assignment():
             points_val = step_row['points']
             
             cursor.execute("""
-                UPDATE file_pipeline SET status = 'Done' 
+                UPDATE file_pipeline 
+                SET status = 'Done', end_date = COALESCE(end_date, ?), remarks = NULL
                 WHERE file_id = ? AND step_name = ?
-            """, (da['file_id'], step_name))
+            """, (today_str, da['file_id'], step_name))
             
             cursor.execute("""
                 INSERT INTO points (user_id, date, points, reason, awarded_by)
@@ -1864,6 +2244,10 @@ def validate_assignment():
                        (session['user_id'], f"Validated EOD Task Done for {da['artist_name']} on '{da['file_name']}'"))
         _push_notification(db, da['user_id'], "Task Completed", f"Your task '{da['file_name']}' has been validated as Done. Points credited!", "task", link=url_for('dashboard'))
         db.commit()
+        
+        # Recalculate file metadata
+        recalculate_file_metadata(db, da['file_id'])
+        
         flash(f"Task for {da['artist_name']} validated as completed. Points credited!", "success")
         
     elif validation_status == 'Pending':
@@ -1872,6 +2256,18 @@ def validate_assignment():
             return redirect(request.referrer or url_for('dashboard'))
             
         cursor.execute("UPDATE daily_assignments SET status = 'Pending', remarks = ? WHERE id = ?", (remarks, assignment_id))
+        
+        # Set remarks in the active step of file_pipeline
+        cursor.execute("""
+            SELECT step_name FROM file_pipeline 
+            WHERE file_id = ? AND assigned_to = ? AND status IN ('Open', 'In Progress')
+        """, (da['file_id'], da['user_id']))
+        step_row = cursor.fetchone()
+        if step_row:
+            cursor.execute("""
+                UPDATE file_pipeline SET remarks = ? 
+                WHERE file_id = ? AND step_name = ?
+            """, (remarks, da['file_id'], step_row['step_name']))
         
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         tomorrow_str = tomorrow.strftime('%Y-%m-%d')
@@ -1885,7 +2281,12 @@ def validate_assignment():
                        (session['user_id'], f"Carried forward task for {da['artist_name']} on '{da['file_name']}' to tomorrow. Reason: {remarks}"))
         _push_notification(db, da['user_id'], "Task Pending", f"Your task '{da['file_name']}' has been marked Pending. Reason: {remarks}", "task", link=url_for('dashboard'))
         db.commit()
+        
+        # Recalculate file metadata
+        recalculate_file_metadata(db, da['file_id'])
+        
         flash(f"Task for {da['artist_name']} marked pending and carried forward to tomorrow.", "info")
+
         
     return redirect(request.referrer or url_for('dashboard'))
 

@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS files (
     status TEXT DEFAULT 'Pending',
     assigned_to INTEGER,
     content_released_at TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    remarks TEXT,
+    final_approval_date TEXT,
+    internal_lead_status TEXT DEFAULT 'Pending',
+    internal_content_status TEXT DEFAULT 'Pending',
+    final_review_status TEXT DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
