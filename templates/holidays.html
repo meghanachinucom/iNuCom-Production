@@ -309,9 +309,11 @@ function openEdit(btn) {
     document.getElementById('edit-h-date').value = date;
     document.getElementById('edit-h-name').value = name;
     document.getElementById('editModal').classList.add('show');
+    document.body.classList.add('modal-open');
 }
 function closeEdit() {
     document.getElementById('editModal').classList.remove('show');
+    document.body.classList.remove('modal-open');
 }
 document.getElementById('editModal').addEventListener('click', function(e) {
     if (e.target === this) closeEdit();

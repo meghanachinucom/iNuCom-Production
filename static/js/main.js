@@ -125,11 +125,13 @@ function openEditModal(dateStr, clockInStr, clockOutStr) {
     document.getElementById('modal-edit-reason').value = '';
     
     modal.classList.add('active');
+    document.body.classList.add('modal-open');
 }
 
 function closeEditModal() {
     const modal = document.getElementById('attendanceEditModal');
     if (modal) {
         modal.classList.remove('active');
+        document.body.classList.remove('modal-open');
     }
 }

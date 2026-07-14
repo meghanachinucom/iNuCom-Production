@@ -672,12 +672,14 @@
             
             document.getElementById('modal-employee-name-display').textContent = employeeName;
             document.getElementById('employeeCalendarModal').classList.add('active');
+            document.body.classList.add('modal-open');
             
             fetchCalendarData();
         }
 
         function closeCalendarModal() {
             document.getElementById('employeeCalendarModal').classList.remove('active');
+            document.body.classList.remove('modal-open');
         }
 
         function shiftPopupMonth(offset) {

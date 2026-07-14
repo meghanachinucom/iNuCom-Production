@@ -55,6 +55,10 @@ body {
     font-weight: 500;
 }
 
+body.modal-open {
+    overflow: hidden !important;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 6px;
