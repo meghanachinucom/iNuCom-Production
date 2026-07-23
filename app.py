@@ -321,7 +321,19 @@ def recalculate_file_metadata(db, file_id):
             active_artist_id = step['assigned_to']
             break
             
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+
     # b. Start and End Dates
+    # Auto-ensure steps that are 'In Progress' or 'Done' have a start_date set if missing
+    for step in ordered_steps:
+        if step['status'] in ['In Progress', 'Done'] and not step['start_date']:
+            step['start_date'] = today_str
+            cursor.execute("""
+                UPDATE file_pipeline 
+                SET start_date = ? 
+                WHERE file_id = ? AND step_name = ?
+            """, (today_str, file_id, step['step_name']))
+
     start_dates = []
     end_dates = []
     for step in ordered_steps:
@@ -346,7 +358,7 @@ def recalculate_file_metadata(db, file_id):
     any_progress = any(s['status'] == 'In Progress' for s in ordered_steps)
     any_open = any(s['status'] == 'Open' for s in ordered_steps)
     
-    if file_row['final_review_status'] == 'Approved':
+    if all_done and file_row['final_review_status'] == 'Approved':
         calc_status = 'Done'
     elif all_done:
         calc_status = 'Review'
@@ -356,6 +368,10 @@ def recalculate_file_metadata(db, file_id):
         calc_status = 'Open'
     else:
         calc_status = 'Pending'
+
+    # If file is In Progress, Review, or Done, ensure calc_start_date is calculated/set
+    if calc_status in ['In Progress', 'Review', 'Done'] and not calc_start_date:
+        calc_start_date = today_str
         
     # If overall status is Done, calculate and set end_date automatically
     if calc_status == 'Done':
@@ -1902,6 +1918,54 @@ def get_file_details(file_id):
         if stage in steps_map:
             sorted_steps.append(steps_map[stage])
     
+    # Calculate pending team and active stage for file details popup
+    in_progress_step = next((s for s in sorted_steps if s['status'] == 'In Progress'), None)
+    open_step = next((s for s in sorted_steps if s['status'] == 'Open'), None)
+    pending_step = next((s for s in sorted_steps if s['status'] != 'Done'), None)
+    
+    target_step = in_progress_step or open_step or pending_step
+
+    def resolve_team(step):
+        if step and step.get('artist_team'):
+            return step['artist_team']
+        if step and step['step_name'] in STAGE_TEAMS:
+            return STAGE_TEAMS[step['step_name']]
+        return artist_team or "Content"
+
+    if target_step:
+        # Pipeline steps are still active / pending across teams
+        active_stage = target_step['step_name']
+        pending_team = resolve_team(target_step)
+    else:
+        # All pipeline steps are 'Done'! Check review workflow stages
+        last_step_team = None
+        if sorted_steps:
+            for step in reversed(sorted_steps):
+                if step.get('artist_team'):
+                    last_step_team = step['artist_team']
+                    break
+                elif step['step_name'] in STAGE_TEAMS:
+                    last_step_team = STAGE_TEAMS[step['step_name']]
+                    break
+        eff_team = artist_team or last_step_team or "Content"
+
+        if file_data['internal_lead_status'] != 'Approved':
+            active_stage = "Lead Review"
+            pending_team = eff_team
+        elif file_data['internal_content_status'] != 'Approved':
+            active_stage = "Content Review"
+            pending_team = "Content"
+        elif file_data['final_review_status'] != 'Approved':
+            active_stage = "Final Review"
+            pending_team = "Management"
+        else:
+            # Fully approved across all teams and reviews
+            active_stage = "Completed"
+            pending_team = eff_team or "Management"
+
+    file_data['pending_team'] = pending_team
+    file_data['active_stage'] = active_stage
+
     # Fetch all artists for dropdown selection
     cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY name")
     artists_list = [dict(r) for r in cursor.fetchall()]
