@@ -20,7 +20,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                <!-- Sidebar -->
+                                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -76,6 +76,9 @@
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -496,98 +499,106 @@
 
                 <!-- Role Based Views: Admin / HR (Global Summary) -->
                 {% if session['role'] in ['Admin', 'HR'] %}
-                    <div class="card">
-                        <h3 class="card-title">Global Team Attendance - Today</h3>
-                        
-                        {% for team, members in global_today.items() %}
-                            <div style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                                <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
-                                <table class="scoreboard-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Employee</th>
-                                            <th>Role</th>
-                                            <th>Clock In</th>
-                                            <th>Clock Out</th>
-                                            <th>Late Minutes</th>
-                                            <th>Extra Hours</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for row in members %}
+                    <!-- Days Attendance Dropdown Card -->
+                    <details class="card" open style="margin-bottom: 24px;">
+                        <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 4px 0; user-select: none;">
+                            ▼ Today's Days Attendance Dropdown (Click to Toggle)
+                        </summary>
+                        <div style="margin-top: 16px;">
+                            {% for team, members in global_today.items() %}
+                                <div style="margin-top: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                    <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
+                                    <table class="scoreboard-table">
+                                        <thead>
                                             <tr>
-                                                <td><strong>{{ row['name'] }}</strong> <span style="font-size: 11px; color: var(--text-muted);">(@{{ row['username'] }})</span></td>
-                                                <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
-                                                <td>{{ row['clock_in']|time12 if row['clock_in'] else '--' }}</td>
-                                                <td>{{ row['clock_out']|time12 if row['clock_out'] else '--' }}</td>
-                                                <td class="{% if row['late_minutes'] and row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
-                                                    {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
-                                                </td>
-                                                <td class="{% if row['extra_hours'] and row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
-                                                    +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
-                                                </td>
-                                                <td>
-                                                    {% set status_lower = row['status']|lower if row['status'] else 'absent' %}
-                                                    <span class="att-badge {% if status_lower == 'half day' %}half{% else %}{{ status_lower }}{% endif %}">
-                                                        {{ row['status'] if row['status'] else 'Absent' }}
-                                                    </span>
-                                                </td>
+                                                <th>Employee</th>
+                                                <th>Role</th>
+                                                <th>Clock In</th>
+                                                <th>Clock Out</th>
+                                                <th>Late Minutes</th>
+                                                <th>Extra Hours</th>
+                                                <th>Status</th>
                                             </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% endfor %}
-                    </div>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in members %}
+                                                <tr>
+                                                    <td><strong>{{ row['name'] }}</strong> <span style="font-size: 11px; color: var(--text-muted);">(@{{ row['username'] }})</span></td>
+                                                    <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
+                                                    <td>{{ row['clock_in']|time12 if row['clock_in'] else '--' }}</td>
+                                                    <td>{{ row['clock_out']|time12 if row['clock_out'] else '--' }}</td>
+                                                    <td class="{% if row['late_minutes'] and row['late_minutes'] > 0 %}txt-late-highlight{% endif %}">
+                                                        {{ row['late_minutes'] if row['late_minutes'] else 0 }}m
+                                                    </td>
+                                                    <td class="{% if row['extra_hours'] and row['extra_hours'] > 0 %}txt-extra-highlight{% endif %}">
+                                                        +{{ "%.1f"|format(row['extra_hours']) if row['extra_hours'] else '0.0' }}h
+                                                    </td>
+                                                    <td>
+                                                        {% set status_lower = row['status']|lower if row['status'] else 'absent' %}
+                                                        <span class="att-badge {% if status_lower == 'half day' %}half{% else %}{{ status_lower }}{% endif %}">
+                                                            {{ row['status'] if row['status'] else 'Absent' }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </details>
 
-                    <div class="card">
-                        <h3 class="card-title">Global Employee Statistics - Selected Month</h3>
-                        
-                        {% for team, members in global_monthly_stats.items() %}
-                            <div style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                                <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
-                                <table class="scoreboard-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Employee</th>
-                                            <th>Role</th>
-                                            <th>Present</th>
-                                            <th>Late Days</th>
-                                            <th>Half Days</th>
-                                            <th>Absent</th>
-                                            <th>Leaves</th>
-                                            <th>Late Minutes</th>
-                                            <th>Extra Hours</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for row in members %}
+                    <!-- Monthly Attendance Dropdown Card -->
+                    <details class="card" open style="margin-bottom: 24px;">
+                        <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 4px 0; user-select: none;">
+                            ▼ Monthly Attendance &amp; Employee Statistics Dropdown (Click to Toggle)
+                        </summary>
+                        <div style="margin-top: 16px;">
+                            {% for team, members in global_monthly_stats.items() %}
+                                <div style="margin-top: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                    <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
+                                    <table class="scoreboard-table">
+                                        <thead>
                                             <tr>
-                                                <td><strong>{{ row['name'] }}</strong></td>
-                                                <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
-                                                <td style="color: var(--color-green); font-weight: 600;">{{ row['present'] }}</td>
-                                                <td style="color: var(--color-red);">{{ row['late'] }}</td>
-                                                <td style="color: #b45309;">{{ row['half_day'] }}</td>
-                                                <td style="color: var(--text-muted);">{{ row['absent'] }}</td>
-                                                <td style="color: #6b21a8;">{{ row['leaves'] }}</td>
-                                                <td style="color: var(--color-red); font-weight: 600;">{{ row['late_minutes'] }}m</td>
-                                                <td style="color: var(--color-green); font-weight: 600;">+{{ "%.1f"|format(row['extra_hours']) }}h</td>
-                                                <td>
-                                                    {% if session['role'] == 'Admin' %}
-                                                        <button type="button" class="btn btn-primary btn-sm" data-id="{{ row['id'] }}" data-name="{{ row['name'] }}" onclick="openCalendarModal(this.dataset.id, this.dataset.name)" style="font-size: 11px; padding: 4px 8px; border: none; cursor: pointer;">View Calendar</button>
-                                                    {% else %}
-                                                        <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
-                                                    {% endif %}
-                                                </td>
+                                                <th>Employee</th>
+                                                <th>Role</th>
+                                                <th>Present</th>
+                                                <th>Late Days</th>
+                                                <th>Half Days</th>
+                                                <th>Absent</th>
+                                                <th>Leaves</th>
+                                                <th>Late Minutes</th>
+                                                <th>Extra Hours</th>
+                                                <th>Action</th>
                                             </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% endfor %}
-                    </div>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in members %}
+                                                <tr>
+                                                    <td><strong>{{ row['name'] }}</strong></td>
+                                                    <td><span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span></td>
+                                                    <td style="color: var(--color-green); font-weight: 600;">{{ row['present'] }}</td>
+                                                    <td style="color: var(--color-red);">{{ row['late'] }}</td>
+                                                    <td style="color: #b45309;">{{ row['half_day'] }}</td>
+                                                    <td style="color: var(--text-muted);">{{ row['absent'] }}</td>
+                                                    <td style="color: #6b21a8;">{{ row['leaves'] }}</td>
+                                                    <td style="color: var(--color-red); font-weight: 600;">{{ row['late_minutes'] }}m</td>
+                                                    <td style="color: var(--color-green); font-weight: 600;">+{{ "%.1f"|format(row['extra_hours']) }}h</td>
+                                                    <td>
+                                                        {% if session['role'] == 'Admin' %}
+                                                            <button type="button" class="btn btn-primary btn-sm" data-id="{{ row['id'] }}" data-name="{{ row['name'] }}" onclick="openCalendarModal(this.dataset.id, this.dataset.name)" style="font-size: 11px; padding: 4px 8px; border: none; cursor: pointer;">View Calendar</button>
+                                                        {% else %}
+                                                            <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </details>
                 {% endif %}
             </div>
         </main>
@@ -770,6 +781,24 @@
                     });
                     
                     html += `</div>`;
+                    
+                    if (data.stats) {
+                        html += `
+                            <div class="attendance-stats-summary" style="margin-top: 20px;">
+                                <div class="stat-box"><div class="stat-box-num" style="color: var(--color-green);">${data.stats.present}</div><div class="stat-box-lbl">Present</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: var(--color-red);">${data.stats.late}</div><div class="stat-box-lbl">Late Days</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: #b45309;">${data.stats.half}</div><div class="stat-box-lbl">Half Days</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: var(--text-muted);">${data.stats.absent}</div><div class="stat-box-lbl">Absent</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: #6b21a8;">${data.stats.leave}</div><div class="stat-box-lbl">Leave</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: #475569;">${data.stats.off}</div><div class="stat-box-lbl">Off Days</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: var(--color-blue);">${data.stats.holiday}</div><div class="stat-box-lbl">Holiday</div></div>
+                                <div class="stat-box" style="border-left: 1px solid var(--border-color); padding-left: 10px;"><div class="stat-box-num" style="color: var(--color-green);">${data.stats.extra_hours.toFixed(1)}h</div><div class="stat-box-lbl">Extra Hours</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: var(--color-red);">${data.stats.late_minutes}m</div><div class="stat-box-lbl">Late Mins</div></div>
+                                <div class="stat-box"><div class="stat-box-num" style="color: var(--color-red);">${data.stats.early_minutes}m</div><div class="stat-box-lbl">Early Mins</div></div>
+                                <div class="stat-box" style="border-left: 2px solid var(--color-blue); padding-left: 12px;"><div class="stat-box-num ${data.stats.net_pending > 0 ? 'txt-pending-positive' : 'txt-pending-negative-or-zero'}">${data.stats.net_pending}m</div><div class="stat-box-lbl">Net Pending</div></div>
+                            </div>
+                        `;
+                    }
                     container.innerHTML = html;
                 })
                 .catch(err => {

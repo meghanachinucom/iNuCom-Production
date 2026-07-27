@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                <!-- Sidebar -->
+                                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -64,6 +64,9 @@
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -238,6 +241,43 @@
             {% endwith %}
             
             {% if view_tab == 'pipeline' %}
+            <!-- Top Production Pipeline Status Banner -->
+            {% if pipeline_summary %}
+            <div class="card" style="margin-bottom: 24px; padding: 20px; background: var(--bg-card);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                    <h3 class="card-title" style="margin-bottom: 0; font-size: 16px; border: 0; padding: 0;">
+                        📊 Overall Production Pipeline Status Overview
+                    </h3>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <span style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700;">
+                            🔄 Work In Progress (WIP): <strong>{{ pipeline_summary.total_wip }}</strong>
+                        </span>
+                        <span style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700;">
+                            📂 Open / Unassigned: <strong>{{ pipeline_summary.total_open }}</strong>
+                        </span>
+                        <span style="background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700;">
+                            ⏳ Pending Stages: <strong>{{ pipeline_summary.total_pending }}</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+                    Pipeline Stage Breakdown (WIP vs Open / Unassigned):
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    {% for stage_name in all_stages %}
+                        {% set s_info = pipeline_summary.stage_stats.get(stage_name, {'wip': 0, 'open': 0}) %}
+                        <div style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 11.5px;">
+                            <strong style="color: var(--text-primary);">{{ stage_name }}:</strong>
+                            <span style="color: #b45309; font-weight: 700; margin-left: 4px;" title="Work In Progress">{{ s_info.wip }} WIP</span>
+                            <span style="color: var(--text-muted);">|</span>
+                            <span style="color: #0369a1; font-weight: 700;" title="Open / Unassigned">{{ s_info.open }} Open</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Sub Tab Bar (Assets / Scenes) -->
             <div class="report-tabs" style="margin-bottom: 24px;">
                 <a href="{{ url_for('dashboard', view='pipeline', sub_tab='assets') }}" class="report-tab-btn {% if sub_tab == 'assets' %}active{% endif %}" style="text-decoration: none; display: inline-block; text-align: center;">

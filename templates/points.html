@@ -14,7 +14,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                <!-- Sidebar -->
+                                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -70,6 +70,9 @@
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -326,16 +329,16 @@
             {% if session['role'] == 'Admin' %}
                 <!-- Individual Work Report Card -->
                 <div id="individual-report" class="card" style="margin-bottom: 24px;">
-                    <h3 class="card-title">Individual Work Report</h3>
+                    <h3 class="card-title">Employee Search &amp; Individual Work Report</h3>
                     
                     <form action="{{ url_for('points_page') }}" method="GET" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px;">
-                        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 200px;">
-                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT EMPLOYEE:</label>
+                        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 220px; flex: 1;">
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SEARCH / SELECT ARTIST OR LEAD:</label>
                             <select name="employee_id" class="select-input" onchange="this.form.submit()" required>
-                                <option value="">-- Choose Employee --</option>
+                                <option value="">-- Choose Artist or Lead --</option>
                                 {% for artist in target_artists %}
                                     <option value="{{ artist['id'] }}" {% if selected_employee and selected_employee['id'] == artist['id'] %}selected{% endif %}>
-                                        {{ artist['name'] }}{% if artist['role']|default('') == 'Lead' %} [Lead]{% endif %} (@{{ artist['username'] }})
+                                        {{ artist['name'] }}{% if artist['role']|default('') == 'Lead' %} [Lead]{% endif %} ({{ artist['team'] }} Team - @{{ artist['username'] }})
                                     </option>
                                 {% endfor %}
                             </select>
@@ -346,9 +349,9 @@
                             <input type="month" name="month" class="form-input" value="{{ selected_month }}" onchange="this.form.submit()" required>
                         </div>
                         
-                        <button type="submit" class="btn btn-primary" style="padding: 7.5px 16px; height: 38px;">View Report</button>
+                        <button type="submit" class="btn btn-primary" style="padding: 7.5px 16px; height: 38px;">View Details</button>
                         {% if selected_employee %}
-                            <a href="{{ url_for('points_page') }}" class="btn btn-outline" style="padding: 7.5px 16px; height: 38px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Clear</a>
+                            <a href="{{ url_for('points_page') }}" class="btn btn-outline" style="padding: 7.5px 16px; height: 38px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Clear Filter</a>
                         {% endif %}
                     </form>
                     
@@ -358,7 +361,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
                             <div>
                                 <h4 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-                                    {{ selected_employee['name'] }}'s Report
+                                    {{ selected_employee['name'] }}'s Points &amp; Targets
                                 </h4>
                                 <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
                                     Role: <strong>{{ selected_employee['role'] }}</strong> | Team: <strong>{{ selected_employee['team'] }}</strong> | Month: <strong>{{ selected_month }}</strong>
@@ -384,7 +387,7 @@
                             <div class="progress-bar-fill {% if selected_pct >= 80 %}high-prog{% endif %}" data-width="{{ selected_pct }}"></div>
                         </div>
                         
-                        <h4 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;">Work Done & Points Credited</h4>
+                        <h4 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;">Work Done &amp; Points Credited Ledger</h4>
                         {% if points_transactions %}
                             <div class="table-responsive">
                                 <table class="scoreboard-table">
@@ -416,16 +419,18 @@
                             </div>
                         {% endif %}
                     {% else %}
-                        <div style="text-align: center; padding: 40px; color: var(--text-muted); background: var(--bg-main); border-radius: 8px; border: 1px dashed var(--border-color);">
-                            💡 Select an employee from the dropdown above or click on their name in the Global Scoreboard to view their detailed work report.
+                        <div style="text-align: center; padding: 32px; color: var(--text-muted); background: var(--bg-main); border-radius: 8px; border: 1px dashed var(--border-color);">
+                            💡 Select an artist or lead from the dropdown search bar above (or toggle the Global Scoreboard below) to view their points and target details.
                         </div>
                     {% endif %}
                 </div>
 
-                <div class="score-grid">
-                    <!-- Global Scoreboard list -->
-                    <div class="card" style="grid-column: span 2;">
-                        <h3 class="card-title">Global Scoreboard</h3>
+                <!-- Global Scoreboard Dropdown (Collapsible) -->
+                <details class="card" style="margin-bottom: 24px;" {% if not selected_employee %}open{% endif %}>
+                    <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 4px 0; user-select: none;">
+                        ▼ Global Artists &amp; Leads Scoreboard Dropdown (Click to Toggle)
+                    </summary>
+                    <div style="margin-top: 16px;">
                         {% if global_scoreboard %}
                             {% for team, rows in global_scoreboard.items() %}
                                 <div style="margin-bottom: 24px;">
@@ -435,7 +440,7 @@
                                     <table class="scoreboard-table" style="margin-bottom: 12px;">
                                         <thead>
                                             <tr>
-                                                <th>Artist</th>
+                                                <th>Artist / Lead</th>
                                                 <th>Target</th>
                                                 <th>Earned</th>
                                                 <th class="progress-cell">Progress</th>
@@ -471,30 +476,30 @@
                             <div style="text-align: center; padding: 24px; color: var(--text-muted);">No scoreboard data available.</div>
                         {% endif %}
                     </div>
+                </details>
 
-                    <!-- Admin Target Editor Card -->
-                    <div class="card">
-                        <h3 class="card-title">Set Monthly Target (Admin)</h3>
-                        <form action="{{ url_for('set_monthly_target') }}" method="POST" class="form-card-inline">
-                            <input type="hidden" name="month" value="{{ current_month }}">
-                            
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT EMPLOYEE:</label>
-                                <select name="artist_id" class="select-input" required>
-                                    {% for artist in target_artists %}
-                                        <option value="{{ artist['id'] }}">{{ artist['name'] }}{% if artist['role']|default('') == 'Lead' %} [Lead]{% endif %} (@{{ artist['username'] }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">TARGET POINTS:</label>
-                                <input type="number" name="target_points" class="form-input" placeholder="e.g. 500" min="100" max="5000" required>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px;">Save Target</button>
-                        </form>
-                    </div>
+                <!-- Admin Target Editor Card -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <h3 class="card-title">Set Monthly Target (Admin)</h3>
+                    <form action="{{ url_for('set_monthly_target') }}" method="POST" class="form-card-inline">
+                        <input type="hidden" name="month" value="{{ current_month }}">
+                        
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">SELECT EMPLOYEE:</label>
+                            <select name="artist_id" class="select-input" required>
+                                {% for artist in target_artists %}
+                                    <option value="{{ artist['id'] }}">{{ artist['name'] }}{% if artist['role']|default('') == 'Lead' %} [Lead]{% endif %} (@{{ artist['username'] }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary);">TARGET POINTS:</label>
+                            <input type="number" name="target_points" class="form-input" placeholder="e.g. 500" min="100" max="5000" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px;">Save Target</button>
+                    </form>
                 </div>
             {% endif %}
         </main>

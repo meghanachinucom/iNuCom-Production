@@ -93,7 +93,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                <!-- Sidebar -->
+                                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -149,6 +149,9 @@
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -294,19 +297,29 @@
                 </div>
             </div>
 
-            <!-- Team Filter (Admin / HR only) -->
-            {% if session['role'] in ['Admin', 'HR'] and teams %}
+            <!-- Team & Month Filter (Admin / HR only) -->
+            {% if session['role'] in ['Admin', 'HR'] %}
                 <div class="filter-bar">
-                    <label>Filter by Team:</label>
-                    <form method="GET" style="display: flex; gap: 8px; align-items: center;">
-                        <select name="team" id="filter_team" onchange="this.form.submit()">
-                            <option value="">All Teams</option>
-                            {% for t in teams %}
-                                <option value="{{ t }}" {% if filter_team == t %}selected{% endif %}>{{ t }}</option>
-                            {% endfor %}
-                        </select>
-                        {% if filter_team %}
-                            <a href="{{ url_for('compensation_page') }}" class="btn btn-sm" style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; text-decoration: none; color: var(--text-secondary);">Clear</a>
+                    <form method="GET" style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label for="filter_month">Select Month:</label>
+                            <input type="month" name="month" id="filter_month" class="form-input" style="padding: 5px 10px; font-size: 13px;" value="{{ selected_month }}" onchange="this.form.submit()">
+                        </div>
+
+                        {% if teams %}
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label for="filter_team">Filter by Team:</label>
+                            <select name="team" id="filter_team" onchange="this.form.submit()">
+                                <option value="">All Teams</option>
+                                {% for t in teams %}
+                                    <option value="{{ t }}" {% if filter_team == t %}selected{% endif %}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        {% if filter_team or selected_month %}
+                            <a href="{{ url_for('compensation_page') }}" class="btn btn-sm" style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; text-decoration: none; color: var(--text-secondary);">Clear Filters (View All-Time)</a>
                         {% endif %}
                     </form>
                 </div>
@@ -316,7 +329,8 @@
             <div class="card">
                 <h3 class="card-title">
                     {% if session['role'] == 'Lead' %}My Team — {% endif %}Compensation Ledger
-                    {% if filter_team %}<span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;"> — {{ filter_team }}</span>{% endif %}
+                    {% if selected_month %}<span style="font-size: 13px; color: var(--color-blue); font-weight: bold;"> — Monthly View: {{ selected_month }}</span>{% else %}<span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;"> — All-Time Balance</span>{% endif %}
+                    {% if filter_team %}<span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;"> ({{ filter_team }} Team)</span>{% endif %}
                 </h3>
                 <table class="scoreboard-table" style="margin-top: 14px;">
                     <thead>

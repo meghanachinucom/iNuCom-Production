@@ -58,6 +58,9 @@ sidebar_replacement = """        <!-- Sidebar -->
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
+                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
+                </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
                     <a href="{{ url_for('notifications_page') }}">

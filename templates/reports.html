@@ -90,7 +90,7 @@
 </head>
 <body>
 <div class="dashboard-layout">
-                                            <!-- Sidebar -->
+                                                    <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -146,6 +146,9 @@
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -365,11 +368,11 @@
 
                 {% if no_task_artists %}
                 <div style="margin-top:20px;padding:14px;background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;">
-                    <strong style="color:var(--color-red);">⚠ Artists with NO tasks on {{ rdate }}:</strong>
+                    <strong style="color:var(--color-red);">⚠ Artists &amp; Leads with NO tasks on {{ rdate }}:</strong>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
                     {% for a in no_task_artists %}
                         <span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;">
-                            {{ a['name'] }} <span style="opacity:.6;">({{ a['team'] }})</span>
+                            {{ a['name'] }} <span style="opacity:.7;font-size:11px;">({{ a['team'] }}{% if a['role'] == 'Lead' %} - Lead{% endif %})</span>
                         </span>
                     {% endfor %}
                     </div>
@@ -391,64 +394,118 @@
                 </a>
             </div>
 
-            {% set eod_done    = eod_rows | selectattr('assign_status','equalto','Done')    | list | length %}
-            {% set eod_pending = eod_rows | selectattr('assign_status','equalto','Pending') | list | length %}
-            {% set eod_pts     = eod_rows | selectattr('assign_status','equalto','Done') | sum(attribute='points') %}
+            {% set eod_done_list    = eod_rows | selectattr('assign_status','equalto','Done')    | list %}
+            {% set eod_pending_list = eod_rows | selectattr('assign_status','equalto','Pending') | list %}
+            {% set eod_done         = eod_done_list | length %}
+            {% set eod_pending      = eod_pending_list | length %}
+            {% set eod_pts          = eod_done_list | sum(attribute='points') %}
+            
             <div class="stat-chip-row">
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ eod_done }}</div><div class="stat-chip-lbl">Done</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-orange,#f59e0b);">{{ eod_pending }}</div><div class="stat-chip-lbl">Pending</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ eod_done }}</div><div class="stat-chip-lbl">Done Files</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-orange,#f59e0b);">{{ eod_pending }}</div><div class="stat-chip-lbl">Pending (CF to Tomorrow)</div></div>
                 <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ eod_pts }}</div><div class="stat-chip-lbl">Points Credited</div></div>
             </div>
 
-            <div class="card">
-                {% if eod_rows %}
-                <div class="table-responsive">
-                <table class="scoreboard-table">
-                    <thead><tr>
-                        <th>Team</th><th>Artist</th><th>File</th>
-                        <th>Stage</th><th>Status</th>
-                        <th style="text-align:right">Pts Credited</th><th>Pending Reason</th>
-                    </tr></thead>
-                    <tbody>
-                    {% set ns2 = namespace(cur_team='') %}
-                    {% for row in eod_rows %}
-                        {% if ns2.cur_team != row['team'] %}
-                        <tr class="team-group-hdr"><td colspan="7">{{ row['team'] }} Team</td></tr>
-                        {% set ns2.cur_team = row['team'] %}
-                        {% endif %}
-                        <tr>
-                            <td>{{ row['team'] }}</td>
-                            <td><strong>{{ row['artist_name'] }}</strong></td>
-                            <td style="font-size:12.5px;">{{ row['file_name'] or '—' }}</td>
-                            <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['stage'] or '—' }}</span></td>
-                            <td>
-                                {% set s = (row['assign_status'] or '') | lower %}
-                                <span class="rpt-badge {% if s=='done' %}done{% else %}pending{% endif %}">
-                                    {{ row['assign_status'] or '—' }}
-                                </span>
-                            </td>
-                            <td class="{% if row['assign_status']=='Done' %}txt-green{% else %}txt-muted{% endif %}" style="text-align:right;font-weight:700;">
-                                {% if row['assign_status'] == 'Done' %}+{{ row['points'] or 0 }}{% else %}—{% endif %}
-                            </td>
-                            <td style="font-size:12px;color:var(--text-secondary);max-width:200px;">{{ row['pending_reason'] or '' }}</td>
+            {% if eod_rows %}
+                <!-- SECTION 1: COMPLETED / DONE FILES -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <h3 class="card-title" style="color: var(--color-green); margin-bottom: 14px;">
+                        ✅ Completed / Done Files ({{ eod_done }})
+                    </h3>
+                    {% if eod_done_list %}
+                    <div class="table-responsive">
+                    <table class="scoreboard-table">
+                        <thead><tr>
+                            <th>Team</th><th>Artist / Lead</th><th>File</th>
+                            <th>Stage</th><th>Status</th>
+                            <th style="text-align:right">Points Credited</th>
+                        </tr></thead>
+                        <tbody>
+                        {% set ns_done = namespace(cur_team='') %}
+                        {% for row in eod_done_list %}
+                            {% if ns_done.cur_team != row['team'] %}
+                            <tr class="team-group-hdr"><td colspan="6">{{ row['team'] }} Team</td></tr>
+                            {% set ns_done.cur_team = row['team'] %}
+                            {% endif %}
+                            <tr>
+                                <td>{{ row['team'] }}</td>
+                                <td><strong>{{ row['artist_name'] }}</strong></td>
+                                <td style="font-size:12.5px;">{{ row['file_name'] or '—' }}</td>
+                                <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['stage'] or '—' }}</span></td>
+                                <td>
+                                    <span class="rpt-badge done">Done</span>
+                                </td>
+                                <td class="txt-green" style="text-align:right;font-weight:700;">
+                                    +{{ row['points'] or 0 }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="subtotal-row">
+                            <td colspan="4"></td>
+                            <td style="font-weight:700;">Done Total: {{ eod_done }}</td>
+                            <td style="text-align:right;font-weight:800;color:var(--color-green);">{{ eod_pts }} pts</td>
                         </tr>
-                    {% endfor %}
-                    <tr class="subtotal-row">
-                        <td colspan="4"></td>
-                        <td><span class="rpt-badge done">Done: {{ eod_done }}</span> <span class="rpt-badge pending">Pend: {{ eod_pending }}</span></td>
-                        <td style="text-align:right;font-weight:800;">{{ eod_pts }} pts</td>
-                        <td></td>
-                    </tr>
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                    </div>
+                    {% else %}
+                    <div style="text-align:center;padding:20px;color:var(--text-muted);">No done files for this date.</div>
+                    {% endif %}
                 </div>
-                {% else %}
-                <div class="rpt-empty">
-                    <div class="rpt-empty-icon">✅</div>
-                    No EOD data found for {{ rdate }}. Try a different date.
+
+                <!-- SECTION 2: PENDING FILES (CARRY FORWARD TO TOMORROW) -->
+                <div class="card">
+                    <h3 class="card-title" style="color: var(--color-orange,#f59e0b); margin-bottom: 14px;">
+                        ⏳ Pending Files — Carry Forward (CF) to Tomorrow ({{ eod_pending }})
+                    </h3>
+                    {% if eod_pending_list %}
+                    <div class="table-responsive">
+                    <table class="scoreboard-table">
+                        <thead><tr>
+                            <th>Team</th><th>Artist / Lead</th><th>File</th>
+                            <th>Stage</th><th>Status</th>
+                            <th>Carry-Forward Pending Reason</th>
+                        </tr></thead>
+                        <tbody>
+                        {% set ns_pend = namespace(cur_team='') %}
+                        {% for row in eod_pending_list %}
+                            {% if ns_pend.cur_team != row['team'] %}
+                            <tr class="team-group-hdr"><td colspan="6">{{ row['team'] }} Team</td></tr>
+                            {% set ns_pend.cur_team = row['team'] %}
+                            {% endif %}
+                            <tr>
+                                <td>{{ row['team'] }}</td>
+                                <td><strong>{{ row['artist_name'] }}</strong></td>
+                                <td style="font-size:12.5px;">{{ row['file_name'] or '—' }}</td>
+                                <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['stage'] or '—' }}</span></td>
+                                <td>
+                                    <span class="rpt-badge pending">Pending (CF)</span>
+                                </td>
+                                <td style="font-size:12px;color:var(--color-red);font-weight:600;">
+                                    {{ row['pending_reason'] or 'Carried forward to tomorrow' }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="subtotal-row">
+                            <td colspan="4"></td>
+                            <td style="font-weight:700;color:var(--color-orange,#f59e0b);">Pending CF Total: {{ eod_pending }}</td>
+                            <td></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    </div>
+                    {% else %}
+                    <div style="text-align:center;padding:20px;color:var(--text-muted);">No pending carry-forward files for this date.</div>
+                    {% endif %}
                 </div>
-                {% endif %}
-            </div>
+            {% else %}
+                <div class="card">
+                    <div class="rpt-empty">
+                        <div class="rpt-empty-icon">✅</div>
+                        No EOD data found for {{ rdate }}. Try a different date.
+                    </div>
+                </div>
+            {% endif %}
         </div><!-- /eod -->
 
 
