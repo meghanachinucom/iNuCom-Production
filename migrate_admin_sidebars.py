@@ -25,14 +25,20 @@ sidebar_replacement = """        <!-- Sidebar -->
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                </li>
+                {% else %}
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
-                    <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+                {% endif %}
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
@@ -52,14 +58,8 @@ sidebar_replacement = """        <!-- Sidebar -->
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                {% endif %}
-                
-                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">

@@ -16,11 +16,76 @@
         }
         .calendar-edit-btn:hover { opacity: 1; background: rgba(0,0,0,0.06); }
         .calendar-day-header { display: flex; justify-content: space-between; align-items: center; }
+
+        details.card summary {
+            cursor: pointer;
+            padding: 12px 16px;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+            background: var(--bg-main);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            list-style: none;
+        }
+        details.card summary::-webkit-details-marker {
+            display: none;
+        }
+        .chevron-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--color-blue);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chevron-badge::after {
+            content: "▼";
+            font-size: 10px;
+            transition: transform 0.25s ease;
+        }
+        details[open] .chevron-badge::after {
+            transform: rotate(180deg);
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex !important;
+        }
+        .modal-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.2);
+            max-height: 90vh;
+            overflow-y: auto;
+            margin: auto;
+            position: relative;
+        }
     </style>
 </head>
 <body>
     <div class="dashboard-layout">
-                                                        <!-- Sidebar -->
+                                                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -44,14 +109,20 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                </li>
+                {% else %}
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
-                    <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+                {% endif %}
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
@@ -71,14 +142,8 @@
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                {% endif %}
-                
-                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -499,14 +564,15 @@
 
                 <!-- Role Based Views: Admin / HR (Global Summary) -->
                 {% if session['role'] in ['Admin', 'HR'] %}
-                    <!-- Days Attendance Dropdown Card -->
-                    <details class="card" open style="margin-bottom: 24px;">
-                        <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 4px 0; user-select: none;">
-                            ▼ Today's Days Attendance Dropdown (Click to Toggle)
+                    <!-- Days Attendance Dropdown Card (Default Closed) -->
+                    <details class="card" style="margin-bottom: 24px;">
+                        <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 12px 16px; user-select: none;">
+                            <span>Today's Days Attendance Overview</span>
+                            <span class="chevron-badge">Toggle List</span>
                         </summary>
-                        <div style="margin-top: 16px;">
+                        <div style="padding: 16px;">
                             {% for team, members in global_today.items() %}
-                                <div style="margin-top: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                <div style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                                     <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
                                     <table class="scoreboard-table">
                                         <thead>
@@ -548,14 +614,15 @@
                         </div>
                     </details>
 
-                    <!-- Monthly Attendance Dropdown Card -->
-                    <details class="card" open style="margin-bottom: 24px;">
-                        <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 4px 0; user-select: none;">
-                            ▼ Monthly Attendance &amp; Employee Statistics Dropdown (Click to Toggle)
+                    <!-- Monthly Attendance Dropdown Card (Default Closed) -->
+                    <details class="card" style="margin-bottom: 24px;">
+                        <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 12px 16px; user-select: none;">
+                            <span>Monthly Attendance &amp; Employee Statistics</span>
+                            <span class="chevron-badge">Toggle List</span>
                         </summary>
-                        <div style="margin-top: 16px;">
+                        <div style="padding: 16px;">
                             {% for team, members in global_monthly_stats.items() %}
-                                <div style="margin-top: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                                <div style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                                     <h4 style="margin-bottom: 10px; color: var(--color-blue); text-transform: uppercase; font-size: 13px; letter-spacing: 0.05em;">{{ team }} Team</h4>
                                     <table class="scoreboard-table">
                                         <thead>

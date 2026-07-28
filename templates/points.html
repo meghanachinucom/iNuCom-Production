@@ -10,11 +10,49 @@
         .txt-red { color: var(--color-red); }
         .txt-blue { color: var(--color-blue); }
         .txt-muted { color: var(--text-muted); }
+
+        details.card summary {
+            cursor: pointer;
+            padding: 12px 16px;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+            background: var(--bg-main);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            list-style: none;
+        }
+        details.card summary::-webkit-details-marker {
+            display: none;
+        }
+        .chevron-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--color-blue);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chevron-badge::after {
+            content: "▼";
+            font-size: 10px;
+            transition: transform 0.25s ease;
+        }
+        details[open] .chevron-badge::after {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body>
     <div class="dashboard-layout">
-                                                        <!-- Sidebar -->
+                                                                <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -38,14 +76,20 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                </li>
+                {% else %}
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
-                    <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+                {% endif %}
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
@@ -65,14 +109,8 @@
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                {% endif %}
-                
-                {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'work_reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Work Reports</span></a>
                 </li>
                 {% endif %}
                 <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
@@ -425,12 +463,13 @@
                     {% endif %}
                 </div>
 
-                <!-- Global Scoreboard Dropdown (Collapsible) -->
-                <details class="card" style="margin-bottom: 24px;" {% if not selected_employee %}open{% endif %}>
-                    <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 4px 0; user-select: none;">
-                        ▼ Global Artists &amp; Leads Scoreboard Dropdown (Click to Toggle)
+                <!-- Global Scoreboard Dropdown (Collapsible - Default Closed) -->
+                <details class="card" style="margin-bottom: 24px;">
+                    <summary style="font-size: 15px; font-weight: 700; color: var(--text-primary); cursor: pointer; padding: 12px 16px; user-select: none;">
+                        <span>Global Artists &amp; Leads Scoreboard Overview</span>
+                        <span class="chevron-badge">Toggle List</span>
                     </summary>
-                    <div style="margin-top: 16px;">
+                    <div style="padding: 16px;">
                         {% if global_scoreboard %}
                             {% for team, rows in global_scoreboard.items() %}
                                 <div style="margin-bottom: 24px;">

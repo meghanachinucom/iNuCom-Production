@@ -1144,11 +1144,20 @@ def dashboard():
     matrix = {}
     
     view_tab = request.args.get('view', 'overview')
-    if view_tab == 'pipeline':
-        active_projects_list = projects
+    if view_tab == 'pipeline' or session['role'] == 'Admin':
+        if session['role'] == 'Admin' and project_id:
+            active_projects_list = [p for p in projects if p['id'] == project_id]
+            if not active_projects_list and projects:
+                active_projects_list = [projects[0]]
+        else:
+            active_projects_list = projects
+
         for proj in active_projects_list:
             pid = proj['id']
-            cursor.execute("SELECT * FROM chapters WHERE project_id = ? AND status = 'Active'", (pid,))
+            if session['role'] == 'Admin' and chapter_id:
+                cursor.execute("SELECT * FROM chapters WHERE id = ? AND status = 'Active'", (chapter_id,))
+            else:
+                cursor.execute("SELECT * FROM chapters WHERE project_id = ? AND status = 'Active'", (pid,))
             chaps = cursor.fetchall()
             project_chapters_map[pid] = chaps
             for chap in chaps:
@@ -1173,28 +1182,70 @@ def dashboard():
                 'artist_username': row['artist_username'],
                 'artist_lead': row['artist_lead']
             }
-        # Populate files list as flat list of all files for backward compatibility
         files = []
         for cid, flist in chapter_files_map.items():
             files.extend(flist)
 
+    asset_stages = ['Content', 'Modeling', 'Texturing', 'Rig']
+    scene_stages = ['Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp', 'Motion graphics']
+    active_stages = asset_stages if sub_tab == 'assets' else scene_stages
+
     pipeline_summary = {
+        'sub_tab': sub_tab,
+        'total_items': 0,
+        'subtab_active_files': 0,
+        'total_assets_count': 0,
+        'total_scenes_count': 0,
         'total_wip': 0,
         'total_open': 0,
         'total_pending': 0,
         'total_done': 0,
-        'stage_stats': {stg: {'wip': 0, 'open': 0, 'pending': 0, 'done': 0} for stg in PIPELINE_STAGES}
+        'stage_stats': {stg: {'wip': 0, 'open': 0, 'pending': 0, 'done': 0} for stg in active_stages}
     }
-    if view_tab == 'pipeline':
-        cursor.execute("""
-            SELECT fp.step_name, fp.status
-            FROM file_pipeline fp
-            JOIN files f ON fp.file_id = f.id
-            JOIN chapters c ON f.chapter_id = c.id
-            JOIN projects p ON c.project_id = p.id
-            WHERE c.status = 'Active' AND p.status = 'Active'
-        """)
-        for fp_item in cursor.fetchall():
+
+    if view_tab == 'pipeline' or session['role'] == 'Admin':
+        if session['role'] == 'Admin' and chapter_id:
+            cursor.execute("""
+                SELECT COUNT(DISTINCT f.id)
+                FROM files f
+                JOIN file_pipeline fp ON fp.file_id = f.id
+                WHERE f.chapter_id = ? AND fp.step_name IN ({}) AND fp.status IN ('In Progress', 'Open')
+            """.format(','.join('?' for _ in active_stages)), [chapter_id] + active_stages)
+            tot_res = cursor.fetchone()
+            pipeline_summary['total_items'] = tot_res[0] if tot_res else 0
+            pipeline_summary['subtab_active_files'] = pipeline_summary['total_items']
+
+            cursor.execute("""
+                SELECT fp.step_name, fp.status
+                FROM file_pipeline fp
+                JOIN files f ON fp.file_id = f.id
+                WHERE f.chapter_id = ? AND fp.step_name IN ({})
+            """.format(','.join('?' for _ in active_stages)), [chapter_id] + active_stages)
+            fp_rows = cursor.fetchall()
+        else:
+            cursor.execute("""
+                SELECT COUNT(DISTINCT f.id)
+                FROM files f
+                JOIN chapters c ON f.chapter_id = c.id
+                JOIN projects p ON c.project_id = p.id
+                JOIN file_pipeline fp ON fp.file_id = f.id
+                WHERE c.status = 'Active' AND p.status = 'Active' AND fp.step_name IN ({}) AND fp.status IN ('In Progress', 'Open')
+            """.format(','.join('?' for _ in active_stages)), tuple(active_stages))
+            tot_res = cursor.fetchone()
+            pipeline_summary['total_items'] = tot_res[0] if tot_res else 0
+            pipeline_summary['subtab_active_files'] = pipeline_summary['total_items']
+
+            cursor.execute("""
+                SELECT fp.step_name, fp.status
+                FROM file_pipeline fp
+                JOIN files f ON fp.file_id = f.id
+                JOIN chapters c ON f.chapter_id = c.id
+                JOIN projects p ON c.project_id = p.id
+                WHERE c.status = 'Active' AND p.status = 'Active' AND fp.step_name IN ({})
+            """.format(','.join('?' for _ in active_stages)), tuple(active_stages))
+            fp_rows = cursor.fetchall()
+
+        for fp_item in fp_rows:
             stg = fp_item['step_name']
             st = fp_item['status']
             if stg in pipeline_summary['stage_stats']:
@@ -2461,17 +2512,18 @@ def validate_assignment():
     return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/target/set', methods=['POST'])
+@app.route('/points/set-target', methods=['POST'])
 def set_monthly_target():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
     artist_id = request.form.get('artist_id', type=int)
     target_points = request.form.get('target_points', type=int)
-    month = request.form.get('month', '')
+    month = request.form.get('month', '') or datetime.date.today().strftime('%Y-%m')
     
     if not artist_id or not target_points or not month:
         flash("Invalid target values.", "error")
-        return redirect(url_for('points_page'))
+        return redirect(request.referrer or url_for('work_reports_page'))
         
     db = get_db()
     cursor = db.cursor()
@@ -2481,12 +2533,12 @@ def set_monthly_target():
     
     if not artist:
         flash("Employee not found.", "error")
-        return redirect(url_for('points_page'))
+        return redirect(request.referrer or url_for('work_reports_page'))
         
     if session['role'] != 'Admin':
         if not (session['role'] == 'Lead' and session['team'] == artist['team'] and artist['role'] == 'Artist'):
             flash("Unauthorized to set target for this user.", "error")
-            return redirect(url_for('points_page'))
+            return redirect(request.referrer or url_for('work_reports_page'))
         
     cursor.execute("SELECT id FROM monthly_targets WHERE user_id = ? AND month = ?", (artist_id, month))
     target_row = cursor.fetchone()
@@ -2501,12 +2553,14 @@ def set_monthly_target():
     db.commit()
     
     flash(f"Monthly points target set to {target_points} for {artist['name']}.", "success")
-    return redirect(url_for('points_page'))
+    return redirect(request.referrer or url_for('work_reports_page'))
 
 @app.route('/points')
 def points_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if session['role'] == 'Admin':
+        return redirect(url_for('work_reports_page', **request.args))
         
     db = get_db()
     cursor = db.cursor()
@@ -5292,6 +5346,9 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
     total_tasks_completed = 0
     total_points_earned = 0
 
+    current_month = today.strftime('%Y-%m')
+    global_scoreboard = {}
+
     for s in staff_members:
         sid = s['id']
         c.execute("""
@@ -5322,7 +5379,12 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
         days_worked = att_row['days_worked'] if att_row else 0
         total_hrs = round(att_row['total_hrs'], 1) if att_row else 0.0
 
-        staff_reports.append({
+        c.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (sid, current_month))
+        target_res = c.fetchone()
+        target_pts = target_res['target_points'] if target_res else 500
+        prog_pct = round((pts_sum / target_pts) * 100, 1) if target_pts > 0 else 0
+
+        staff_info = {
             'id': sid,
             'name': s['name'],
             'username': s['username'],
@@ -5331,11 +5393,19 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
             'tasks_completed': len(done_assignments),
             'tasks_pending': len(pending_assignments),
             'total_points': pts_sum,
+            'target_points': target_pts,
+            'progress_pct': prog_pct,
             'days_worked': days_worked,
             'total_hours': total_hrs,
             'assignments': assignments,
             'done_assignments': done_assignments
-        })
+        }
+        staff_reports.append(staff_info)
+
+        tm = s['team']
+        if tm not in global_scoreboard:
+            global_scoreboard[tm] = []
+        global_scoreboard[tm].append(staff_info)
 
         total_tasks_completed += len(done_assignments)
         total_points_earned += pts_sum
@@ -5350,11 +5420,13 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
         'custom_start': custom_start,
         'custom_end': custom_end,
         'staff_reports': staff_reports,
+        'global_scoreboard': global_scoreboard,
         'all_staff': all_staff_dropdown,
         'total_tasks_completed': total_tasks_completed,
         'total_points_earned': total_points_earned,
         'search_query': search_query,
-        'selected_employee_id': employee_id
+        'selected_employee_id': employee_id,
+        'current_month': current_month
     }
 
 
@@ -5385,6 +5457,8 @@ def work_reports_page():
             if s['id'] == employee_id:
                 selected_staff = s
                 break
+    elif len(data['staff_reports']) == 1:
+        selected_staff = data['staff_reports'][0]
 
     return render_template(
         'work_reports.html',
@@ -5393,6 +5467,7 @@ def work_reports_page():
         selected_staff=selected_staff,
         today_str=datetime.date.today().strftime('%Y-%m-%d')
     )
+
 
 
 @app.route('/work-reports/export')
