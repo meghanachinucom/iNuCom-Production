@@ -798,7 +798,7 @@ def init_db():
                     
                 cursor.execute("""
                     INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points, start_date, end_date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (file_id, stage, stage_status, stage_assigned, stage_points, stage_start_date, stage_end_date))
                 
                 if stage == f_demo['active_stage'] and stage_assigned and stage_status != 'Done':
@@ -887,7 +887,7 @@ def init_db():
 
                 cursor.execute("""
                     INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points, start_date, end_date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (file_id, stage, stage_status, stage_assigned, stage_points, stage_start_date, stage_end_date))
 
                 if stage_status == 'In Progress' and stage_assigned:
@@ -951,7 +951,7 @@ def init_db():
 
                 cursor.execute("""
                     INSERT INTO file_pipeline (file_id, step_name, status, assigned_to, points, start_date, end_date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (file_id, stage, stage_status, stage_assigned, stage_points, stage_start_date, stage_end_date))
 
                 if idx == active_idx and stage_assigned and stage_status == 'In Progress':
@@ -5457,7 +5457,7 @@ def work_reports_page():
             if s['id'] == employee_id:
                 selected_staff = s
                 break
-    elif len(data['staff_reports']) == 1:
+    elif data['staff_reports']:
         selected_staff = data['staff_reports'][0]
 
     return render_template(
