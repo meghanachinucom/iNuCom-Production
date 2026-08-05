@@ -1133,6 +1133,10 @@ def dashboard():
     if sub_tab not in ['assets', 'scenes']:
         sub_tab = 'assets'
         
+    sheet_view = request.args.get('sheet_view', 'standard')
+    if sheet_view not in ['standard', 'team_overview']:
+        sheet_view = 'standard'
+        
     if sub_tab == 'assets':
         stages_list = ['Content', 'Modeling', 'Texturing', 'Rig']
     else:
@@ -1166,7 +1170,7 @@ def dashboard():
                 chapter_files_map[cid] = cursor.fetchall()
                 
         cursor.execute("""
-            SELECT fp.file_id, fp.step_name, fp.status, fp.points, u.name as artist_name, u.username as artist_username, u.reports_to as artist_lead
+            SELECT fp.file_id, fp.step_name, fp.status, fp.points, fp.take_count, u.name as artist_name, u.username as artist_username, u.reports_to as artist_lead
             FROM file_pipeline fp
             LEFT JOIN users u ON fp.assigned_to = u.id
         """)
@@ -1178,10 +1182,39 @@ def dashboard():
             matrix[f_id][row['step_name']] = {
                 'status': row['status'],
                 'points': row['points'],
+                'take_count': row['take_count'] if 'take_count' in row.keys() and row['take_count'] else 1,
                 'artist_name': row['artist_name'],
                 'artist_username': row['artist_username'],
                 'artist_lead': row['artist_lead']
             }
+        # Compute live dynamic file name suffix based on active team stage
+        suffix_map = {
+            'Modeling': 'mod', 'Texturing': 'tex', 'Rig': 'rig', 'Animation': 'anim',
+            'FBX export': 'vfx', 'VFX': 'vfx', 'Lightning': 'ligh', 'Rendering': 'rend',
+            '3D Comp': 'comp', 'Motion graphics': 'comp', 'VR': 'comp', 'Content': 'mod'
+        }
+        for cid, flist in list(chapter_files_map.items()):
+            updated_flist = []
+            for f_item in flist:
+                f_dict = dict(f_item)
+                f_id = f_dict['id']
+                f_matrix = matrix.get(f_id, {})
+                active_stg = '3D Comp'
+                for stg in PIPELINE_STAGES:
+                    st_info = f_matrix.get(stg)
+                    if st_info and st_info['status'] in ['In Progress', 'Open', 'WIP']:
+                        active_stg = stg
+                        break
+                cur_sfx = suffix_map.get(active_stg, 'comp')
+                raw_stem = f_dict['name']
+                for sfx in ['_mod', '_tex', '_rig', '_anim', '_vfx', '_ligh', '_rend', '_comp']:
+                    if raw_stem.endswith(sfx):
+                        raw_stem = raw_stem[:-len(sfx)]
+                        break
+                f_dict['display_name'] = f"{raw_stem}_{cur_sfx}"
+                updated_flist.append(f_dict)
+            chapter_files_map[cid] = updated_flist
+
         files = []
         for cid, flist in chapter_files_map.items():
             files.extend(flist)
@@ -1196,11 +1229,14 @@ def dashboard():
         'subtab_active_files': 0,
         'total_assets_count': 0,
         'total_scenes_count': 0,
+        'total_yts': 0,
         'total_wip': 0,
+        'total_review': 0,
+        'total_rework': 0,
+        'total_done': 0,
         'total_open': 0,
         'total_pending': 0,
-        'total_done': 0,
-        'stage_stats': {stg: {'wip': 0, 'open': 0, 'pending': 0, 'done': 0} for stg in active_stages}
+        'stage_stats': {stg: {'yts': 0, 'wip': 0, 'review': 0, 'rework': 0, 'done': 0, 'open': 0, 'pending': 0} for stg in active_stages}
     }
 
     if view_tab == 'pipeline' or session['role'] == 'Admin':
@@ -1209,7 +1245,7 @@ def dashboard():
                 SELECT COUNT(DISTINCT f.id)
                 FROM files f
                 JOIN file_pipeline fp ON fp.file_id = f.id
-                WHERE f.chapter_id = ? AND fp.step_name IN ({}) AND fp.status IN ('In Progress', 'Open')
+                WHERE f.chapter_id = ? AND fp.step_name IN ({}) AND fp.status IN ('In Progress', 'Open', 'WIP', 'YTS', 'Review', 'Rework')
             """.format(','.join('?' for _ in active_stages)), [chapter_id] + active_stages)
             tot_res = cursor.fetchone()
             pipeline_summary['total_items'] = tot_res[0] if tot_res else 0
@@ -1229,7 +1265,7 @@ def dashboard():
                 JOIN chapters c ON f.chapter_id = c.id
                 JOIN projects p ON c.project_id = p.id
                 JOIN file_pipeline fp ON fp.file_id = f.id
-                WHERE c.status = 'Active' AND p.status = 'Active' AND fp.step_name IN ({}) AND fp.status IN ('In Progress', 'Open')
+                WHERE c.status = 'Active' AND p.status = 'Active' AND fp.step_name IN ({}) AND fp.status IN ('In Progress', 'Open', 'WIP', 'YTS', 'Review', 'Rework')
             """.format(','.join('?' for _ in active_stages)), tuple(active_stages))
             tot_res = cursor.fetchone()
             pipeline_summary['total_items'] = tot_res[0] if tot_res else 0
@@ -1249,16 +1285,24 @@ def dashboard():
             stg = fp_item['step_name']
             st = fp_item['status']
             if stg in pipeline_summary['stage_stats']:
-                if st == 'In Progress':
+                if st in ['Pending', 'YTS']:
+                    pipeline_summary['stage_stats'][stg]['yts'] += 1
+                    pipeline_summary['stage_stats'][stg]['pending'] += 1
+                    pipeline_summary['total_yts'] += 1
+                    pipeline_summary['total_pending'] += 1
+                elif st in ['In Progress', 'WIP', 'Open']:
                     pipeline_summary['stage_stats'][stg]['wip'] += 1
                     pipeline_summary['total_wip'] += 1
-                elif st == 'Open':
-                    pipeline_summary['stage_stats'][stg]['open'] += 1
-                    pipeline_summary['total_open'] += 1
-                elif st == 'Pending':
-                    pipeline_summary['stage_stats'][stg]['pending'] += 1
-                    pipeline_summary['total_pending'] += 1
-                elif st == 'Done':
+                    if st == 'Open':
+                        pipeline_summary['stage_stats'][stg]['open'] += 1
+                        pipeline_summary['total_open'] += 1
+                elif st in ['Review', 'Final Review', 'Lead Review', 'Content Review']:
+                    pipeline_summary['stage_stats'][stg]['review'] += 1
+                    pipeline_summary['total_review'] += 1
+                elif st in ['Rework', 'Reject', 'Rejected']:
+                    pipeline_summary['stage_stats'][stg]['rework'] += 1
+                    pipeline_summary['total_rework'] += 1
+                elif st in ['Done', 'Approved']:
                     pipeline_summary['stage_stats'][stg]['done'] += 1
                     pipeline_summary['total_done'] += 1
     else:
@@ -1855,6 +1899,7 @@ def dashboard():
         project_chapters_map=project_chapters_map,
         chapter_files_map=chapter_files_map,
         sub_tab=sub_tab,
+        sheet_view=sheet_view,
         lead_queue=lead_queue,
         queue_stage=queue_stage,
         artists=artists,
@@ -2048,8 +2093,59 @@ def get_file_details(file_id):
             active_stage = "Completed"
             pending_team = eff_team or "Management"
 
-    file_data['pending_team'] = pending_team
-    file_data['active_stage'] = active_stage
+    # Dynamic team suffix map
+    suffix_map = {
+        'Modeling': 'mod', 'Texturing': 'tex', 'Rig': 'rig', 'Animation': 'anim',
+        'FBX export': 'vfx', 'VFX': 'vfx', 'Lightning': 'ligh', 'Rendering': 'rend',
+        '3D Comp': 'comp', 'Motion graphics': 'comp', 'VR': 'comp', 'Content': 'mod'
+    }
+    cur_suffix = suffix_map.get(active_stage, 'comp') if active_stage != 'Completed' else 'comp'
+
+    # Strip existing stage suffix from base name
+    raw_name = file_data['name']
+    for sfx in ['_mod', '_tex', '_rig', '_anim', '_vfx', '_ligh', '_rend', '_comp']:
+        if raw_name.endswith(sfx):
+            raw_name = raw_name[:-len(sfx)]
+            break
+    
+    file_data['dynamic_name'] = f"{raw_name}_{cur_suffix}"
+    
+    # Take count & retake versioning details
+    cursor.execute("SELECT MAX(take_count) FROM file_pipeline WHERE file_id = ?", (file_id,))
+    max_take_row = cursor.fetchone()
+    current_take = (max_take_row[0] if max_take_row and max_take_row[0] else 1)
+    file_data['take_count'] = current_take
+
+    # Format 12-hour submission time if final_approval_date or end_date exists
+    sub_time_12 = ""
+    if file_data['final_approval_date']:
+        try:
+            parts = file_data['final_approval_date'].split(' ')
+            if len(parts) > 1:
+                t_str = _time12_filter(parts[1])
+                sub_time_12 = f"{parts[0]} {t_str}"
+            else:
+                sub_time_12 = parts[0]
+        except Exception:
+            sub_time_12 = file_data['final_approval_date']
+    file_data['submission_time_12'] = sub_time_12
+
+    # Build side-by-side original vs retake versions
+    file_data['original_version'] = {
+        'name': f"{raw_name}_mod",
+        'start_date': file_data['start_date'] or 'N/A',
+        'end_date': file_data['end_date'] or 'N/A',
+        'status': 'Take 1 (Original)'
+    }
+    
+    file_data['retake_version'] = {
+        'name': file_data['dynamic_name'],
+        'take_label': f"Take {current_take}",
+        'start_date': target_step['start_date'] if target_step and target_step['start_date'] else (file_data['start_date'] or 'N/A'),
+        'end_date': target_step['end_date'] if target_step and target_step['end_date'] else (file_data['end_date'] or 'N/A'),
+        'status': file_data['status'],
+        'submission_time_12': sub_time_12
+    }
 
     # Fetch all artists for dropdown selection
     cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY name")
@@ -2176,6 +2272,7 @@ def assign_file():
     step_name = request.form.get('step_name', '')
     artist_id = request.form.get('artist_id', '')
     points = request.form.get('points', type=int, default=0)
+    end_date = request.form.get('end_date', '').strip()
     
     if artist_id == '':
         artist_id = None
@@ -2198,7 +2295,20 @@ def assign_file():
     db = get_db()
     cursor = db.cursor()
     
+    cursor.execute("SELECT points FROM file_pipeline WHERE file_id = ? AND step_name = ?", (file_id, step_name))
+    existing_step = cursor.fetchone()
+    existing_points = existing_step['points'] if existing_step and existing_step['points'] else 0
+    
     if artist_id:
+        if existing_points > 0:
+            points = existing_points  # Points locked: points cannot change across retake versions
+        elif points <= 0:
+            flash("A file stage cannot be assigned to an artist until points are assigned first.", "error")
+            return redirect(request.referrer or url_for('dashboard'))
+            
+        if not end_date:
+            end_date = datetime.date.today().strftime('%Y-%m-%d')
+            
         cursor.execute("SELECT name, team, role FROM users WHERE id = ?", (artist_id,))
         artist = cursor.fetchone()
         if not artist or artist['role'] != 'Artist' or artist['team'] != target_team:
@@ -2209,16 +2319,16 @@ def assign_file():
     else:
         artist_name = "Unassigned"
         new_status = 'Open'
-        points = 0
+        points = existing_points
         
     try:
         today_str = datetime.date.today().strftime('%Y-%m-%d')
         if artist_id:
             cursor.execute("""
                 UPDATE file_pipeline 
-                SET assigned_to = ?, status = ?, points = ?, start_date = COALESCE(start_date, ?)
+                SET assigned_to = ?, status = ?, points = ?, start_date = COALESCE(start_date, ?), end_date = ?
                 WHERE file_id = ? AND step_name = ?
-            """, (artist_id, new_status, points, today_str, file_id, step_name))
+            """, (artist_id, new_status, points, today_str, end_date, file_id, step_name))
         else:
             cursor.execute("""
                 UPDATE file_pipeline 
@@ -2390,7 +2500,7 @@ def validate_assignment():
     validation_status = request.form.get('validation_status', '')
     remarks = request.form.get('remarks', '').strip()
     
-    if not assignment_id or validation_status not in ['Done', 'Pending']:
+    if not assignment_id or validation_status not in ['Done', 'Pending', 'Rework']:
         flash("Invalid validation parameters.", "error")
         return redirect(request.referrer or url_for('dashboard'))
         
@@ -2508,7 +2618,41 @@ def validate_assignment():
         
         flash(f"Task for {da['artist_name']} marked pending and carried forward to tomorrow.", "info")
 
+    elif validation_status == 'Rework':
+        rework_team = request.form.get('rework_team', '').strip()
+        if not rework_team:
+            rework_team = da['team']
+            
+        target_stage = None
+        for stg, tm in STAGE_TEAMS.items():
+            if tm.lower() == rework_team.lower():
+                target_stage = stg
+                break
+        if not target_stage:
+            target_stage = 'Modeling'
+            
+        cursor.execute("""
+            UPDATE file_pipeline 
+            SET take_count = COALESCE(take_count, 1) + 1, status = 'Rework', remarks = ? 
+            WHERE file_id = ? AND step_name = ?
+        """, (remarks or 'Rework requested', da['file_id'], target_stage))
         
+        cursor.execute("UPDATE daily_assignments SET status = 'Rework', remarks = ? WHERE id = ?", 
+                       (remarks or 'Rework requested', assignment_id))
+                       
+        cursor.execute("SELECT id FROM users WHERE team = ? AND role = 'Lead'", (rework_team,))
+        target_leads = cursor.fetchall()
+        for tl in target_leads:
+            _push_notification(db, tl['id'], "Rework Assigned", 
+                               f"File '{da['file_name']}' sent for Rework to {rework_team} team by {session['name']}.", 
+                               "approval", link=url_for('dashboard'))
+                               
+        cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Rework', ?)",
+                       (session['user_id'], f"Sent task for Rework to {rework_team} team on '{da['file_name']}'"))
+        db.commit()
+        recalculate_file_metadata(db, da['file_id'])
+        flash(f"Task sent for Rework to {rework_team} team. Take counter incremented, points unchanged!", "warning")
+
     return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/target/set', methods=['POST'])
@@ -4854,6 +4998,74 @@ def reports_export(tab):
     return send_file(buf, as_attachment=True, download_name=fname,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+@app.route('/attendance/export-monthly')
+def export_monthly_attendance():
+    if 'user_id' not in session or session['role'] != 'Admin':
+        flash("Unauthorized to export monthly attendance.", "error")
+        return redirect(url_for('attendance_page'))
+        
+    month_str = request.args.get('month', datetime.date.today().strftime('%Y-%m')).strip()
+    try:
+        year, month = map(int, month_str.split('-'))
+    except Exception:
+        year, month = datetime.date.today().year, datetime.date.today().month
+        month_str = f"{year:04d}-{month:02d}"
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("""
+        SELECT id, name, username, team, role FROM users 
+        WHERE role IN ('Artist', 'Lead', 'HR', 'Admin') 
+        ORDER BY team, role, name
+    """)
+    users = cursor.fetchall()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Attendance_{month_str}"
+
+    ws.append([f"Monthly Attendance & Salary Processing Report — {month_str}"])
+    ws['A1'].font = Font(bold=True, size=14, color="004080")
+    ws.merge_cells('A1:J1')
+    ws.append([])
+
+    headers = [
+        'User ID', 'Employee Name', 'Username', 'Team', 'Role', 
+        'Present Days', 'Late Days', 'Half Days', 'Absent Days', 'Total Hours Worked'
+    ]
+    _xl_header_row(ws, 3, headers)
+
+    row_idx = 4
+    for u in users:
+        cursor.execute("""
+            SELECT status, total_hours FROM attendance 
+            WHERE user_id = ? AND date LIKE ?
+        """, (u['id'], f"{month_str}-%"))
+        records = cursor.fetchall()
+        
+        present_cnt = sum(1 for r in records if r['status'] in ['Present', 'Late'])
+        late_cnt = sum(1 for r in records if r['status'] == 'Late')
+        half_cnt = sum(1 for r in records if r['status'] == 'Half Day')
+        absent_cnt = sum(1 for r in records if r['status'] == 'Absent')
+        total_hours = sum(r['total_hours'] or 0.0 for r in records)
+
+        _xl_data_row(ws, row_idx, [
+            u['id'], u['name'], f"@{u['username']}", u['team'], u['role'],
+            present_cnt, late_cnt, half_cnt, absent_cnt, round(total_hours, 2)
+        ])
+        row_idx += 1
+
+    _xl_autowidth(ws)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"Attendance_Monthly_{month_str}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LAYER 10: HOLIDAYS
@@ -5135,42 +5347,66 @@ def check_and_push_admin_target_alerts(db, admin_id):
 
 @app.context_processor
 def inject_notifications():
-    """Inject unread notification count and recent list into every template."""
+    """Inject unread notification counts (Approvals vs Work-related) and recent list into templates."""
     count = 0
+    unread_approvals = 0
+    unread_work = 0
     recent = []
     if 'user_id' in session:
         try:
             db = get_db()
-            row = db.cursor().execute(
-                "SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0",
-                (session['user_id'],)
-            ).fetchone()
-            count = row[0] if row else 0
-            
             cursor = db.cursor()
             cursor.execute("""
                 SELECT id, title, body, link, type, is_read, created_at
                 FROM notifications 
                 WHERE user_id=? 
-                ORDER BY created_at DESC LIMIT 10
+                ORDER BY created_at DESC LIMIT 20
             """, (session['user_id'],))
-            recent = cursor.fetchall()
+            recent_rows = [dict(r) for r in cursor.fetchall()]
+            
+            for n in recent_rows:
+                ntype = (n.get('type') or '').lower()
+                title = (n.get('title') or '').lower()
+                is_approval = ntype in ['approval', 'leave', 'permission'] or any(k in title for k in ['approval', 'leave', 'permission', 'validation'])
+                n['category'] = 'Approvals' if is_approval else 'Work'
+                if not n['is_read']:
+                    count += 1
+                    if is_approval:
+                        unread_approvals += 1
+                    else:
+                        unread_work += 1
+            recent = recent_rows[:10]
         except Exception:
             count = 0
-    return dict(unread_notif_count=count, recent_notifications=recent)
+    return dict(
+        unread_notif_count=count, 
+        unread_approvals_count=unread_approvals, 
+        unread_work_count=unread_work, 
+        recent_notifications=recent
+    )
 
 @app.route('/api/notifications/unread_count')
 def api_unread_notifications_count():
     if 'user_id' not in session:
-        return {'unread_count': 0}
+        return {'unread_count': 0, 'unread_approvals': 0, 'unread_work': 0}
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0", (session['user_id'],))
-        count = cursor.fetchone()[0]
-        return {'unread_count': count}
+        cursor.execute("SELECT type, title, is_read FROM notifications WHERE user_id = ? AND is_read = 0", (session['user_id'],))
+        rows = cursor.fetchall()
+        tot = len(rows)
+        appr = 0
+        wrk = 0
+        for r in rows:
+            ntype = (r['type'] or '').lower()
+            title = (r['title'] or '').lower()
+            if ntype in ['approval', 'leave', 'permission'] or any(k in title for k in ['approval', 'leave', 'permission', 'validation']):
+                appr += 1
+            else:
+                wrk += 1
+        return {'unread_count': tot, 'unread_approvals': appr, 'unread_work': wrk}
     except Exception:
-        return {'unread_count': 0}
+        return {'unread_count': 0, 'unread_approvals': 0, 'unread_work': 0}
 
 @app.route('/notifications')
 def notifications_page():
@@ -5184,11 +5420,21 @@ def notifications_page():
         SELECT * FROM notifications WHERE user_id=?
         ORDER BY is_read ASC, created_at DESC LIMIT 100
     """, (session['user_id'],))
-    notifs = cursor.fetchall()
-    # Mark all as read
-    cursor.execute("UPDATE notifications SET is_read=1 WHERE user_id=?", (session['user_id'],))
-    db.commit()
-    return render_template('notifications.html', user=user_info, notifs=notifs)
+    raw_notifs = [dict(r) for r in cursor.fetchall()]
+    
+    approvals_list = []
+    work_list = []
+    for n in raw_notifs:
+        ntype = (n.get('type') or '').lower()
+        title = (n.get('title') or '').lower()
+        if ntype in ['approval', 'leave', 'permission'] or any(k in title for k in ['approval', 'leave', 'permission', 'validation']):
+            n['category'] = 'Approvals'
+            approvals_list.append(n)
+        else:
+            n['category'] = 'Work'
+            work_list.append(n)
+            
+    return render_template('notifications.html', user=user_info, notifs=raw_notifs, approvals_notifs=approvals_list, work_notifs=work_list)
 
 @app.route('/notifications/click/<int:nid>')
 def click_notification(nid):
@@ -5201,8 +5447,8 @@ def click_notification(nid):
     if notif:
         cursor.execute("UPDATE notifications SET is_read=1 WHERE id=?", (nid,))
         db.commit()
-        if notif['link']:
-            return redirect(notif['link'])
+        target_link = notif['link'] or url_for('dashboard')
+        return redirect(target_link)
     return redirect(url_for('dashboard'))
 
 @app.route('/notifications/read-all', methods=['POST'])

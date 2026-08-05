@@ -56,7 +56,7 @@ sidebar_replacement = """        <!-- Sidebar -->
                 
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>

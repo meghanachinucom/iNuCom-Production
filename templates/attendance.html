@@ -109,6 +109,11 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                </li>
+                {% endif %}
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
@@ -140,7 +145,7 @@
                 
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
@@ -153,9 +158,6 @@
                 </li>
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-section-title">Admin</li>
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
@@ -180,8 +182,16 @@
         <!-- Main Panel -->
         <main class="main-content">
             <header class="page-header">
-                <div>
-                    <h1>Attendance & Shifts Tracker</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <h1>Attendance &amp; Shifts Tracker</h1>
+                    {% if session['role'] == 'Admin' %}
+                    <form action="{{ url_for('export_monthly_attendance') }}" method="GET" style="display: flex; gap: 8px; align-items: center;">
+                        <input type="month" name="month" class="form-input" style="width: 150px; height: 34px; font-size: 12px;" value="{{ current_month or today_str[:7] }}">
+                        <button type="submit" class="btn btn-success btn-sm" style="height: 34px; padding: 0 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                            ⬇ Download Monthly (.xlsx)
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
                 <div class="header-actions-wrapper">
                     <!-- Notification Bell Container -->

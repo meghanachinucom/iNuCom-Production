@@ -48,6 +48,11 @@
             
             <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                </li>
+                {% endif %}
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
@@ -79,7 +84,7 @@
                 
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
@@ -92,9 +97,6 @@
                 </li>
                 {% if session['role'] == 'Admin' %}
                 <li class="menu-section-title">Admin</li>
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
-                </li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
