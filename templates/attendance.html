@@ -85,7 +85,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                                        <!-- Sidebar -->
+                                                                                        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -126,14 +126,16 @@
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
                 {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
+                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
                 {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
                 {% if session['role'] == 'Lead' %}
@@ -142,22 +144,20 @@
                 </li>
                 {% endif %}
                 {% endif %}
-                
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+
                 {% if session['role'] == 'Admin' %}
+                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin</li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
@@ -225,7 +225,7 @@
                                             <div class="notif-content">
                                                 <div class="notif-title">{{ n.title }}</div>
                                                 <div class="notif-body">{{ n.body }}</div>
-                                                <div class="notif-time">{{ n.created_at }}</div>
+                                                <div class="notif-time">{{ n.created_at | ddmmyyyy }}</div>
                                             </div>
                                         </a>
                                     {% endfor %}
@@ -292,7 +292,7 @@
                         <h3 class="card-title">Clock Panel</h3>
                         <div style="text-align: center; padding: 20px 0;">
                             <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500;">
-                                Today: <span style="font-weight: 600;">{{ today_str }}</span>
+                                Today: <span style="font-weight: 600;">{{ today_str | ddmmyyyy }}</span>
                             </div>
                             
                             <div class="clock-time-display" id="live-clock">--:--:--</div>
@@ -529,46 +529,6 @@
                         </table>
                     </div>
 
-                    <div class="card">
-                        <h3 class="card-title">Team Statistics - Selected Month</h3>
-                        <table class="scoreboard-table">
-                            <thead>
-                                <tr>
-                                    <th>Artist</th>
-                                    <th>Present</th>
-                                    <th>Late Days</th>
-                                    <th>Half Days</th>
-                                    <th>Absent</th>
-                                    <th>Leaves</th>
-                                    <th>Late Minutes</th>
-                                    <th>Extra Hours</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if team_monthly_stats %}
-                                    {% for row in team_monthly_stats %}
-                                        <tr>
-                                            <td><strong>{{ row['name'] }}</strong></td>
-                                            <td style="color: var(--color-green); font-weight: 600;">{{ row['present'] }}</td>
-                                            <td style="color: var(--color-red);">{{ row['late'] }}</td>
-                                            <td style="color: #b45309;">{{ row['half_day'] }}</td>
-                                            <td style="color: var(--text-muted);">{{ row['absent'] }}</td>
-                                            <td style="color: #6b21a8;">{{ row['leaves'] }}</td>
-                                            <td style="color: var(--color-red); font-weight: 600;">{{ row['late_minutes'] }}m</td>
-                                            <td style="color: var(--color-green); font-weight: 600;">+{{ "%.1f"|format(row['extra_hours']) }}h</td>
-                                            <td>
-                                                <a href="{{ url_for('attendance_page', employee_id=row['id'], year=selected_year, month=selected_month) }}" class="btn-control" style="font-size: 11px; padding: 4px 8px;">View Calendar</a>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No records available.</td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
                     </div>
                 {% endif %}
 

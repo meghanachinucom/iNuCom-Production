@@ -52,7 +52,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                                <!-- Sidebar -->
+                                                                                <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -93,14 +93,16 @@
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
                 {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
+                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
                 {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
                 {% if session['role'] == 'Lead' %}
@@ -109,22 +111,20 @@
                 </li>
                 {% endif %}
                 {% endif %}
-                
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+
                 {% if session['role'] == 'Admin' %}
+                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin</li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
@@ -184,7 +184,7 @@
                                             <div class="notif-content">
                                                 <div class="notif-title">{{ n.title }}</div>
                                                 <div class="notif-body">{{ n.body }}</div>
-                                                <div class="notif-time">{{ n.created_at }}</div>
+                                                <div class="notif-time">{{ n.created_at | ddmmyyyy }}</div>
                                             </div>
                                         </a>
                                     {% endfor %}
@@ -257,8 +257,8 @@
                             </span>
                         </div>
                         
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill {% if my_pct >= 80 %}high-prog{% endif %}" data-width="{{ my_pct }}"></div>
+                        <div class="progress-bar-container" style="background: #e2e8f0; border-radius: 4px; overflow: hidden; height: 10px;">
+                            <div class="progress-bar-fill {% if my_pct >= 80 %}high-prog{% endif %}" data-width="{{ my_pct }}" style="height: 100%; transition: width 0.3s ease;"></div>
                         </div>
                         <div class="progress-text">
                             <span>Target Status</span>
@@ -282,7 +282,7 @@
                                 <tr>
                                     <td>
                                         <strong>{{ day['day_name'] }}</strong>
-                                        <div style="font-size: 9.5px; color: var(--text-muted);">{{ day['date'] }}</div>
+                                        <div style="font-size: 9.5px; color: var(--text-muted);">{{ day['date'] | ddmmyyyy }}</div>
                                     </td>
                                     <td class="{% if day['points'] > 0 %}pts-positive{% else %}pts-zero{% endif %}" style="font-weight: 700; text-align: right;">
                                         +{{ day['points'] }} pts
@@ -321,8 +321,8 @@
                                             <td>{{ row['target'] }} pts</td>
                                             <td style="font-weight: 700; color: var(--color-blue);">{{ row['earned'] }} pts</td>
                                             <td>
-                                                <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px;">
-                                                    <div class="progress-bar-fill {% if row['pct'] >= 80 %}high-prog{% endif %}" data-width="{{ row['pct'] }}"></div>
+                                                <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                                                    <div class="progress-bar-fill {% if row['pct'] >= 80 %}high-prog{% endif %}" data-width="{{ row['pct'] }}" style="height: 100%; transition: width 0.3s ease;"></div>
                                                 </div>
                                                 <div style="font-size: 10px; font-weight: 600; color: var(--text-secondary); text-align: right;">
                                                     {{ row['pct'] }}%
@@ -423,8 +423,8 @@
                             </div>
                         </div>
 
-                        <div class="progress-bar-container" style="margin-bottom: 24px; height: 10px;">
-                            <div class="progress-bar-fill {% if selected_pct >= 80 %}high-prog{% endif %}" data-width="{{ selected_pct }}"></div>
+                        <div class="progress-bar-container" style="margin-bottom: 24px; height: 10px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                            <div class="progress-bar-fill {% if selected_pct >= 80 %}high-prog{% endif %}" data-width="{{ selected_pct }}" style="height: 100%; transition: width 0.3s ease;"></div>
                         </div>
                         
                         <h4 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;">Work Done &amp; Points Credited Ledger</h4>
@@ -442,7 +442,7 @@
                                     <tbody>
                                         {% for txn in points_transactions %}
                                             <tr>
-                                                <td>{{ txn['date'] }}</td>
+                                                <td>{{ txn['date'] | ddmmyyyy }}</td>
                                                 <td><strong>{{ txn['reason'] }}</strong></td>
                                                 <td>{{ txn['awarded_by_name'] or 'System' }}</td>
                                                 <td class="{% if txn['points'] >= 0 %}txt-green{% else %}txt-red{% endif %}" style="text-align: right; font-weight: 700;">
@@ -500,8 +500,8 @@
                                                     <td>{{ row['target'] }} pts</td>
                                                     <td style="font-weight: 700; color: var(--color-blue);">{{ row['earned'] }} pts</td>
                                                     <td>
-                                                        <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px;">
-                                                            <div class="progress-bar-fill {% if row['pct'] >= 80 %}high-prog{% endif %}" data-width="{{ row['pct'] }}"></div>
+                                                        <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                                                            <div class="progress-bar-fill {% if row['pct'] >= 80 %}high-prog{% endif %}" data-width="{{ row['pct'] }}" style="height: 100%; transition: width 0.3s ease;"></div>
                                                         </div>
                                                         <div style="font-size: 10px; font-weight: 600; color: var(--text-secondary); text-align: right;">
                                                             {{ row['pct'] }}%

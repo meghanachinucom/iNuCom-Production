@@ -144,7 +144,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                <!-- Sidebar -->
+                                <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -185,14 +185,16 @@
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
                 {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
+                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
                 {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
                 {% if session['role'] == 'Lead' %}
@@ -201,22 +203,20 @@
                 </li>
                 {% endif %}
                 {% endif %}
-                
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+
                 {% if session['role'] == 'Admin' %}
+                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin</li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
@@ -261,15 +261,31 @@
                     <div class="filter-row-block">
                         <div class="filter-field" style="min-width: 220px;">
                             <label class="filter-label">Select Duration:</label>
-                            <select name="range_type" class="select-input" onchange="toggleCustomDates(this.value); this.form.submit();">
+                            <select name="range_type" class="select-input" onchange="toggleFilterFields(this.value); this.form.submit();">
                                 <option value="this_week" {% if data.range_type == 'this_week' %}selected{% endif %}>This Week (Mon–Today)</option>
                                 <option value="last_week" {% if data.range_type == 'last_week' %}selected{% endif %}>Last Week</option>
                                 <option value="this_month" {% if data.range_type == 'this_month' %}selected{% endif %}>This Month</option>
                                 <option value="last_month" {% if data.range_type == 'last_month' %}selected{% endif %}>Last Month</option>
+                                <option value="select_month" {% if data.range_type == 'select_month' %}selected{% endif %}>Specific Month...</option>
+                                <option value="select_year" {% if data.range_type == 'select_year' %}selected{% endif %}>Specific Year...</option>
                                 <option value="3_months" {% if data.range_type == '3_months' %}selected{% endif %}>Last 3 Months</option>
                                 <option value="6_months" {% if data.range_type == '6_months' %}selected{% endif %}>Last 6 Months</option>
                                 <option value="1_year" {% if data.range_type == '1_year' %}selected{% endif %}>Last 1 Year (Max)</option>
                                 <option value="custom" {% if data.range_type == 'custom' %}selected{% endif %}>Custom Date Range...</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-field {% if data.range_type != 'select_month' %}d-none{% endif %}" id="month-select-div" style="min-width: 180px;">
+                            <label class="filter-label">Select Month:</label>
+                            <input type="month" name="selected_month" class="form-input" value="{{ data.selected_month }}" onchange="this.form.submit()">
+                        </div>
+
+                        <div class="filter-field {% if data.range_type != 'select_year' %}d-none{% endif %}" id="year-select-div" style="min-width: 160px;">
+                            <label class="filter-label">Select Year:</label>
+                            <select name="selected_year" class="select-input" onchange="this.form.submit()">
+                                {% for yr in data.available_years %}
+                                    <option value="{{ yr }}" {% if data.selected_year == yr %}selected{% endif %}>{{ yr }}</option>
+                                {% endfor %}
                             </select>
                         </div>
 
@@ -279,21 +295,17 @@
                                 <input type="date" name="start_date" class="form-input" value="{{ data.custom_start }}" max="{{ today_str }}">
                                 <span style="font-weight: bold; color: var(--text-secondary);">to</span>
                                 <input type="date" name="end_date" class="form-input" value="{{ data.custom_end }}" max="{{ today_str }}">
+                                <button type="submit" class="btn btn-primary btn-sm" style="height: 32px; padding: 0 10px;">Go</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Row 2: Search, Employee dropdown & Export -->
+                    <!-- Row 2: Employee Selection & Export -->
                     <div class="filter-row-block" style="border-top: 1px dashed var(--border-color); padding-top: 14px;">
-                        <div class="filter-field" style="flex: 1; min-width: 220px;">
-                            <label class="filter-label">Search Employee / Team:</label>
-                            <input type="text" name="q" class="form-input" placeholder="Search by name, team..." value="{{ data.search_query }}">
-                        </div>
-
-                        <div class="filter-field" style="flex: 1; min-width: 240px;">
-                            <label class="filter-label">Select Particular Staff:</label>
+                        <div class="filter-field" style="flex: 1; min-width: 280px;">
+                            <label class="filter-label">Select Employee:</label>
                             <select name="employee_id" class="select-input" onchange="this.form.submit()">
-                                <option value="">-- All Artists &amp; Leads --</option>
+                                <option value="">-- Select Employee --</option>
                                 {% for emp in data.all_staff %}
                                     <option value="{{ emp.id }}" {% if data.selected_employee_id == emp.id %}selected{% endif %}>
                                         {{ emp.name }} {% if emp.role == 'Lead' %}[Lead]{% endif %} ({{ emp.team }} Team)
@@ -303,11 +315,10 @@
                         </div>
 
                         <div style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 16px;">Apply Filters</button>
-                            {% if selected_staff or data.search_query %}
-                                <a href="{{ url_for('work_reports_page', range_type=data.range_type) }}" class="btn btn-outline" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Clear Filter</a>
+                            {% if selected_staff or data.range_type != 'this_week' %}
+                                <a href="{{ url_for('work_reports_page') }}" class="btn btn-outline" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Clear Selection</a>
                             {% endif %}
-                            <a href="{{ url_for('work_reports_export', range_type=data.range_type, start_date=data.custom_start, end_date=data.custom_end, q=data.search_query, employee_id=data.selected_employee_id) }}" class="btn btn-success" style="height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;">
+                            <a href="{{ url_for('work_reports_export', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id) }}" class="btn btn-success" style="height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;">
                                 ⬇ Export .xlsx
                             </a>
                         </div>
@@ -330,8 +341,8 @@
                     <div class="stat-banner-lbl">Total Points Earned</div>
                 </div>
                 <div class="stat-banner-chip">
-                    <div class="stat-banner-val" style="font-size: 16px; padding-top: 6px; color: var(--text-primary);">
-                        {{ data.start_date }} <br><span style="font-size: 11px; color: var(--text-muted);">to</span> {{ data.end_date }}
+                    <div class="stat-banner-val" style="font-size: 15px; padding-top: 6px; color: var(--text-primary);">
+                        {{ data.start_date_display }} <br><span style="font-size: 11px; color: var(--text-muted);">to</span> {{ data.end_date_display }}
                     </div>
                     <div class="stat-banner-lbl">Selected Duration</div>
                 </div>
@@ -366,6 +377,10 @@
                             <div style="background: var(--bg-main); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); text-align: right;">
                                 <div class="{% if selected_staff.progress_pct >= 100 %}txt-green{% else %}txt-blue{% endif %}" style="font-size: 18px; font-weight: 700;">{{ selected_staff.progress_pct }}%</div>
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Progress</div>
+                            </div>
+                            <div style="background: var(--bg-main); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); text-align: right;">
+                                <div style="font-size: 18px; font-weight: 700; color: #c2410c;">{{ selected_staff.rework_count or 0 }}</div>
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Reworks / Retakes</div>
                             </div>
                         </div>
                     </div>
@@ -403,7 +418,7 @@
                                 <tbody>
                                     {% for task in selected_staff.assignments %}
                                         <tr>
-                                            <td><strong>{{ task.date }}</strong></td>
+                                            <td><strong>{{ task.date | ddmmyyyy }}</strong></td>
                                             <td>{{ task.project_name or '—' }}</td>
                                             <td>{{ task.chapter_name or '—' }}</td>
                                             <td style="max-width: 250px;">
@@ -470,8 +485,8 @@
                                                     <td style="text-align: right;">{{ m.target_points }} pts</td>
                                                     <td style="text-align: right; font-weight: 700; color: var(--color-blue);">{{ m.total_points }} pts</td>
                                                     <td>
-                                                        <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px;">
-                                                            <div class="progress-bar-fill {% if m.progress_pct >= 80 %}high-prog{% endif %}" data-width="{{ m.progress_pct }}"></div>
+                                                        <div class="progress-bar-container" style="margin-top: 0; margin-bottom: 2px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                                                            <div class="progress-bar-fill {% if m.progress_pct >= 80 %}high-prog{% endif %}" data-width="{{ m.progress_pct }}" style="height: 100%; transition: width 0.3s ease;"></div>
                                                         </div>
                                                         <div style="font-size: 10px; font-weight: 600; color: var(--text-secondary); text-align: right;">
                                                             {{ m.progress_pct }}%
@@ -542,18 +557,24 @@
     </div>
 
     <script>
-        function toggleCustomDates(val) {
+        function toggleFilterFields(val) {
             const customDiv = document.getElementById('custom-dates-div');
-            if (customDiv) {
-                if (val === 'custom') {
-                    customDiv.classList.remove('d-none');
-                    customDiv.style.display = 'flex';
-                } else {
-                    customDiv.classList.add('d-none');
-                    customDiv.style.display = 'none';
-                }
-            }
+            const monthDiv = document.getElementById('month-select-div');
+            const yearDiv = document.getElementById('year-select-div');
+            
+            if (customDiv) customDiv.style.display = (val === 'custom') ? 'flex' : 'none';
+            if (monthDiv) monthDiv.style.display = (val === 'select_month') ? 'flex' : 'none';
+            if (yearDiv) yearDiv.style.display = (val === 'select_year') ? 'flex' : 'none';
         }
+
+        function renderProgressBars() {
+            document.querySelectorAll('.progress-bar-fill[data-width]').forEach(function(bar) {
+                var w = parseFloat(bar.getAttribute('data-width')) || 0;
+                var pct = Math.min(100, Math.max(0, w));
+                bar.style.width = pct + '%';
+            });
+        }
+        document.addEventListener('DOMContentLoaded', renderProgressBars);
     </script>
 </body>
 </html>

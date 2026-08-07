@@ -90,7 +90,7 @@
 </head>
 <body>
 <div class="dashboard-layout">
-                                                                    <!-- Sidebar -->
+                                                                                    <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -131,14 +131,16 @@
                     <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
                 </li>
                 {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
+                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
                 {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'leaves_page' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
                 {% if session['role'] == 'Lead' %}
@@ -147,22 +149,20 @@
                 </li>
                 {% endif %}
                 {% endif %}
-                
+                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                    <a href="{{ url_for('notifications_page') }}">
+                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+
                 {% if session['role'] == 'Admin' %}
+                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
                     <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
                 </li>
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin</li>
                 {% elif session['role'] == 'HR' %}
                 <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
@@ -222,7 +222,7 @@
                                         <div class="notif-content">
                                             <div class="notif-title">{{ n.title }}</div>
                                             <div class="notif-body">{{ n.body }}</div>
-                                            <div class="notif-time">{{ n.created_at }}</div>
+                                            <div class="notif-time">{{ n.created_at | ddmmyyyy }}</div>
                                         </div>
                                     </a>
                                 {% endfor %}
@@ -364,13 +364,13 @@
                 {% else %}
                 <div class="rpt-empty">
                     <div class="rpt-empty-icon">📋</div>
-                    No assignments found for {{ rdate }}. Try a different date.
+                    No assignments found for {{ rdate | ddmmyyyy }}. Try a different date.
                 </div>
                 {% endif %}
 
                 {% if no_task_artists %}
                 <div style="margin-top:20px;padding:14px;background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;">
-                    <strong style="color:var(--color-red);">⚠ Artists &amp; Leads with NO tasks on {{ rdate }}:</strong>
+                    <strong style="color:var(--color-red);">⚠ Artists &amp; Leads with NO tasks on {{ rdate | ddmmyyyy }}:</strong>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
                     {% for a in no_task_artists %}
                         <span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;">
@@ -504,7 +504,7 @@
                 <div class="card">
                     <div class="rpt-empty">
                         <div class="rpt-empty-icon">✅</div>
-                        No EOD data found for {{ rdate }}. Try a different date.
+                        No EOD data found for {{ rdate | ddmmyyyy }}. Try a different date.
                     </div>
                 </div>
             {% endif %}
@@ -524,7 +524,7 @@
             </div>
 
             <div class="card" style="margin-bottom:24px;">
-                <h3 class="card-title">Daily Login Details — {{ rdate }}</h3>
+                <h3 class="card-title">Daily Login Details — {{ rdate | ddmmyyyy }}</h3>
                 {% if login_day %}
                 <div class="table-responsive">
                 <table class="scoreboard-table" style="margin-top:12px;">
@@ -566,7 +566,7 @@
                 {% else %}
                 <div class="rpt-empty">
                     <div class="rpt-empty-icon">🕐</div>
-                    No attendance records for {{ rdate }}.
+                    No attendance records for {{ rdate | ddmmyyyy }}.
                 </div>
                 {% endif %}
             </div>
@@ -574,7 +574,7 @@
             <!-- Weekly Overview Grid -->
             {% if login_weekly %}
             <div class="card">
-                <h3 class="card-title">Weekly Overview (week containing {{ rdate }})</h3>
+                <h3 class="card-title">Weekly Overview (week containing {{ rdate | ddmmyyyy }})</h3>
                 <div style="overflow-x:auto;margin-top:12px;">
                 <table class="scoreboard-table weekly-grid">
                     <thead><tr>
