@@ -4,7 +4,7 @@
 
 /* CSS Variables for Clean Design System */
 :root {
-    --font-primary: 'Ubuntu', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-primary: 'Ubuntu', sans-serif;
     
     /* Elegant Clean Color Palette (White/Light Theme with Blue/Red Accents) */
     --bg-main: #f8fafc;
@@ -271,11 +271,12 @@ body.modal-open {
     box-sizing: border-box;
 }
 
-/* Sidebar Navigation */
+/* Sidebar Navigation - Distinct Standout Styling */
 .sidebar {
     width: 260px;
-    background-color: var(--bg-sidebar);
-    border-right: 1px solid var(--border-color);
+    background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
+    color: #f8fafc;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -283,63 +284,66 @@ body.modal-open {
     left: 0;
     top: 0;
     z-index: 10;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
     animation: slideIn var(--transition-normal);
 }
 
 .sidebar-brand {
     padding: 24px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-brand h2 {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: 19px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.01em;
 }
 
 .sidebar-brand h2 span.blue {
-    color: var(--color-blue);
+    color: #38bdf8;
 }
 
 .sidebar-brand h2 span.red {
-    color: var(--color-red);
+    color: #f43f5e;
 }
 
 .sidebar-user {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border-color);
-    background-color: var(--bg-main);
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.04);
 }
 
 .sidebar-user .user-name {
     font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 700;
+    color: #ffffff;
 }
 
 .sidebar-user .user-role-badge {
     display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10.5px;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 2px 8px;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
     border-radius: 12px;
     margin-top: 4px;
 }
 
 /* Role Badges color styles */
-.badge-admin { background-color: var(--color-red-light); color: var(--color-red); }
-.badge-hr { background-color: #fdf2f8; color: #db2777; }
-.badge-lead { background-color: var(--color-blue-light); color: var(--color-blue); }
-.badge-artist { background-color: #f0fdfa; color: #0d9488; }
+.badge-admin { background-color: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+.badge-hr { background-color: rgba(236, 72, 153, 0.25); color: #fbcfe8; border: 1px solid rgba(236, 72, 153, 0.4); }
+.badge-lead { background-color: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
+.badge-artist { background-color: rgba(20, 184, 166, 0.25); color: #99f6e4; border: 1px solid rgba(20, 184, 166, 0.4); }
 
 .sidebar-user .user-designation {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: #94a3b8;
     margin-top: 4px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -347,55 +351,57 @@ body.modal-open {
 
 .sidebar-user .user-team {
     font-size: 11px;
-    font-weight: 500;
-    color: var(--color-blue);
+    font-weight: 600;
+    color: #38bdf8;
     margin-top: 2px;
 }
 
-
 .sidebar-menu {
     list-style: none;
-    padding: 24px 16px;
+    padding: 20px 14px;
     flex-grow: 1;
     overflow-y: auto;
 }
 
 .menu-section-title {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10.5px;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    margin: 16px 8px 8px 8px;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin: 18px 10px 8px 10px;
 }
 
 .menu-item a {
     display: flex;
     align-items: center;
-    padding: 10px 12px;
+    padding: 10px 14px;
     font-size: 13.5px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-weight: 600;
+    color: #cbd5e1;
     text-decoration: none;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
+    border-radius: 8px;
+    transition: all 0.2s ease;
     margin-bottom: 4px;
 }
 
 .menu-item a:hover {
-    background-color: var(--bg-main);
-    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    transform: translateX(2px);
 }
 
 .menu-item.active a {
-    background-color: var(--color-blue-light);
-    color: var(--color-blue);
-    font-weight: 600;
+    background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
 }
 
 .sidebar-footer {
     padding: 16px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .btn-logout {
@@ -687,6 +693,55 @@ body.modal-open {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.artist-highlight-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9.5px;
+    font-weight: 700;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 3px;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.points-highlight-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 9.5px;
+    font-weight: 800;
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 3px;
+    white-space: nowrap;
+}
+
+.points-big-num {
+    font-size: 15px;
+    font-weight: 900;
+    color: #b45309;
+    background: #fef3c7;
+    border: 1.5px solid #fde68a;
+    border-radius: 6px;
+    padding: 2px 7px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 
 /* Queue and Task Panels */
@@ -1632,6 +1687,109 @@ body.modal-open {
 .card-theme-scenes .count-value,
 .card-theme-scenes .count-label {
     color: #7c3aed !important;
+}
+
+/* ==========================================================================
+   GLOBAL TYPOGRAPHY ENHANCEMENTS (Ubuntu Only, Larger Font Size & Bolder Weights)
+   ========================================================================== */
+
+*, body, button, input, select, textarea, table, th, td, h1, h2, h3, h4, h5, h6, span, a, div, p, label {
+    font-family: 'Ubuntu', sans-serif !important;
+}
+
+body {
+    font-size: 17.5px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+}
+
+/* Sidebar Navigation & User Info */
+.sidebar-user .user-name {
+    font-size: 16.5px !important;
+    font-weight: 800 !important;
+}
+.sidebar-user .user-designation,
+.sidebar-user .user-team {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+.menu-section-title {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+}
+.menu-item a {
+    font-size: 15.5px !important;
+    font-weight: 700 !important;
+}
+.menu-item.active a {
+    font-weight: 800 !important;
+}
+
+/* Page Headers & Card Titles */
+.page-header h1 {
+    font-size: 30px !important;
+    font-weight: 800 !important;
+}
+.page-header p {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+}
+.card-title, .queue-stage-title {
+    font-size: 18.5px !important;
+    font-weight: 700 !important;
+}
+
+/* Matrix Tables & Production Sheets */
+.matrix-table {
+    font-size: 15px !important;
+}
+.matrix-table th {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+}
+.matrix-table td {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+}
+.file-name-cell, .clickable-filename, .task-card-name {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+}
+.status-pill {
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+}
+
+/* Buttons & Input Controls */
+.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-logout {
+    font-size: 15.5px !important;
+    font-weight: 700 !important;
+}
+.form-input, .select-input, .reason-input {
+    font-size: 15.5px !important;
+    font-weight: 600 !important;
+}
+label, .filter-group label, .form-group label {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+}
+.alert {
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+}
+
+/* Tables Across Reports, Points, Leaves, Holidays, Comp-Off */
+table.table, table.data-table {
+    font-size: 15px !important;
+}
+table.table th, table.data-table th {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+}
+table.table td, table.data-table td {
+    font-size: 15px !important;
+    font-weight: 600 !important;
 }
 
 

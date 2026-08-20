@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comp-Off &amp; Working Days Management - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
+    <style>
+        .badge-full { background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .badge-partial { background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .badge-pending { background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+        .badge-approved { background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+            </div>
+            
+            <div class="sidebar-user">
+                <div class="user-name">{{ session['name'] }}</div>
+                <div class="user-designation">HR Manager</div>
+                <div class="user-team">{{ session['team'] }} Team</div>
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li class="menu-section-title">Navigation</li>
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
+                </li>
+
+                <li class="menu-section-title">HR Management</li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
+                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout">
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1>Comp-Off &amp; Working Days Management</h1>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                        Configure Full/Partial working days, approve Partial Workday attendance, and manage distinct Comp-Off balances.
+                    </p>
+                </div>
+            </header>
+
+            <!-- Alerts -->
+            {% with messages = get_flashed_messages(category_filter=["error"]) %}
+                {% if messages %}{% for m in messages %}
+                    <div class="alert alert-error" style="margin-bottom:16px;"><span>{{ m }}</span></div>
+                {% endfor %}{% endif %}
+            {% endwith %}
+            {% with messages = get_flashed_messages(category_filter=["success"]) %}
+                {% if messages %}{% for m in messages %}
+                    <div class="alert alert-success" style="margin-bottom:16px;"><span>{{ m }}</span></div>
+                {% endfor %}{% endif %}
+            {% endwith %}
+
+            <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; margin-bottom: 24px;">
+                <!-- Left: Pending Partial Workday Claims & Configured Working Days -->
+                <div>
+                    <!-- 1. Pending Partial Workday Attendance Claims -->
+                    <div class="card" style="margin-bottom: 24px; border-top: 4px solid var(--color-blue);">
+                        <h3 class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>⚡ Pending Partial Workday Comp-Off Claims ({{ pending_claims | length }})</span>
+                        </h3>
+                        <table class="matrix-table" style="margin-top: 12px; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Team</th>
+                                    <th>Workday Date</th>
+                                    <th>Clock In / Out</th>
+                                    <th>Status</th>
+                                    <th style="text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for claim in pending_claims %}
+                                    <tr>
+                                        <td><strong>{{ claim['artist_name'] }}</strong> <span style="font-size:11px; color:var(--text-secondary);">(@{{ claim['artist_username'] }})</span></td>
+                                        <td>{{ claim['artist_team'] }}</td>
+                                        <td><strong>{{ claim['date'] }}</strong></td>
+                                        <td>{{ claim['clock_in'] or '09:00' }} - {{ claim['clock_out'] or '18:00' }}</td>
+                                        <td><span class="badge-pending">{{ claim['comp_off_status'] or 'Pending' }}</span></td>
+                                        <td style="text-align: center;">
+                                            <div style="display: flex; gap: 6px; justify-content: center;">
+                                                <form action="{{ url_for('comp_off_management_page') }}" method="POST" style="margin:0;">
+                                                    <input type="hidden" name="action" value="approve_comp_off">
+                                                    <input type="hidden" name="att_id" value="{{ claim['id'] }}">
+                                                    <button type="submit" class="btn btn-sm btn-primary" style="padding: 4px 12px; font-size: 11px;">Approve (+1 Comp-Off)</button>
+                                                </form>
+                                                <form action="{{ url_for('comp_off_management_page') }}" method="POST" style="margin:0;">
+                                                    <input type="hidden" name="action" value="reject_comp_off">
+                                                    <input type="hidden" name="att_id" value="{{ claim['id'] }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger" style="padding: 4px 12px; font-size: 11px;">Reject</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-secondary);">
+                                            No pending Comp-Off attendance claims right now.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 2. Configured Working Days List -->
+                    <div class="card" style="margin-bottom: 24px;">
+                        <h3 class="card-title">📅 Configured Working Days (Full vs Partial)</h3>
+                        <table class="matrix-table" style="margin-top: 12px; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Working Day Type</th>
+                                    <th>Expected Teams / Details</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for w in working_days %}
+                                    <tr>
+                                        <td><strong>{{ w['date'] }}</strong></td>
+                                        <td>
+                                            {% if w['day_type'] == 'Partial' %}
+                                                <span class="badge-partial">⚡ Partial Working Day</span>
+                                            {% else %}
+                                                <span class="badge-full">🏢 Full Working Day</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ w['working_teams'] or 'All Teams' }}</td>
+                                        <td>{{ w['remarks'] or '-' }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-secondary);">
+                                            No special working day configurations defined. All days follow standard full workday schedule.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Right: Set Working Day Form & User Balances -->
+                <div>
+                    <!-- Form: Set Working Day Type -->
+                    <div class="card" style="margin-bottom: 24px;">
+                        <h3 class="card-title">⚙️ Configure Working Day</h3>
+                        <form action="{{ url_for('comp_off_management_page') }}" method="POST" style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+                            <input type="hidden" name="action" value="set_working_day">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 4px;">Select Date</label>
+                                <input type="date" name="w_date" class="reason-input" style="background: #fff;" required>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 4px;">Working Day Type</label>
+                                <select name="day_type" class="select-input" style="background: #fff;" required>
+                                    <option value="Full">🏢 FULL Working Day (All Teams)</option>
+                                    <option value="Partial">⚡ PARTIAL Working Day (Comp-Off Eligible)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 4px;">Expected Teams (Optional)</label>
+                                <input type="text" name="working_teams" class="reason-input" style="background: #fff;" placeholder="e.g. Content, Modeling, Rig">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 4px;">Remarks / Reason</label>
+                                <input type="text" name="remarks" class="reason-input" style="background: #fff;" placeholder="e.g. Weekend sprint / Special launch">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="padding: 10px;">Save Working Day Config</button>
+                        </form>
+                    </div>
+
+                    <!-- User Balances Table (Distinct Comp-Off Pool) -->
+                    <div class="card">
+                        <h3 class="card-title">🎁 Employee Comp-Off Balances</h3>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                            Tracked in a <strong>separate comp-off ledger</strong>, distinct from annual leave pool.
+                        </p>
+                        <div style="max-height: 360px; overflow-y: auto;">
+                            <table class="matrix-table" style="width: 100%; font-size: 12px;">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th style="text-align: center;">Annual Leave</th>
+                                        <th style="text-align: center;">Comp-Off Days</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for u in all_users %}
+                                        <tr>
+                                            <td><strong>{{ u['name'] }}</strong> <div style="font-size: 10px; color: var(--text-secondary);">{{ u['team'] }} ({{ u['role'] }})</div></td>
+                                            <td style="text-align: center;">{{ u['leave_balance'] or 12.0 }} days</td>
+                                            <td style="text-align: center;"><strong style="color: var(--color-blue); font-size: 13px;">+{{ u['comp_off_balance'] or 0.0 }}</strong></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

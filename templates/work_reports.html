@@ -173,18 +173,12 @@
                     <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
                 {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% else %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
-                </li>
-                {% endif %}
                 {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
@@ -254,9 +248,20 @@
                 {% endfor %}{% endif %}
             {% endwith %}
 
+            <!-- PIPELINE SUB-TAB SELECTOR (Asset Pipeline vs Scene Pipeline) -->
+            <div class="report-tabs" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                <a href="{{ url_for('work_reports_page', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id, sub_tab='assets') }}" class="report-tab-btn {% if sub_tab != 'scenes' %}active{% endif %}" style="text-decoration: none; padding: 10px 20px; font-weight: 700; border-radius: 8px;">
+                    📦 Asset Pipeline Work
+                </a>
+                <a href="{{ url_for('work_reports_page', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id, sub_tab='scenes') }}" class="report-tab-btn {% if sub_tab == 'scenes' %}active{% endif %}" style="text-decoration: none; padding: 10px 20px; font-weight: 700; border-radius: 8px;">
+                    🎬 Scene Pipeline Work
+                </a>
+            </div>
+
             <!-- Report Filter Controls -->
             <div class="report-controls-card">
                 <form action="{{ url_for('work_reports_page') }}" method="GET" id="workReportForm">
+                    <input type="hidden" name="sub_tab" value="{{ sub_tab }}">
                     <!-- Row 1: Duration selection -->
                     <div class="filter-row-block">
                         <div class="filter-field" style="min-width: 220px;">

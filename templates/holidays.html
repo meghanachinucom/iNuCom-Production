@@ -99,6 +99,9 @@
                 <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
                     <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
                 </li>
+                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
+                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
+                </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
                     <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
                 </li>

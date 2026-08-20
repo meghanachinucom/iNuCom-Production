@@ -101,18 +101,12 @@
                     <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
                 {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% else %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
-                </li>
-                {% endif %}
                 {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>

@@ -103,18 +103,12 @@
                     <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
                 {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% else %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
-                </li>
-                {% endif %}
                 {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
@@ -154,6 +148,9 @@
                 </li>
                 <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
                     <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
+                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
                     <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
@@ -264,27 +261,66 @@
                 {% endif %}
             {% endwith %}
 
-            <div class="card">
-                <h3 class="card-title">Select Excel File</h3>
-                
-                <form action="{{ url_for('upload_project_page') }}" method="POST" enctype="multipart/form-data">
-                    <div class="upload-area" onclick="document.getElementById('excel_file').click()">
-                        <span class="upload-icon">📁</span>
-                        <div class="upload-title" id="file-title">Click to browse or drop your Excel file here</div>
-                        <div class="upload-subtitle">Supports .xlsx and .xls formats</div>
-                        
-                        <div class="file-input-wrapper">
-                            <button type="button" class="btn btn-secondary btn-sm">Choose File</button>
-                            <input type="file" name="file" id="excel_file" class="file-input" accept=".xlsx, .xls" required onchange="updateFileName(this)">
-                        </div>
-                    </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                <!-- Card 1: Asset Pipeline Project Spreadsheet Uploader -->
+                <div class="card" style="margin: 0; border-top: 4px solid var(--color-blue);">
+                    <h3 class="card-title" style="color: var(--color-blue); display: flex; align-items: center; gap: 8px;">
+                        📦 Import Asset Project Spreadsheet
+                    </h3>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                        Imports asset files into the <strong>Asset Pipeline</strong>. Initialized with Asset stages (Reference, Explanation, Modeling, Texturing, Rig).
+                    </p>
                     
-                    <div style="text-align: right;">
-                        <button type="submit" class="btn btn-primary">Upload &amp; Initialize Project</button>
-                    </div>
-                </form>
-                
-                <div class="guidelines-card">
+                    <form action="{{ url_for('upload_project_page') }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="pipeline_type" value="assets">
+                        <div class="upload-area" style="padding: 24px;" onclick="document.getElementById('asset_excel_file').click()">
+                            <span class="upload-icon" style="font-size: 36px;">📦</span>
+                            <div class="upload-title" id="asset-file-title" style="font-size: 14px;">Select Asset Project Excel file</div>
+                            <div class="upload-subtitle" style="margin-bottom: 16px;">Supports .xlsx and .xls formats</div>
+                            
+                            <div class="file-input-wrapper">
+                                <button type="button" class="btn btn-secondary btn-sm">Choose File</button>
+                                <input type="file" name="file" id="asset_excel_file" class="file-input" accept=".xlsx, .xls" required onchange="updateAssetFileName(this)">
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: right;">
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">Upload &amp; Initialize Asset Project</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Card 2: Scene Pipeline Project Spreadsheet Uploader -->
+                <div class="card" style="margin: 0; border-top: 4px solid #7c3aed;">
+                    <h3 class="card-title" style="color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                        🎬 Import Scene Project Spreadsheet
+                    </h3>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                        Imports scene files into the <strong>Scene Pipeline</strong>. Initialized with Scene stages (Voice Over, Storyboards, Animation, VFX, Rendering, 3D Comp).
+                    </p>
+                    
+                    <form action="{{ url_for('upload_project_page') }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="pipeline_type" value="scenes">
+                        <div class="upload-area" style="padding: 24px;" onclick="document.getElementById('scene_excel_file').click()">
+                            <span class="upload-icon" style="font-size: 36px;">🎬</span>
+                            <div class="upload-title" id="scene-file-title" style="font-size: 14px;">Select Scene Project Excel file</div>
+                            <div class="upload-subtitle" style="margin-bottom: 16px;">Supports .xlsx and .xls formats</div>
+                            
+                            <div class="file-input-wrapper">
+                                <button type="button" class="btn btn-secondary btn-sm" style="background: #ede9fe; color: #6d28d9;">Choose File</button>
+                                <input type="file" name="file" id="scene_excel_file" class="file-input" accept=".xlsx, .xls" required onchange="updateSceneFileName(this)">
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: right;">
+                            <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); border-color: #6d28d9; width: 100%;">Upload &amp; Initialize Scene Project</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="guidelines-card" style="margin-top: 0;">
                     <div class="guidelines-title">Spreadsheet Format Guidelines</div>
                     <ul class="guidelines-list">
                         <li>The Excel sheet should contain the following columns from left to right:
@@ -295,7 +331,7 @@
                         </li>
                         <li>The first row is automatically treated as a header and skipped if it contains terms like "Project" or "File".</li>
                         <li>Existing projects and chapters will be matched automatically by name. New projects/chapters will be created if they do not exist.</li>
-                        <li>Each imported file will have its full pipeline stage board initialized (Content stage starts as <strong>Open</strong>, other stages start as <strong>Pending</strong>) and will instantly be visible in all artist, lead, and admin trackers.</li>
+                        <li>Asset project uploads populate the 📦 <strong>Asset Pipeline Sheet</strong>. Scene project uploads populate the 🎬 <strong>Scene Pipeline Sheet</strong>.</li>
                     </ul>
                 </div>
             </div>
@@ -303,12 +339,20 @@
     </div>
     
     <script>
-        function updateFileName(input) {
-            const label = document.getElementById('file-title');
+        function updateAssetFileName(input) {
+            const label = document.getElementById('asset-file-title');
             if (input.files && input.files.length > 0) {
                 label.innerHTML = "Selected file: <strong>" + input.files[0].name + "</strong>";
             } else {
-                label.innerHTML = "Click to browse or drop your Excel file here";
+                label.innerHTML = "Select Asset Project Excel file";
+            }
+        }
+        function updateSceneFileName(input) {
+            const label = document.getElementById('scene-file-title');
+            if (input.files && input.files.length > 0) {
+                label.innerHTML = "Selected file: <strong>" + input.files[0].name + "</strong>";
+            } else {
+                label.innerHTML = "Select Scene Project Excel file";
             }
         }
     </script>

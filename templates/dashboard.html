@@ -4,12 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - iNuCom Production Tracker</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260819_3">
     <style>
         .pts-text-green { color: var(--color-green) !important; }
         .pts-text-amber { color: #b45309 !important; }
         .pts-bar-green { background-color: var(--color-green) !important; }
         .pts-bar-blue { background-color: var(--color-blue) !important; }
+        .sheet-status-select { border-radius:4px; font-weight:700; cursor:pointer; }
+        .sheet-status-Done { background:#dcfce7 !important; color:#15803d !important; border:1px solid #86efac !important; }
+        .sheet-status-Wip { background:#fef3c7 !important; color:#b45309 !important; border:1px solid #fde68a !important; }
+        .sheet-status-Review { background:#dbeafe !important; color:#1d4ed8 !important; border:1px solid #93c5fd !important; }
+        .sheet-status-RTK { background:#fee2e2 !important; color:#b91c1c !important; border:1px solid #fca5a5 !important; }
+        .sheet-status-Hold { background:#ffedd5 !important; color:#c2410c !important; border:1px solid #fdba74 !important; }
+        .sheet-status-Yts { background:#f3f4f6 !important; color:#4b5563 !important; border:1px solid #d1d5db !important; }
     </style>
 </head>
 <body>
@@ -43,18 +50,12 @@
                     <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
                 {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% else %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
-                </li>
-                {% endif %}
                 {% if session['role'] in ['Admin', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
                     <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
@@ -183,6 +184,7 @@
                     </script>
 
                     <!-- Quick-Clock Widget -->
+                    {% if session['role'] != 'Admin' %}
                     <div class="quick-clock-widget">
                         {% if not attendance_today %}
                             <form action="{{ url_for('clock_in') }}" method="POST" class="clock-form">
@@ -201,6 +203,7 @@
                             </div>
                         {% endif %}
                     </div>
+                    {% endif %}
                 </div>
             </header>
 
@@ -248,8 +251,71 @@
                 {% endif %}
             {% endwith %}
             
-            {% if session['role'] == 'Admin' %}
-                <!-- ADMIN MERGED VIEW: 1. Cascading Project & Chapter Selector -->
+            <!-- Lead Absent Alert & Self-Log Option (Shown to team members when Lead is Absent today) -->
+            {% if lead_absent_info %}
+            <div class="card" style="background:#f0f9ff; border:2px solid #0284c7; border-radius:10px; padding:16px 20px; margin-bottom:20px; box-shadow:0 4px 12px rgba(2,132,199,0.12);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-size:26px;">📝</span>
+                        <div>
+                            <div style="font-size:14px; font-weight:800; color:#0369a1; text-transform:uppercase; letter-spacing:0.04em;">Your Team Lead ({{ lead_absent_info['name'] }}) is Absent Today</div>
+                            <div style="font-size:12px; color:#0c4a6e; margin-top:2px;">You can self-log your work for today below. Your entry will be held in queue for your Lead's approval upon return before points credit.</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="toggleSelfLogModal(true)" style="background:#0284c7; border:none; padding:8px 18px; font-size:12.5px; font-weight:700; border-radius:6px; cursor:pointer;">
+                        ➕ Self-Log Today's Work
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Pending Self-Logged Work Approval Queue (Shown to returning Lead/Admin) -->
+            {% if pending_self_logs and session['role'] in ['Admin', 'Lead'] %}
+            <div class="card" style="background:#fff7ed; border:2px solid #f97316; border-radius:10px; padding:16px 20px; margin-bottom:20px; box-shadow:0 4px 12px rgba(249,115,22,0.12);">
+                <h3 style="font-size:14px; font-weight:800; color:#c2410c; margin:0 0 12px 0; text-transform:uppercase; display:flex; align-items:center; gap:8px;">
+                    📋 Pending Self-Logged Work Queue ({{ pending_self_logs|length }} Entries Awaiting Approval)
+                </h3>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                        <thead>
+                            <tr style="background:#ffedd5; color:#9a3412; font-weight:700; border-bottom:1.5px solid #fdba74;">
+                                <th style="padding:8px 10px;">Artist</th>
+                                <th style="padding:8px 10px;">File &amp; Stage</th>
+                                <th style="padding:8px 10px;">Logged Status</th>
+                                <th style="padding:8px 10px;">Points</th>
+                                <th style="padding:8px 10px;">Remarks</th>
+                                <th style="padding:8px 10px;">Date</th>
+                                <th style="padding:8px 10px; text-align:center; width:160px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in pending_self_logs %}
+                            <tr style="border-bottom:1px solid #fed7aa; background:#fff;">
+                                <td style="padding:8px 10px; font-weight:700; color:var(--text-primary);">{{ log['artist_name'] }}</td>
+                                <td style="padding:8px 10px; font-weight:600; color:var(--color-blue);">{{ log['file_name'] }} <span style="color:var(--text-muted); font-size:11px;">({{ log['step_name'] }})</span></td>
+                                <td style="padding:8px 10px;"><span class="status-pill status-{{ log['status']|lower }}" style="font-size:10px; padding:2px 6px;">{{ log['status'] }}</span></td>
+                                <td style="padding:8px 10px; font-weight:800; color:#b45309;">{{ log['points'] }} pts</td>
+                                <td style="padding:8px 10px; color:var(--text-secondary);">{{ log['remarks'] or '-' }}</td>
+                                <td style="padding:8px 10px; color:var(--text-muted); font-size:11px;">{{ log['log_date'] }}</td>
+                                <td style="padding:8px 10px; text-align:center;">
+                                    <div style="display:flex; gap:6px; justify-content:center;">
+                                        <form action="/self-log-work/{{ log['id'] }}/approve" method="POST" style="margin:0;">
+                                            <button type="submit" class="btn btn-success btn-sm" style="padding:3px 10px; font-size:11px; font-weight:700;">Approve</button>
+                                        </form>
+                                        <form action="/self-log-work/{{ log['id'] }}/reject" method="POST" style="margin:0;">
+                                            <button type="submit" class="btn btn-danger btn-sm" style="padding:3px 10px; font-size:11px; font-weight:700;">Reject</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            
+                <!-- Cascading Project & Chapter Selector -->
                 <div class="card" style="margin-bottom: 24px; padding: 20px; background: var(--bg-card);">
                     <form action="{{ url_for('dashboard') }}" method="GET" id="adminProjChapForm" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
                         <input type="hidden" name="sub_tab" value="{{ sub_tab }}">
@@ -282,29 +348,8 @@
                     </form>
                 </div>
 
-                <!-- ADMIN MERGED VIEW: 2. Sub-Tab Selector (Assets vs Scenes) -->
-                <!-- ADMIN MERGED VIEW: 2. Sub-Tab Selector & Team-wise Overview Toggle -->
-                <div class="report-tabs" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                    <div style="display: flex; gap: 8px;">
-                        <a href="{{ url_for('dashboard', project_id=selected_project_id, chapter_id=selected_chapter_id, sub_tab='assets', sheet_view=sheet_view) }}" class="report-tab-btn {% if sub_tab == 'assets' %}active{% endif %}" style="text-decoration: none; display: inline-block; text-align: center;">
-                            📦 Assets Pipeline
-                        </a>
-                        <a href="{{ url_for('dashboard', project_id=selected_project_id, chapter_id=selected_chapter_id, sub_tab='scenes', sheet_view=sheet_view) }}" class="report-tab-btn {% if sub_tab == 'scenes' %}active{% endif %}" style="text-decoration: none; display: inline-block; text-align: center;">
-                            🎬 Scenes Pipeline
-                        </a>
-                    </div>
-                    <div style="display: flex; gap: 6px; background: var(--bg-card); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <a href="{{ url_for('dashboard', project_id=selected_project_id, chapter_id=selected_chapter_id, sub_tab=sub_tab, sheet_view='standard') }}" class="report-tab-btn {% if sheet_view != 'team_overview' %}active{% endif %}" style="text-decoration: none; padding: 6px 12px; font-size: 12px;">
-                            📊 Assets/Scenes Sheet
-                        </a>
-                        <a href="{{ url_for('dashboard', project_id=selected_project_id, chapter_id=selected_chapter_id, sub_tab=sub_tab, sheet_view='team_overview') }}" class="report-tab-btn {% if sheet_view == 'team_overview' %}active{% endif %}" style="text-decoration: none; padding: 6px 12px; font-size: 12px;">
-                            👥 Team-wise Overview
-                        </a>
-                    </div>
-                </div>
-
-                <!-- ADMIN MERGED VIEW: 3. Dynamic Overview Box for Selected Sub-Tab & Chapter -->
                 {% if pipeline_summary %}
+                {% if session['role'] == 'Admin' %}
                 <div class="card" style="margin-bottom: 24px; padding: 24px; background: var(--bg-card); border-top: 4px solid var(--color-blue);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
                         <div>
@@ -358,6 +403,12 @@
                                 ✅ Done/Approved
                             </div>
                         </div>
+                        <div style="background: var(--bg-main); border: 1px solid #fed7aa; border-radius: 12px; padding: 16px; text-align: center;">
+                            <div style="font-size: 28px; font-weight: 800; color: #c2410c; line-height: 1.1;">{{ pipeline_summary.total_hold }}</div>
+                            <div style="font-size: 11px; font-weight: 700; color: #c2410c; text-transform: uppercase; margin-top: 6px;">
+                                🛑 Hold
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Department / Team Breakdown Cards for Active Sub-Tab Stages -->
@@ -386,40 +437,19 @@
                         {% endfor %}
                     </div>
                 </div>
-                {% endif %}
-
-            {% else %}
-            <!-- NON-ADMIN ROLES (Artist, Lead, HR) EXISTING VIEW -->
-            {% if view_tab == 'pipeline' %}
-            <!-- Top Production Pipeline Status Banner (Assets vs Scenes) -->
-            {% if pipeline_summary %}
-            <div class="card" style="margin-bottom: 24px; padding: 24px; background: var(--bg-card); border-top: 4px solid var(--color-blue);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                {% else %}
+                <div class="card" style="margin-bottom: 24px; padding: 14px 20px; background: var(--bg-card); border-left: 4px solid var(--color-blue); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                     <div>
-                        <h3 class="card-title" style="margin-bottom: 4px; font-size: 20px; border: 0; padding: 0; display: flex; align-items: center; gap: 8px;">
-                            📊 Production Pipeline Overall Status Overview
-                        </h3>
+                        <h4 style="margin: 0; font-size: 15px; font-weight: 700;">
+                            {% if sub_tab == 'scenes' %}🎬 Scenes Pipeline{% else %}📦 Assets Pipeline{% endif %} — Chapter: {{ selected_chapter_name or 'Chapter' }}
+                        </h4>
+                    </div>
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); background: var(--bg-main); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        Total Files: <span style="color: var(--color-blue); font-weight: 800; font-size: 15px;">{{ pipeline_summary.subtab_active_files }}</span>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                    <div style="background: var(--bg-main); border: 2px solid var(--color-blue); border-radius: 12px; padding: 18px; text-align: center;">
-                        <div style="font-size: 32px; font-weight: 800; color: var(--color-blue); line-height: 1.1;">{{ pipeline_summary.total_assets_count }}</div>
-                        <div style="font-size: 11px; font-weight: 700; color: var(--color-blue); text-transform: uppercase; margin-top: 6px;">📦 Total Assets</div>
-                    </div>
-                    <div style="background: var(--bg-main); border: 2px solid #7c3aed; border-radius: 12px; padding: 18px; text-align: center;">
-                        <div style="font-size: 32px; font-weight: 800; color: #7c3aed; line-height: 1.1;">{{ pipeline_summary.total_scenes_count }}</div>
-                        <div style="font-size: 11px; font-weight: 700; color: #7c3aed; text-transform: uppercase; margin-top: 6px;">🎬 Total Scenes</div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="report-tabs" style="margin-bottom: 24px;">
-                <a href="{{ url_for('dashboard', view='pipeline', sub_tab='assets') }}" class="report-tab-btn {% if sub_tab == 'assets' %}active{% endif %}" style="text-decoration: none;">📦 Assets Pipeline</a>
-                <a href="{{ url_for('dashboard', view='pipeline', sub_tab='scenes') }}" class="report-tab-btn {% if sub_tab == 'scenes' %}active{% endif %}" style="text-decoration: none;">🎬 Scenes Pipeline</a>
-            </div>
-            {% endif %}
-            {% endif %}
+                {% endif %}
+                {% endif %}
 
             <!-- Display tables for each project and its chapters -->
             {% for project in active_projects_list %}
@@ -432,9 +462,16 @@
                 {% for chapter in project_chapters_map[project['id']] %}
                     <div class="card" style="padding: 16px; margin-bottom: 24px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; flex-wrap: wrap; gap: 12px;">
-                            <h3 class="card-title" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">
-                                📖 {{ chapter['name'] }} <span style="font-weight: normal; font-size: 13px; color: var(--text-secondary);">({{ chapter['description'] }})</span>
-                            </h3>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <h3 class="card-title" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">
+                                    📖 {{ chapter['name'] }} <span style="font-weight: normal; font-size: 13px; color: var(--text-secondary);">({{ chapter['description'] }})</span>
+                                </h3>
+                                {% if session['role'] == 'Admin' %}
+                                    <button type="button" class="btn btn-sm btn-outline" id="admin-edit-btn-{{ chapter['id'] }}" data-chapter-id="{{ chapter['id'] }}" onclick="toggleAdminChapterEdit(this.dataset.chapterId)" style="font-size: 11px; padding: 2px 10px; height: 26px; border-radius: 14px; border: 1px solid var(--color-blue); color: var(--color-blue); font-weight: 700;">
+                                        ✏️ Edit Statuses
+                                    </button>
+                                {% endif %}
+                            </div>
                             
                             <!-- Add File form for this chapter (only Content Lead or Admin) -->
                             {% if session['role'] == 'Admin' or (session['role'] == 'Lead' and session['team'] == 'Content') %}
@@ -484,34 +521,167 @@
                                                                 (session['role'] == 'Lead' and (session['username'] == cell['artist_lead'] or session['team'] == STAGE_TEAMS.get(stage))) or
                                                                 (session['role'] == 'Artist' and cell['artist_username'] and session['username'] == cell['artist_username'])
                                                             ) %}
+                                                            {% set can_edit_cell_status = (
+                                                                session['role'] == 'Admin' or
+                                                                (session['role'] == 'Lead' and session['team'] == STAGE_TEAMS.get(stage))
+                                                            ) %}
+
+                                                            {% set norm_st = 'Yts' %}
+                                                            {% if cell['status'] in ['Done', 'Approved'] %}{% set norm_st = 'Done' %}
+                                                            {% elif cell['status'] in ['In Progress', 'WIP', 'Wip', 'Open'] %}{% set norm_st = 'Wip' %}
+                                                            {% elif cell['status'] == 'Review' %}{% set norm_st = 'Review' %}
+                                                            {% elif cell['status'] in ['RTK', 'Rework', 'Re-take'] %}{% set norm_st = 'RTK' %}
+                                                            {% elif cell['status'] in ['Hold', 'hold', 'ON HOLD'] %}{% set norm_st = 'Hold' %}
+                                                            {% endif %}
+
                                                             {% if sheet_view == 'team_overview' %}
-                                                                <div style="font-size: 10.5px; padding: 6px 8px; border-radius: 6px; background: var(--bg-main); border: 1px solid var(--border-color); text-align: center;">
-                                                                    <div style="font-weight: 700; color: var(--color-blue); font-size: 11px;">{{ cell['artist_name'] or 'Unassigned' }}</div>
-                                                                    <div style="font-size: 9.5px; color: var(--text-secondary); margin: 2px 0;">{% if can_see_cell_points %}Pts: <strong>{{ cell['points'] or 0 }}</strong> | {% endif %}<span style="font-weight:700; color:#b45309;">{% if cell['take_count'] and cell['take_count'] >= 1 %}Take {{ cell['take_count'] }}{% else %}Original{% endif %}</span></div>
-                                                                    <div>
-                                                                        {% if cell['status'] == 'Done' %}<span class="status-pill status-done" style="font-size:9px; padding:1px 5px;">Done</span>
-                                                                        {% elif cell['status'] in ['In Progress', 'WIP'] %}<span class="status-pill status-progress" style="font-size:9px; padding:1px 5px;">WIP</span>
-                                                                        {% elif cell['status'] == 'Open' %}<span class="status-pill status-open" style="font-size:9px; padding:1px 5px;">Open</span>
-                                                                        {% else %}<span class="status-pill status-pending" style="font-size:9px; padding:1px 5px;">{{ cell['status'] or 'YTS' }}</span>
-                                                                        {% endif %}
+                                                                <div style="font-size: 10.5px; padding: 6px 8px; border-radius: 6px; background: var(--bg-main); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-around; gap: 6px;">
+                                                                    {% if can_see_cell_points and cell['points'] %}
+                                                                        <div class="points-big-num" title="Points: {{ cell['points'] }}">
+                                                                            {{ cell['points'] }}
+                                                                        </div>
+                                                                    {% endif %}
+                                                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1;">
+                                                                        <div style="font-size: 9.5px; margin: 1px 0;">
+                                                                            <span style="font-weight:700; color:#b45309; font-size: 9px; padding: 1px 4px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px;">
+                                                                                {% if cell['take_count'] and cell['take_count'] >= 1 %}Take {{ cell['take_count'] }}{% else %}Original{% endif %}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div>
+                                                                            {% if session['role'] == 'Admin' %}
+                                                                                <div class="admin-status-view-{{ chapter['id'] }}">
+                                                                                    {% if norm_st == 'Hold' %}
+                                                                                        <span class="status-pill status-hold" style="font-size:9px; padding:1px 5px; background:#ffedd5; color:#c2410c; border:1px solid #fdba74;" title="Hold Reason: {{ cell['hold_reason'] or cell['remarks'] or 'On Hold' }}">🛑 Hold</span>
+                                                                                    {% elif norm_st == 'Done' %}
+                                                                                        <span class="status-pill status-done" style="font-size:9px; padding:1px 5px;">Done</span>
+                                                                                    {% elif norm_st == 'Wip' %}
+                                                                                        <span class="status-pill status-progress" style="font-size:9px; padding:1px 5px;">Wip</span>
+                                                                                    {% elif norm_st == 'Review' %}
+                                                                                        <span class="status-pill status-review" style="font-size:9px; padding:1px 5px; background:#dbeafe; color:#1d4ed8;">Review</span>
+                                                                                    {% elif norm_st == 'RTK' %}
+                                                                                        <span class="status-pill status-rtk" style="font-size:9px; padding:1px 5px; background:#fee2e2; color:#b91c1c;">RTK</span>
+                                                                                    {% else %}
+                                                                                        <span class="status-pill status-pending" style="font-size:9px; padding:1px 5px;">Yts</span>
+                                                                                    {% endif %}
+                                                                                </div>
+                                                                                <div class="admin-status-edit-{{ chapter['id'] }}" style="display:none;">
+                                                                                    <form action="/files/{{ file['id'] }}/stage-status" method="POST" style="margin:0;" onclick="event.stopPropagation();">
+                                                                                        <input type="hidden" name="step_name" value="{{ stage }}">
+                                                                                        <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
+                                                                                        <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9px; height:20px; padding:0 2px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
+                                                                                            <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
+                                                                                            <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                            <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
+                                                                                            <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
+                                                                                            <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
+                                                                                            <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                        </select>
+                                                                                    </form>
+                                                                                </div>
+                                                                            {% elif can_edit_cell_status %}
+                                                                                <form action="/files/{{ file['id'] }}/stage-status" method="POST" style="margin:0;" onclick="event.stopPropagation();">
+                                                                                    <input type="hidden" name="step_name" value="{{ stage }}">
+                                                                                    <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
+                                                                                    <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9px; height:20px; padding:0 2px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
+                                                                                        <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
+                                                                                        <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                        <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
+                                                                                        <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
+                                                                                        <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
+                                                                                        <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                    </select>
+                                                                                </form>
+                                                                            {% else %}
+                                                                                {% if norm_st == 'Hold' %}
+                                                                                    <span class="status-pill status-hold" style="font-size:9px; padding:1px 5px; background:#ffedd5; color:#c2410c; border:1px solid #fdba74;" title="Hold Reason: {{ cell['hold_reason'] or cell['remarks'] or 'On Hold' }}">🛑 Hold</span>
+                                                                                {% elif norm_st == 'Done' %}
+                                                                                    <span class="status-pill status-done" style="font-size:9px; padding:1px 5px;">Done</span>
+                                                                                {% elif norm_st == 'Wip' %}
+                                                                                    <span class="status-pill status-progress" style="font-size:9px; padding:1px 5px;">Wip</span>
+                                                                                {% elif norm_st == 'Review' %}
+                                                                                    <span class="status-pill status-review" style="font-size:9px; padding:1px 5px; background:#dbeafe; color:#1d4ed8;">Review</span>
+                                                                                {% elif norm_st == 'RTK' %}
+                                                                                    <span class="status-pill status-rtk" style="font-size:9px; padding:1px 5px; background:#fee2e2; color:#b91c1c;">RTK</span>
+                                                                                {% else %}
+                                                                                    <span class="status-pill status-pending" style="font-size:9px; padding:1px 5px;">Yts</span>
+                                                                                {% endif %}
+                                                                            {% endif %}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             {% else %}
-                                                                {% if cell['status'] == 'Pending' %}
-                                                                    <div class="status-pill status-pending">Pending</div>
-                                                                {% elif cell['status'] == 'Open' %}
-                                                                    <div class="status-pill status-open">Open</div>
-                                                                {% elif cell['status'] == 'In Progress' %}
-                                                                    <div class="status-pill status-progress">
-                                                                        <span>In Progress</span>
-                                                                        <span class="artist-badge-name" title="{{ cell['artist_name'] }}">@{{ cell['artist_username'] }}</span>
-                                                                        {% if can_see_cell_points %}
-                                                                            <span class="artist-badge-name" style="font-weight: 700; color: #b45309;">({{ cell['points'] }} pts)</span>
+                                                                <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                                                                    {% if can_see_cell_points and cell['points'] %}
+                                                                        <div class="points-big-num" title="Points: {{ cell['points'] }}">
+                                                                            {{ cell['points'] }}
+                                                                        </div>
+                                                                    {% endif %}
+
+                                                                    <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                                                                        {% if session['role'] == 'Admin' %}
+                                                                            <div class="admin-status-view-{{ chapter['id'] }}">
+                                                                                {% if norm_st == 'Hold' %}
+                                                                                    <div class="status-pill status-hold" style="background:#ffedd5; color:#c2410c; border:1px solid #fdba74;" title="Hold Reason: {{ cell['hold_reason'] or cell['remarks'] or 'On Hold' }}">🛑 Hold</div>
+                                                                                {% elif norm_st == 'Done' %}
+                                                                                    <div class="status-pill status-done">Done</div>
+                                                                                {% elif norm_st == 'Wip' %}
+                                                                                    <div class="status-pill status-progress">Wip</div>
+                                                                                {% elif norm_st == 'Review' %}
+                                                                                    <div class="status-pill status-review" style="background:#dbeafe; color:#1d4ed8;">Review</div>
+                                                                                {% elif norm_st == 'RTK' %}
+                                                                                    <div class="status-pill status-rtk" style="background:#fee2e2; color:#b91c1c;">RTK</div>
+                                                                                {% else %}
+                                                                                    <div class="status-pill status-pending">Yts</div>
+                                                                                {% endif %}
+                                                                            </div>
+                                                                            <div class="admin-status-edit-{{ chapter['id'] }}" style="display:none;">
+                                                                                <form action="/files/{{ file['id'] }}/stage-status" method="POST" style="margin:0;" onclick="event.stopPropagation();">
+                                                                                    <input type="hidden" name="step_name" value="{{ stage }}">
+                                                                                    <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
+                                                                                    <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9.5px; height:22px; padding:0 3px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
+                                                                                        <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
+                                                                                        <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                        <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
+                                                                                        <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
+                                                                                        <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
+                                                                                        <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                    </select>
+                                                                                </form>
+                                                                            </div>
+                                                                        {% elif can_edit_cell_status %}
+                                                                            <form action="/files/{{ file['id'] }}/stage-status" method="POST" style="margin:0;" onclick="event.stopPropagation();">
+                                                                                <input type="hidden" name="step_name" value="{{ stage }}">
+                                                                                <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
+                                                                                <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9.5px; height:22px; padding:0 3px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
+                                                                                    <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
+                                                                                    <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                    <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
+                                                                                    <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
+                                                                                    <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
+                                                                                    <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                </select>
+                                                                            </form>
+                                                                        {% else %}
+                                                                            {% if norm_st == 'Hold' %}
+                                                                                <div class="status-pill status-hold" style="background:#ffedd5; color:#c2410c; border:1px solid #fdba74;" title="Hold Reason: {{ cell['hold_reason'] or cell['remarks'] or 'On Hold' }}">🛑 Hold</div>
+                                                                            {% elif norm_st == 'Done' %}
+                                                                                <div class="status-pill status-done">Done</div>
+                                                                            {% elif norm_st == 'Wip' %}
+                                                                                <div class="status-pill status-progress">Wip</div>
+                                                                            {% elif norm_st == 'Review' %}
+                                                                                <div class="status-pill status-review" style="background:#dbeafe; color:#1d4ed8;">Review</div>
+                                                                            {% elif norm_st == 'RTK' %}
+                                                                                <div class="status-pill status-rtk" style="background:#fee2e2; color:#b91c1c;">RTK</div>
+                                                                            {% else %}
+                                                                                <div class="status-pill status-pending">Yts</div>
+                                                                            {% endif %}
+                                                                        {% endif %}
+
+                                                                        {% if norm_st == 'Hold' and (cell['hold_reason'] or cell['remarks']) %}
+                                                                            <div style="font-size:8px; color:#c2410c; max-width:85px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="Hold Reason: {{ cell['hold_reason'] or cell['remarks'] }}">🛑 {{ cell['hold_reason'] or cell['remarks'] }}</div>
                                                                         {% endif %}
                                                                     </div>
-                                                                {% elif cell['status'] == 'Done' %}
-                                                                    <div class="status-pill status-done">Done</div>
-                                                                {% endif %}
+                                                                </div>
                                                             {% endif %}
                                                         {% else %}
                                                             <div class="status-pill status-pending">-</div>
@@ -771,12 +941,31 @@
                                             </form>
                                             
                                             <!-- Direct Mark Done Option for Lead/Admin -->
-                                            <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%; margin-top: 8px;">
-                                                <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
-                                                <input type="hidden" name="step_name" value="{{ queue_stage }}">
-                                                <input type="hidden" name="status" value="Done">
-                                                <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Direct Mark Stage Done ✓</button>
-                                            </form>
+                                            {% if queue_stage in ['FBX export', 'Animation'] %}
+                                                <div style="display: flex; gap: 6px; width: 100%; margin-top: 8px;">
+                                                    <form action="{{ url_for('update_status') }}" method="POST" style="flex: 1;">
+                                                        <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
+                                                        <input type="hidden" name="step_name" value="{{ queue_stage }}">
+                                                        <input type="hidden" name="status" value="Done">
+                                                        <input type="hidden" name="vfx_choice" value="send">
+                                                        <button type="submit" class="btn btn-success btn-sm" style="width: 100%; font-size: 11px;">Send to VFX ✓</button>
+                                                    </form>
+                                                    <form action="{{ url_for('update_status') }}" method="POST" style="flex: 1;">
+                                                        <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
+                                                        <input type="hidden" name="step_name" value="{{ queue_stage }}">
+                                                        <input type="hidden" name="status" value="Done">
+                                                        <input type="hidden" name="vfx_choice" value="skip">
+                                                        <button type="submit" class="btn btn-warning btn-sm" style="width: 100%; font-size: 11px;">⚡ Skip VFX</button>
+                                                    </form>
+                                                </div>
+                                            {% else %}
+                                                <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%; margin-top: 8px;">
+                                                    <input type="hidden" name="file_id" value="{{ item['file_id'] }}">
+                                                    <input type="hidden" name="step_name" value="{{ queue_stage }}">
+                                                    <input type="hidden" name="status" value="Done">
+                                                    <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Direct Mark Stage Done ✓</button>
+                                                </form>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 {% endfor %}
@@ -811,12 +1000,31 @@
                                         <div class="task-card-actions">
                                             <!-- Complete Daily Task (sets status pending/validation ready) -->
                                             {% if task['assignment_status'] == 'Pending' %}
-                                                <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%;">
-                                                    <input type="hidden" name="file_id" value="{{ task['file_id'] }}">
-                                                    <input type="hidden" name="step_name" value="{{ task['step_name'] }}">
-                                                    <input type="hidden" name="status" value="Done">
-                                                    <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Complete Task ✓ (Awaiting EOD Validation)</button>
-                                                </form>
+                                                {% if task['step_name'] in ['FBX export', 'Animation'] %}
+                                                    <div style="display: flex; gap: 6px; width: 100%;">
+                                                        <form action="{{ url_for('update_status') }}" method="POST" style="flex: 1;">
+                                                            <input type="hidden" name="file_id" value="{{ task['file_id'] }}">
+                                                            <input type="hidden" name="step_name" value="{{ task['step_name'] }}">
+                                                            <input type="hidden" name="status" value="Done">
+                                                            <input type="hidden" name="vfx_choice" value="send">
+                                                            <button type="submit" class="btn btn-success btn-sm" style="width: 100%; font-size: 11px;">Send to VFX ✓</button>
+                                                        </form>
+                                                        <form action="{{ url_for('update_status') }}" method="POST" style="flex: 1;">
+                                                            <input type="hidden" name="file_id" value="{{ task['file_id'] }}">
+                                                            <input type="hidden" name="step_name" value="{{ task['step_name'] }}">
+                                                            <input type="hidden" name="status" value="Done">
+                                                            <input type="hidden" name="vfx_choice" value="skip">
+                                                            <button type="submit" class="btn btn-warning btn-sm" style="width: 100%; font-size: 11px;">⚡ Skip VFX</button>
+                                                        </form>
+                                                    </div>
+                                                {% else %}
+                                                    <form action="{{ url_for('update_status') }}" method="POST" style="width: 100%;">
+                                                        <input type="hidden" name="file_id" value="{{ task['file_id'] }}">
+                                                        <input type="hidden" name="step_name" value="{{ task['step_name'] }}">
+                                                        <input type="hidden" name="status" value="Done">
+                                                        <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">Complete Task ✓ (Awaiting EOD Validation)</button>
+                                                    </form>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                     </div>
@@ -1040,6 +1248,9 @@
                     <div class="modal-header" style="flex-shrink: 0; margin-bottom: 12px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color);">
                         <h3 style="font-weight: 700; color: var(--color-blue); display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px;">
                             🎬 <span id="modal-file-title">File Details</span>
+                            <button id="modal-rename-btn" type="button" class="btn btn-sm" onclick="openRenamePrompt()" style="display: none; padding: 3px 10px; font-size: 11px; margin-left: 8px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 4px; font-weight: 700; cursor: pointer;">✏️ Rename File</button>
+                            <button id="modal-comp-ai-btn" type="button" class="btn btn-sm" onclick="openCompAiPrompt()" style="display: none; padding: 3px 10px; font-size: 11px; margin-left: 8px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; border-radius: 4px; font-weight: 700; cursor: pointer;">🤖 Mark 2D Comp AI</button>
+                            <span id="modal-comp-ai-badge" style="display: none; padding: 3px 10px; font-size: 11px; margin-left: 8px; background: #fef3c7; color: #b45309; border: 1px solid #fde047; border-radius: 4px; font-weight: 800;">🤖 2D COMP AI</span>
                         </h3>
                         <button type="button" class="modal-close-btn" onclick="closeFileDetailsModal()" style="font-size: 22px; background: none; border: none; cursor: pointer; color: var(--text-secondary);">&times;</button>
                     </div>
@@ -1048,6 +1259,17 @@
                     
                     <!-- Scrollable Modal Body -->
                     <div style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 8px;">
+                        <!-- Prominent Hold Alert Banner (shown dynamically when file or any stage is on Hold) -->
+                        <div id="modal-hold-alert-banner" style="display: none; background: #fff7ed; border: 2px solid #ea580c; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; align-items: flex-start; gap: 12px; box-shadow: 0 2px 8px rgba(234,88,12,0.15);">
+                            <span style="font-size: 22px; line-height: 1;">🛑</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 13px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.04em;">THIS FILE IS CURRENTLY ON HOLD</div>
+                                <div style="font-size: 12px; font-weight: 700; color: #9a3412; margin-top: 4px; line-height: 1.4;">
+                                    Hold Reason: <span id="modal-hold-reason-txt" style="color: #7c2d12; font-weight: 800; background: #ffedd5; padding: 2px 8px; border-radius: 4px; border: 1px solid #fdba74;">-</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- File Metadata Grid -->
                         <div class="metadata-section" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 16px; background: var(--bg-main); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 18px;">
                             <div>
@@ -1159,7 +1381,7 @@
                         <!-- Bottom Section: Pipeline Stages Status Table -->
                         <div style="margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 12px;">
                             <h4 style="font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                                ⚙️ Full Pipeline Stages Status (12 Stages)
+                                ⚙️ Full Pipeline Stages Status ({{ all_stages|length }} Stages)
                             </h4>
                             <div style="overflow-y: auto; max-height: 180px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
                                 <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
@@ -1173,6 +1395,31 @@
                                         </tr>
                                     </thead>
                                     <tbody id="modal-pipeline-steps-body">
+                                        <!-- Populated dynamically by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- RTK / Retake Audit History Section -->
+                        <div id="modal-rtk-history-section" style="margin-top: 18px; border-top: 1.5px solid #fed7aa; padding-top: 12px; display: none;">
+                            <h4 style="font-size: 12px; font-weight: 800; margin-bottom: 8px; color: #c2410c; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                                🛠️ RTK / Retake Audit History (<span id="modal-rtk-count-txt">0</span> RTK Events)
+                            </h4>
+                            <div style="overflow-y: auto; max-height: 160px; border: 1px solid #fed7aa; border-radius: var(--radius-sm); background: #fff7ed;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                                    <thead>
+                                        <tr style="border-bottom: 1.5px solid #fdba74; color: #9a3412; font-weight: 700; background-color: #ffedd5; position: sticky; top: 0; z-index: 1;">
+                                            <th style="padding: 5px 8px; width: 60px;">Take #</th>
+                                            <th style="padding: 5px 8px; width: 120px;">Date &amp; Time</th>
+                                            <th style="padding: 5px 8px;">Stage &amp; Target Team</th>
+                                            <th style="padding: 5px 8px;">Assigned Artist</th>
+                                            <th style="padding: 5px 8px;">Old Name ➔ New Name</th>
+                                            <th style="padding: 5px 8px;">RTK Reason</th>
+                                            <th style="padding: 5px 8px;">Initiated By</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="modal-rtk-history-body">
                                         <!-- Populated dynamically by JS -->
                                     </tbody>
                                 </table>
@@ -1252,11 +1499,58 @@
                         if (modalReworkId) modalReworkId.value = file.id;
                         document.getElementById('modal-file-title').textContent = "Details: " + (file.dynamic_name || file.name);
                         
+                        window.compAiArtists = data.comp_artists || [];
+
+                        // ONLY Content team members can rename a file/scene
+                        const renameBtn = document.getElementById('modal-rename-btn');
+                        if (renameBtn) {
+                            if (data.current_user && data.current_user.team === 'Content') {
+                                renameBtn.style.display = 'inline-block';
+                            } else {
+                                renameBtn.style.display = 'none';
+                            }
+                        }
+
+                        // 2D Comp AI button & badge
+                        const compAiBtn = document.getElementById('modal-comp-ai-btn');
+                        const compAiBadge = document.getElementById('modal-comp-ai-badge');
+                        if (compAiBadge) {
+                            compAiBadge.style.display = file.is_comp_ai ? 'inline-block' : 'none';
+                        }
+                        if (compAiBtn) {
+                            const isNotAsset = (file.file_type !== 'Asset');
+                            const isAuthorized = data.current_user && (data.current_user.team === 'Content' || data.current_user.role === 'Admin' || data.current_user.role === 'Lead');
+                            if (isAuthorized && isNotAsset && !file.is_comp_ai) {
+                                compAiBtn.style.display = 'inline-block';
+                            } else {
+                                compAiBtn.style.display = 'none';
+                            }
+                        }
+                        
                         // Set text labels
                         document.getElementById('modal-project-name-txt').textContent = file.project_name || '-';
                         document.getElementById('modal-assigned-artist-txt').textContent = file.artist_name ? (file.artist_name + " (@" + file.artist_username + ")") : 'Unassigned';
                         document.getElementById('modal-pending-team-txt').textContent = file.pending_team || '-';
                         document.getElementById('modal-active-stage-txt').textContent = file.active_stage || '-';
+                        
+                        // Check Hold status and reason
+                        const holdBanner = document.getElementById('modal-hold-alert-banner');
+                        const holdReasonTxt = document.getElementById('modal-hold-reason-txt');
+
+                        let activeHoldReason = file.hold_reason;
+                        if (!activeHoldReason && data.pipeline_steps) {
+                            const holdStep = data.pipeline_steps.find(s => s.status === 'Hold' || s.status === 'ON HOLD' || s.status === 'On Hold' || s.status === 'hold');
+                            if (holdStep) {
+                                activeHoldReason = holdStep.hold_reason || holdStep.remarks;
+                            }
+                        }
+
+                        if (file.status === 'Hold' || activeHoldReason) {
+                            holdBanner.style.display = 'flex';
+                            holdReasonTxt.textContent = activeHoldReason || 'Stage placed on hold';
+                        } else {
+                            holdBanner.style.display = 'none';
+                        }
                         
                         function formatDDMMYYYY(dateStr) {
                             if (!dateStr || dateStr === '-') return '-';
@@ -1308,22 +1602,132 @@
                                 
                                 const tdStatus = document.createElement('td');
                                 tdStatus.style.padding = '6px 8px';
-                                const statusSpan = document.createElement('span');
-                                statusSpan.className = 'status-pill';
-                                statusSpan.textContent = step.status;
-                                if (step.status === 'Done') {
-                                    statusSpan.classList.add('status-done');
-                                } else if (step.status === 'In Progress') {
-                                    statusSpan.classList.add('status-progress');
-                                } else if (step.status === 'Open') {
-                                    statusSpan.classList.add('status-open');
+                                
+                                const STAGE_TEAMS_JS = {
+                                    'Reference': 'Content', 'Explanation': 'Content', 'Voice Over': 'Content', 'Narration': 'Content', 'Storyboards': 'Content', 'Scene-wise Assets': 'Content',
+                                    'Modeling': 'Modeling', 'Texturing': 'Texturing', 'Rig': 'Rig', 'Animation': 'Animation', 'FBX export': 'FBX export',
+                                    'VFX': 'VFX', 'Lightning': 'Lightning', 'Rendering': 'Rendering', '3D Comp & Motion Graphics': '3D Comp & Motion Graphics', 'VR': 'VR'
+                                };
+
+                                const isLeadOrAdmin = (data.current_user.role === 'Admin' || (data.current_user.role === 'Lead' && data.current_user.team === STAGE_TEAMS_JS[step.step_name]));
+
+                                if (isLeadOrAdmin) {
+                                    const form = document.createElement('form');
+                                    form.method = 'POST';
+                                    form.action = `/files/${file.id}/stage-status`;
+                                    form.style.display = 'flex';
+                                    form.style.flexDirection = 'column';
+                                    form.style.gap = '3px';
+                                    form.onsubmit = function() { return validateHoldReason(this); };
+
+                                    const stepInput = document.createElement('input');
+                                    stepInput.type = 'hidden';
+                                    stepInput.name = 'step_name';
+                                    stepInput.value = step.step_name;
+                                    form.appendChild(stepInput);
+
+                                    const sel = document.createElement('select');
+                                    sel.name = 'status';
+                                    sel.className = 'select-input';
+                                    sel.style.fontSize = '10.5px';
+                                    sel.style.height = '24px';
+                                    sel.style.padding = '0 4px';
+                                    sel.onchange = function() { toggleModalHoldInput(this); };
+
+                                    const statuses = [
+                                        { val: 'Yts', label: 'Yts' },
+                                        { val: 'Wip', label: 'Wip' },
+                                        { val: 'Review', label: 'Review' },
+                                        { val: 'RTK', label: 'RTK' },
+                                        { val: 'Done', label: 'Done' },
+                                        { val: 'Hold', label: 'Hold' }
+                                    ];
+
+                                    let curNorm = 'Yts';
+                                    if (step.status === 'Done' || step.status === 'Approved') curNorm = 'Done';
+                                    else if (step.status === 'In Progress' || step.status === 'WIP' || step.status === 'Wip' || step.status === 'Open') curNorm = 'Wip';
+                                    else if (step.status === 'Review') curNorm = 'Review';
+                                    else if (step.status === 'Rework' || step.status === 'RTK' || step.status === 'Re-take') curNorm = 'RTK';
+                                    else if (step.status === 'Hold' || step.status === 'ON HOLD' || step.status === 'On Hold') curNorm = 'Hold';
+
+                                    statuses.forEach(s => {
+                                        const opt = document.createElement('option');
+                                        opt.value = s.val;
+                                        opt.textContent = s.label;
+                                        if (s.val === curNorm) opt.selected = true;
+                                        sel.appendChild(opt);
+                                    });
+                                    form.appendChild(sel);
+
+                                    const holdWrap = document.createElement('div');
+                                    holdWrap.className = 'modal-hold-input-wrap';
+                                    holdWrap.style.display = (curNorm === 'Hold') ? 'block' : 'none';
+                                    holdWrap.style.marginTop = '2px';
+
+                                    const holdInp = document.createElement('input');
+                                    holdInp.type = 'text';
+                                    holdInp.name = 'hold_reason';
+                                    holdInp.placeholder = 'Mandatory Hold Reason...';
+                                    holdInp.value = step.hold_reason || (step.status === 'Hold' ? step.remarks : '') || '';
+                                    holdInp.style.fontSize = '10px';
+                                    holdInp.style.padding = '2px 4px';
+                                    holdInp.style.width = '100%';
+                                    holdInp.style.border = '1px solid #f97316';
+                                    holdInp.style.borderRadius = '4px';
+                                    holdWrap.appendChild(holdInp);
+                                    form.appendChild(holdWrap);
+
+                                    const saveBtn = document.createElement('button');
+                                    saveBtn.type = 'submit';
+                                    saveBtn.className = 'btn btn-primary btn-sm';
+                                    saveBtn.style.fontSize = '9px';
+                                    saveBtn.style.height = '20px';
+                                    saveBtn.style.padding = '0 5px';
+                                    saveBtn.style.marginTop = '2px';
+                                    saveBtn.textContent = 'Save Status';
+                                    form.appendChild(saveBtn);
+
+                                    tdStatus.appendChild(form);
                                 } else {
-                                    statusSpan.classList.add('status-pending');
+                                    const statusSpan = document.createElement('span');
+                                    statusSpan.className = 'status-pill';
+                                    let displayStatus = 'Yts';
+                                    if (step.status === 'Done' || step.status === 'Approved') {
+                                        displayStatus = 'Done';
+                                        statusSpan.classList.add('status-done');
+                                    } else if (step.status === 'In Progress' || step.status === 'WIP' || step.status === 'Wip' || step.status === 'Open') {
+                                        displayStatus = 'Wip';
+                                        statusSpan.classList.add('status-progress');
+                                    } else if (step.status === 'Review') {
+                                        displayStatus = 'Review';
+                                        statusSpan.classList.add('status-open');
+                                    } else if (step.status === 'RTK' || step.status === 'Rework' || step.status === 'Re-take') {
+                                        displayStatus = 'RTK';
+                                        statusSpan.classList.add('status-pending');
+                                    } else if (step.status === 'Hold' || step.status === 'ON HOLD' || step.status === 'On Hold') {
+                                        displayStatus = 'Hold';
+                                        statusSpan.style.background = '#ffedd5';
+                                        statusSpan.style.color = '#c2410c';
+                                        statusSpan.style.border = '1px solid #fdba74';
+                                    } else {
+                                        statusSpan.classList.add('status-pending');
+                                    }
+                                    statusSpan.textContent = displayStatus;
+                                    statusSpan.style.fontSize = '9px';
+                                    statusSpan.style.padding = '2px 4px';
+                                    statusSpan.style.minWidth = 'auto';
+                                    tdStatus.appendChild(statusSpan);
+
+                                    if (step.status === 'Hold' || displayStatus === 'Hold') {
+                                        const hReasonDiv = document.createElement('div');
+                                        hReasonDiv.style.fontSize = '9px';
+                                        hReasonDiv.style.color = '#c2410c';
+                                        hReasonDiv.style.fontWeight = '700';
+                                        hReasonDiv.style.marginTop = '2px';
+                                        hReasonDiv.textContent = `🛑 Reason: ${step.hold_reason || step.remarks || 'On Hold'}`;
+                                        tdStatus.appendChild(hReasonDiv);
+                                    }
                                 }
-                                statusSpan.style.fontSize = '9px';
-                                statusSpan.style.padding = '2px 4px';
-                                statusSpan.style.minWidth = 'auto';
-                                tdStatus.appendChild(statusSpan);
                                 tr.appendChild(tdStatus);
                                 
                                 const tdArtist = document.createElement('td');
@@ -1357,6 +1761,35 @@
                             td.textContent = 'No pipeline steps found.';
                             tr.appendChild(td);
                             stepsBody.appendChild(tr);
+                        }
+
+                        // Populate RTK History Table
+                        const rtkSec = document.getElementById('modal-rtk-history-section');
+                        const rtkBody = document.getElementById('modal-rtk-history-body');
+                        const rtkCount = document.getElementById('modal-rtk-count-txt');
+
+                        rtkBody.innerHTML = '';
+                        if (data.rtk_history && data.rtk_history.length > 0) {
+                            rtkSec.style.display = 'block';
+                            rtkCount.textContent = data.rtk_history.length;
+                            data.rtk_history.forEach(item => {
+                                const tr = document.createElement('tr');
+                                tr.style.borderBottom = '1px solid #fed7aa';
+                                tr.innerHTML = `
+                                    <td style="padding: 5px 8px; font-weight: 800; color: #c2410c;">Take ${item.take_number}</td>
+                                    <td style="padding: 5px 8px; color: var(--text-secondary);">${item.created_at || '-'}</td>
+                                    <td style="padding: 5px 8px; font-weight: 600;">${item.stage_name} (${item.target_team || '-'})</td>
+                                    <td style="padding: 5px 8px;">${item.assigned_to_name ? (item.assigned_to_name + ' (@' + item.assigned_to_username + ')') : '-'}</td>
+                                    <td style="padding: 5px 8px; font-weight: 700; font-family: monospace; font-size: 10px;">
+                                        <span style="color: #991b1b;">${item.old_file_name}</span> ➔ <span style="color: #15803d;">${item.new_file_name}</span>
+                                    </td>
+                                    <td style="padding: 5px 8px; color: #b91c1c; font-weight: 600;">${item.reason || '-'}</td>
+                                    <td style="padding: 5px 8px; color: var(--text-secondary);">${item.created_by_name || 'System'}</td>
+                                `;
+                                rtkBody.appendChild(tr);
+                            });
+                        } else {
+                            rtkSec.style.display = 'none';
                         }
                         
                         // Show modal
@@ -1467,13 +1900,218 @@
                 });
             }
 
+            function openRenamePrompt() {
+                const fileId = document.getElementById('modal-file-id').value;
+                const titleSpan = document.getElementById('modal-file-title');
+                const currentName = titleSpan.textContent.replace('Details: ', '').trim();
+                const newName = prompt('Enter new name for this file/scene:', currentName);
+                if (newName && newName.trim() !== '' && newName.trim() !== currentName) {
+                    const formData = new FormData();
+                    formData.append('new_name', newName.trim());
+                    fetch('/files/' + fileId + '/rename', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            openFileDetailsModal(fileId);
+                            window.location.reload();
+                        } else {
+                            alert('Rename Error: ' + (data.error || 'Failed to rename file.'));
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Rename fetch error:', err);
+                        alert('Failed to rename file.');
+                    });
+                }
+            }
+
+            function openCompAiPrompt() {
+                const fileId = document.getElementById('modal-file-id').value;
+                if (!window.compAiArtists || window.compAiArtists.length === 0) {
+                    alert('No 3D Comp & Motion Graphics artists found.');
+                    return;
+                }
+                let artistOptions = window.compAiArtists.map((a, i) => `${i + 1}. ${a.name} (@${a.username})`).join('\n');
+                let selStr = prompt(`Select 3D Comp & Motion Graphics artist to assign for 2D Comp AI:\n\n${artistOptions}\n\nEnter option number (1-${window.compAiArtists.length}):`);
+                if (selStr) {
+                    let idx = parseInt(selStr.trim()) - 1;
+                    if (isNaN(idx) || idx < 0 || idx >= window.compAiArtists.length) {
+                        alert('Invalid artist selection.');
+                        return;
+                    }
+                    let selectedArtist = window.compAiArtists[idx];
+                    if (confirm(`Confirm assigning 2D Comp AI scene to ${selectedArtist.name}? This will bypass intermediate 3D teams and open directly under 3D Comp & Motion Graphics.`)) {
+                        const formData = new FormData();
+                        formData.append('comp_ai_artist_id', selectedArtist.id);
+                        fetch('/files/' + fileId + '/assign-comp-ai', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert(data.message);
+                                openFileDetailsModal(fileId);
+                                window.location.reload();
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to assign 2D Comp AI.'));
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Comp AI assign fetch error:', err);
+                            alert('Failed to assign 2D Comp AI.');
+                        });
+                    }
+                }
+            }
+
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('[data-width]').forEach(function(el) {
                     var w = el.getAttribute('data-width');
                     if (w) el.style.width = w + '%';
                 });
             });
-            </script>
+                function toggleAdminChapterEdit(chapterId) {
+            const views = document.querySelectorAll('.admin-status-view-' + chapterId);
+            const edits = document.querySelectorAll('.admin-status-edit-' + chapterId);
+            const btn = document.getElementById('admin-edit-btn-' + chapterId);
+            
+            let isEditing = false;
+            views.forEach(v => {
+                if (v.style.display === 'none') {
+                    v.style.display = 'block';
+                    isEditing = false;
+                } else {
+                    v.style.display = 'none';
+                    isEditing = true;
+                }
+            });
+            
+            edits.forEach(e => {
+                if (isEditing) {
+                    e.style.display = 'block';
+                } else {
+                    e.style.display = 'none';
+                }
+            });
+            
+            if (btn) {
+                if (isEditing) {
+                    btn.innerHTML = '✔ Finish Editing';
+                    btn.style.background = 'var(--color-blue)';
+                    btn.style.color = '#ffffff';
+                } else {
+                    btn.innerHTML = '✏️ Edit Statuses';
+                    btn.style.background = 'transparent';
+                    btn.style.color = 'var(--color-blue)';
+                }
+            }
+        }
+
+        function handleSheetStatusChange(selectEl, currentStatus) {
+            const val = selectEl.value;
+            const form = selectEl.closest('form');
+            const holdInp = form.querySelector('input[name="hold_reason"]');
+            if (val === 'Hold') {
+                const reason = prompt("Mandatory Hold Reason (Required to set stage to Hold):", holdInp ? holdInp.value : "");
+                if (!reason || !reason.trim()) {
+                    alert("Hold reason is required when placing a stage on Hold.");
+                    selectEl.value = currentStatus || 'Yts';
+                    return false;
+                }
+                holdInp.value = reason.trim();
+            }
+            form.submit();
+        }
+
+        function validateHoldReason(form) {
+            const statusVal = form.querySelector('select[name="status"]').value;
+            if (statusVal === 'Hold') {
+                const reasonInput = form.querySelector('input[name="hold_reason"]');
+                if (!reasonInput || !reasonInput.value.trim()) {
+                    alert('Hold reason is required when placing a stage on Hold.');
+                    if (reasonInput) reasonInput.focus();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function toggleModalHoldInput(selectEl) {
+            const form = selectEl.closest('form');
+            const holdWrap = form.querySelector('.modal-hold-input-wrap');
+            if (holdWrap) {
+                if (selectEl.value === 'Hold') {
+                    holdWrap.style.display = 'block';
+                    const input = holdWrap.querySelector('input[name="hold_reason"]');
+                    if (input) input.required = true;
+                } else {
+                    holdWrap.style.display = 'none';
+                    const input = holdWrap.querySelector('input[name="hold_reason"]');
+                    if (input) input.required = false;
+                }
+            }
+        }
+
+        function toggleSelfLogModal(show) {
+            const el = document.getElementById('selfLogModal');
+            if (el) el.style.display = show ? 'flex' : 'none';
+        }
+    </script>
+
+    <!-- Self-Log Work Modal -->
+    <div id="selfLogModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
+        <div class="modal-card" style="max-width:520px; width:92%; background:var(--bg-card); border-radius:12px; padding:22px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.2); border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1.5px solid var(--border-color); padding-bottom:10px;">
+                <h3 style="font-size:16px; font-weight:800; color:var(--color-blue); margin:0; display:flex; align-items:center; gap:8px;">
+                    📝 Self-Log Today's Work
+                </h3>
+                <button type="button" onclick="toggleSelfLogModal(false)" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-secondary);">&times;</button>
+            </div>
+            <form action="/self-log-work" method="POST" style="display:flex; flex-direction:column; gap:14px;">
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; display:block; margin-bottom:4px;">Select File:</label>
+                    <select name="file_id" class="select-input" style="width:100%; padding:8px 10px; font-size:12px;" required>
+                        <option value="">-- Select File --</option>
+                        {% for cid, flist in chapter_files_map.items() %}
+                            {% for f in flist %}
+                                <option value="{{ f['id'] }}">{{ f['display_name'] or f['name'] }}</option>
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; display:block; margin-bottom:4px;">Pipeline Stage:</label>
+                    <select name="step_name" class="select-input" style="width:100%; padding:8px 10px; font-size:12px;" required>
+                        {% for stg in all_stages %}
+                            <option value="{{ stg }}">{{ stg }} ({{ STAGE_TEAMS.get(stg, stg) }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; display:block; margin-bottom:4px;">Today's Work Status:</label>
+                    <select name="status" class="select-input" style="width:100%; padding:8px 10px; font-size:12px;" required>
+                        <option value="Wip">Wip (Work In Progress)</option>
+                        <option value="Review">Review (Submitted for Review)</option>
+                        <option value="Done">Done (Completed)</option>
+                        <option value="Hold">Hold (On Hold)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; display:block; margin-bottom:4px;">Work Remarks / Notes:</label>
+                    <input type="text" name="remarks" class="form-input" placeholder="Enter work notes or submission details..." style="width:100%; padding:8px 10px; font-size:12px;">
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                    <button type="button" class="btn" style="background:var(--bg-main); border:1px solid var(--border-color); color:var(--text-secondary);" onclick="toggleSelfLogModal(false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight:700;">Submit Self-Logged Work</button>
+                </div>
+            </form>
+        </div>
+    </div>
         </main>
     </div>
 </body>
