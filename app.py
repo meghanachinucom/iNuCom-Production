@@ -93,7 +93,7 @@ STAGE_TEAMS = {
     'Texturing': 'Texturing',
     'Rig': 'Rig',
     'Animation': 'Animation',
-    'FBX export': 'FBX export',
+    'FBX export': 'Animation',
     'VFX': 'VFX',
     'Lightning': 'Lightning',
     'Rendering': 'Rendering',
@@ -917,7 +917,13 @@ def init_db():
                     cursor.execute("UPDATE files SET assigned_to = ? WHERE assigned_to = ?", (prabhas_id, sana_id))
                     cursor.execute("UPDATE file_pipeline SET assigned_to = ? WHERE assigned_to = ?", (prabhas_id, sana_id))
                     cursor.execute("UPDATE daily_assignments SET user_id = ? WHERE user_id = ?", (prabhas_id, sana_id))
-                cursor.execute("DELETE FROM users WHERE username = 'sana'")
+            cursor.execute("UPDATE projects SET name = 'iNuCom Production Tracker' WHERE id = 13 OR name LIKE 'EV Production%'")
+            cursor.execute("DELETE FROM projects WHERE id IN (17, 18) OR name IN ('Asset Test Proj', 'Scene Test Proj')")
+            
+            cursor.execute("SELECT id, name FROM files WHERE is_comp_ai = 1")
+            for fid, fname in cursor.fetchall():
+                if fname and 'compo' not in fname.lower() and 'comp ai' not in fname.lower():
+                    cursor.execute("UPDATE files SET name = ? WHERE id = ?", (f"{fname}_compo_AI", fid))
             conn.commit()
             
             # Migrate file pipeline stages for standard projects (preserve custom stages for Promo Videos)
@@ -1247,18 +1253,24 @@ def dashboard():
                 break
 
     # Sub-tab parsing & stages split
-    sub_tab = request.args.get('sub_tab', 'assets')
-    if sub_tab not in ['assets', 'scenes']:
-        sub_tab = 'assets'
-        
+    sub_tab = request.args.get('sub_tab')
+    if not sub_tab:
+        if session.get('role') in ['Lead', 'Artist', 'Admin']:
+            sub_tab = 'dashboard'
+        else:
+            sub_tab = 'assets'
+
+    if sub_tab not in ['dashboard', 'assets', 'scenes']:
+        sub_tab = 'dashboard' if session.get('role') in ['Lead', 'Artist', 'Admin'] else 'assets'
+
     sheet_view = request.args.get('sheet_view', 'standard')
     if sheet_view not in ['standard', 'team_overview']:
         sheet_view = 'standard'
         
-    if sub_tab == 'assets':
-        stages_list = ASSET_STAGES
-    else:
+    if sub_tab == 'scenes':
         stages_list = SCENE_STAGES_FULL
+    else:
+        stages_list = ASSET_STAGES
 
     active_projects_list = []
     project_chapters_map = {}
@@ -1341,7 +1353,7 @@ def dashboard():
         'stage_stats': {stg: {'yts': 0, 'wip': 0, 'review': 0, 'rework': 0, 'rtk': 0, 'done': 0, 'hold': 0, 'open': 0, 'pending': 0} for stg in active_stages}
     }
 
-    if view_tab == 'pipeline' or session['role'] == 'Admin':
+    if view_tab == 'pipeline' or session['role'] in ['Admin', 'Lead', 'Artist']:
         active_chaps_files = []
         if chapter_id:
             active_chaps_files = chapter_files_map.get(int(chapter_id), chapter_files_map.get(str(chapter_id), []))
@@ -1398,25 +1410,29 @@ def dashboard():
             pipeline_summary['total_scenes_count'] = cursor.fetchone()[0] or 0
 
         for file_obj in active_chaps_files:
-            f_id = file_obj['id']
-            f_matrix = matrix.get(f_id, {})
-            
+            file_id_val = file_obj['id']
+            file_matrix = matrix.get(file_id_val, {})
+            is_comp_ai_file = file_obj.get('is_comp_ai', 0)
             file_statuses = []
             file_takes = []
             for stg in active_stages:
-                st_data = f_matrix.get(stg, {})
-                st = st_data.get('status', 'Yts')
-                tk = st_data.get('take_count', 0) or 0
-                file_statuses.append(st)
-                file_takes.append(tk)
+                # If file is Comp AI, skip counting stats for intermediate 3D stages
+                if is_comp_ai_file == 1 and stg in ['Modeling', 'Texturing', 'Rig', 'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering']:
+                    continue
+                cell_info = file_matrix.get(stg)
+                if cell_info:
+                    st = cell_info['status']
+                    tk = cell_info['take_count']
+                    file_statuses.append(st)
+                    file_takes.append(tk)
 
-                if stg in pipeline_summary['stage_stats']:
                     if st in ['Hold', 'ON HOLD', 'On Hold', 'hold']:
                         pipeline_summary['stage_stats'][stg]['hold'] += 1
-                    elif st in ['Pending', 'YTS', 'Yts']:
+                    elif st in ['Pending', 'YTS', 'Yts', 'YTS / Open', 'Open']:
                         pipeline_summary['stage_stats'][stg]['yts'] += 1
-                        pipeline_summary['stage_stats'][stg]['pending'] += 1
-                    elif st in ['In Progress', 'WIP', 'Wip', 'Open']:
+                        if st == 'Open':
+                            pipeline_summary['stage_stats'][stg]['open'] += 1
+                    elif st in ['In Progress', 'WIP', 'Wip']:
                         pipeline_summary['stage_stats'][stg]['wip'] += 1
                         if st == 'Open':
                             pipeline_summary['stage_stats'][stg]['open'] += 1
@@ -1437,7 +1453,7 @@ def dashboard():
                 pipeline_summary['total_rtk'] += 1
             elif any(st in ['Review', 'Final Review', 'Lead Review', 'Content Review'] for st in file_statuses):
                 pipeline_summary['total_review'] += 1
-            elif any(st in ['In Progress', 'WIP', 'Wip', 'Open'] for st in file_statuses):
+            elif any(st in ['In Progress', 'WIP', 'Wip'] for st in file_statuses):
                 pipeline_summary['total_wip'] += 1
             else:
                 pipeline_summary['total_yts'] += 1
@@ -1476,38 +1492,34 @@ def dashboard():
     total_reworks_count = tot_reworks_row[0] if tot_reworks_row else 0
     
     if session['role'] in ['Lead', 'Admin']:
-        if session['role'] == 'Lead':
-            for stage, team in STAGE_TEAMS.items():
-                if team == session['team']:
-                    queue_stage = stage
-                    break
-        else:
-            queue_stage = request.args.get('queue_stage', 'Content')
-            
+        queue_stage = request.args.get('queue_stage')
+        if not queue_stage:
+            if session['role'] == 'Lead':
+                for stage, team in STAGE_TEAMS.items():
+                    if team == session['team']:
+                        queue_stage = stage
+                        break
+            if not queue_stage:
+                queue_stage = 'Reference' if sub_tab == 'assets' else 'Voice Over'
+
         if queue_stage:
             if queue_stage == 'Content':
                 order_clause = "f.id ASC"
             else:
                 order_clause = "f.content_released_at ASC, f.id ASC"
-                
-            if session['role'] == 'Lead':
-                cursor.execute(f"""
-                    SELECT f.id as file_id, f.name as file_name, f.description as file_desc, 
-                           fp.id as pipeline_id, fp.status as step_status, fp.assigned_to as step_assigned_to,
-                           fp.points, f.content_released_at, p.name as project_name, c.name as chapter_name
-                    FROM file_pipeline fp
-                    JOIN files f ON fp.file_id = f.id
-                    JOIN chapters c ON f.chapter_id = c.id
-                    JOIN projects p ON c.project_id = p.id
-                    WHERE fp.step_name = ? AND fp.status IN ('Open', 'In Progress')
-                    ORDER BY {order_clause}
-                """, (queue_stage,))
-            queue_stage = request.args.get('queue_stage')
-            if not queue_stage or queue_stage not in STAGE_TEAMS:
-                queue_stage = 'Reference' if sub_tab == 'assets' else 'Voice Over'
+
+            # Determine extra queue filters (Asset vs Scene files, and Comp AI exclusion for middle stages)
+            extra_queue_where = ""
+            if queue_stage in ['Reference', 'Explanation', 'Modeling', 'Texturing', 'Rig']:
+                extra_queue_where += " AND (f.file_type = 'Asset' OR (f.file_type != 'Scene' AND LOWER(f.name) NOT LIKE '%_sc_%' AND LOWER(f.name) NOT LIKE '%scene%'))"
+            elif queue_stage in ['Voice Over', 'Narration', 'Storyboards', 'Scene-wise Assets', 'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp & Motion Graphics']:
+                extra_queue_where += " AND (f.file_type = 'Scene' OR (f.file_type != 'Asset' AND (LOWER(f.name) LIKE '%_sc_%' OR LOWER(f.name) LIKE '%scene%')))"
+
+            if queue_stage in ['Modeling', 'Texturing', 'Rig', 'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering']:
+                extra_queue_where += " AND (f.is_comp_ai IS NULL OR f.is_comp_ai = 0)"
 
             lead_queue = []
-            if chapter_id:
+            if sub_tab in ['assets', 'scenes'] and chapter_id:
                 cursor.execute(f"""
                     SELECT f.id as file_id, f.name as file_name, f.description as file_desc, f.is_comp_ai,
                            fp.id as pipeline_id, fp.status as step_status, fp.assigned_to as step_assigned_to,
@@ -1516,7 +1528,10 @@ def dashboard():
                     JOIN files f ON fp.file_id = f.id
                     JOIN chapters c ON f.chapter_id = c.id
                     JOIN projects p ON c.project_id = p.id
-                    WHERE f.chapter_id = ? AND fp.step_name = ? AND fp.status IN ('Open', 'In Progress', 'Wip', 'Yts')
+                    WHERE f.chapter_id = ? AND fp.step_name = ?
+                      AND (fp.assigned_to IS NULL OR fp.status IN ('Open', 'Yts'))
+                      AND f.id NOT IN (SELECT file_id FROM daily_assignments WHERE status = 'Pending' AND file_id IS NOT NULL)
+                      {extra_queue_where}
                     ORDER BY {order_clause}
                 """, (chapter_id, queue_stage))
                 lead_queue = cursor.fetchall()
@@ -1529,7 +1544,10 @@ def dashboard():
                     JOIN files f ON fp.file_id = f.id
                     JOIN chapters c ON f.chapter_id = c.id
                     JOIN projects p ON c.project_id = p.id
-                    WHERE fp.step_name = ? AND fp.status IN ('Open', 'In Progress', 'Wip', 'Yts')
+                    WHERE c.status = 'Active' AND p.status = 'Active' AND fp.step_name = ?
+                      AND (fp.assigned_to IS NULL OR fp.status IN ('Open', 'Yts'))
+                      AND f.id NOT IN (SELECT file_id FROM daily_assignments WHERE status = 'Pending' AND file_id IS NOT NULL)
+                      {extra_queue_where}
                     ORDER BY {order_clause}
                 """, (queue_stage,))
                 lead_queue = cursor.fetchall()
@@ -1547,7 +1565,7 @@ def dashboard():
         target_team = session['team'] if session['role'] == 'Lead' else STAGE_TEAMS.get(queue_stage)
         if target_team:
             cursor.execute("""
-                SELECT da.id as assignment_id, da.points, da.status as assignment_status, da.task_description, da.remarks,
+                SELECT da.id as assignment_id, da.date as assigned_date, da.points, da.status as assignment_status, da.task_description, da.remarks, da.submit_time, da.submitted_at,
                        u.name as artist_name, u.username as artist_username, f.name as file_name, f.id as file_id,
                        p.name as project_name, c.name as chapter_name
                 FROM daily_assignments da
@@ -1560,10 +1578,11 @@ def dashboard():
             validation_list = cursor.fetchall()
 
     artist_tasks = []
+    artist_upcoming_tasks = []
     if session['role'] == 'Artist':
         cursor.execute("""
-            SELECT da.id as assignment_id, da.task_description, da.points, da.status as assignment_status,
-                   f.id as file_id, f.name as file_name, f.description as file_desc, 
+            SELECT da.id as assignment_id, da.date as assigned_date, da.task_description, da.points, da.status as assignment_status,
+                   f.id as file_id, f.name as file_name, f.description as file_desc,
                    fp.step_name, p.name as project_name, c.name as chapter_name
             FROM daily_assignments da
             JOIN files f ON da.file_id = f.id
@@ -1574,6 +1593,19 @@ def dashboard():
             ORDER BY p.name, c.name, f.name
         """, (session['user_id'], today_str))
         artist_tasks = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT da.id as assignment_id, da.date as assigned_date, da.task_description, da.points, da.status as assignment_status,
+                   f.id as file_id, f.name as file_name, f.description as file_desc,
+                   p.name as project_name, c.name as chapter_name
+            FROM daily_assignments da
+            JOIN files f ON da.file_id = f.id
+            JOIN chapters c ON f.chapter_id = c.id
+            JOIN projects p ON c.project_id = p.id
+            WHERE da.user_id = ? AND da.date > ? AND da.status = 'Pending'
+            ORDER BY da.date ASC, p.name, c.name, f.name
+        """, (session['user_id'], today_str))
+        artist_upcoming_tasks = cursor.fetchall()
 
     # DEADLINE WARNING CHECKS
     now = datetime.datetime.now()
@@ -2060,6 +2092,7 @@ def dashboard():
         total_reworks_count=total_reworks_count,
         artists=artists,
         artist_tasks=artist_tasks,
+        artist_upcoming_tasks=artist_upcoming_tasks,
         validation_list=validation_list,
         late_assignment_flag=late_assignment_flag,
         late_validation_flag=late_validation_flag,
@@ -2212,9 +2245,9 @@ def add_file():
             
         return redirect(request.referrer or url_for('dashboard'))
 
-    # Standard project file creation
-    if session['role'] != 'Admin' and not (session['role'] == 'Lead' and session['team'] == 'Content'):
-        flash("Unauthorized to add files.", "error")
+    # Standard project file creation: Only Content Team Lead can add files
+    if not (session['role'] == 'Lead' and session['team'] == 'Content'):
+        flash("Only Content Team Lead can add files to the asset and scene pipeline.", "error")
         return redirect(request.referrer or url_for('dashboard'))
         
     if not chapter_id or not name:
@@ -2361,7 +2394,12 @@ def assign_comp_ai(file_id):
         return redirect(request.referrer or url_for('dashboard'))
 
     # Mark file as is_comp_ai = 1 and comp_ai_artist_id = comp_ai_artist_id
-    cursor.execute("UPDATE files SET is_comp_ai = 1, comp_ai_artist_id = ? WHERE id = ?", (comp_ai_artist_id, file_id))
+    current_name = file_row['name'] or ''
+    if 'compo' not in current_name.lower() and 'comp ai' not in current_name.lower():
+        new_name = f"{current_name}_compo_AI"
+        cursor.execute("UPDATE files SET is_comp_ai = 1, comp_ai_artist_id = ?, name = ? WHERE id = ?", (comp_ai_artist_id, new_name, file_id))
+    else:
+        cursor.execute("UPDATE files SET is_comp_ai = 1, comp_ai_artist_id = ? WHERE id = ?", (comp_ai_artist_id, file_id))
 
     # In file_pipeline:
     # 1. Mark intermediate 3D stages ('Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering') as status = 'Done' (bypassed)
@@ -2953,6 +2991,101 @@ def assign_file():
         
     return redirect(request.referrer or url_for('dashboard'))
 
+@app.route('/lead/pre-assign-work', methods=['POST'])
+def pre_assign_work():
+    if 'user_id' not in session or session.get('role') != 'Lead':
+        flash("Unauthorized: Only Leads can pre-assign work.", "error")
+        return redirect(url_for('login'))
+
+    from_date = request.form.get('from_date', '').strip()
+    to_date = request.form.get('to_date', '').strip()
+    file_id = request.form.get('file_id', type=int)
+    artist_id = request.form.get('artist_id', type=int)
+    points = request.form.get('points', type=int, default=0)
+    task_description = request.form.get('task_description', '').strip()
+
+    if not from_date or not to_date or not file_id or not artist_id:
+        flash("Please select From Date, To Date, File, and Artist.", "error")
+        return redirect(request.referrer or url_for('dashboard'))
+
+    try:
+        d_start = datetime.datetime.strptime(from_date, '%Y-%m-%d').date()
+        d_end = datetime.datetime.strptime(to_date, '%Y-%m-%d').date()
+    except Exception:
+        flash("Invalid date format. Please select valid dates.", "error")
+        return redirect(request.referrer or url_for('dashboard'))
+
+    if d_start > d_end:
+        flash("From Date cannot be after To Date.", "error")
+        return redirect(request.referrer or url_for('dashboard'))
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT f.id, f.name, f.chapter_id, c.name as chapter_name FROM files f JOIN chapters c ON f.chapter_id = c.id WHERE f.id = ?", (file_id,))
+    f_info = cursor.fetchone()
+    if not f_info:
+        flash("Selected file not found.", "error")
+        return redirect(request.referrer or url_for('dashboard'))
+
+    cursor.execute("SELECT name FROM users WHERE id = ?", (artist_id,))
+    art_row = cursor.fetchone()
+    artist_name = art_row['name'] if art_row else 'Artist'
+
+    lead_stage = None
+    for stage, team in STAGE_TEAMS.items():
+        if team == session.get('team'):
+            lead_stage = stage
+            break
+
+    full_task_desc = task_description if task_description else f"Pre-Assigned [{lead_stage or 'Task'}]: {f_info['name']}"
+
+    curr_date = d_start
+    assigned_count = 0
+    while curr_date <= d_end:
+        ds_str = curr_date.strftime('%Y-%m-%d')
+        assigned_count += 1
+
+        cursor.execute("""
+            SELECT id FROM daily_assignments
+            WHERE file_id = ? AND status = 'Pending'
+        """, (file_id,))
+        exist = cursor.fetchone()
+
+        if exist:
+            cursor.execute("""
+                UPDATE daily_assignments
+                SET user_id = ?, date = ?, points = ?, status = 'Pending', task_description = ?
+                WHERE id = ?
+            """, (artist_id, ds_str, points, full_task_desc, exist['id']))
+        else:
+            cursor.execute("""
+                INSERT INTO daily_assignments (user_id, date, file_id, task_description, points, status)
+                VALUES (?, ?, ?, ?, ?, 'Pending')
+            """, (artist_id, ds_str, file_id, full_task_desc, points))
+
+        curr_date += datetime.timedelta(days=1)
+
+    if lead_stage:
+        cursor.execute("""
+            UPDATE file_pipeline
+            SET assigned_to = ?, points = ?, status = 'Open'
+            WHERE file_id = ? AND step_name = ?
+        """, (artist_id, points, file_id, lead_stage))
+
+    _push_notification(db, artist_id, "Pre-Assigned Work Alert",
+                       f"Work pre-assigned for dates {from_date} to {to_date}: '{f_info['name']}' ({points} pts).",
+                       "task", link=url_for('dashboard'))
+
+    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Pre-Assign Work', ?)",
+                   (session['user_id'], f"Pre-assigned '{f_info['name']}' to {artist_name} for dates {from_date} to {to_date} (Points: {points})"))
+    db.commit()
+
+    recalculate_file_metadata(db, file_id)
+
+    flash(f"Work pre-assigned successfully to {artist_name} for dates {from_date} to {to_date} ({assigned_count} days).", "success")
+    return redirect(request.referrer or url_for('dashboard'))
+
 @app.route('/file/status', methods=['POST'])
 def update_status():
     if 'user_id' not in session:
@@ -2983,7 +3116,15 @@ def update_status():
         
     target_team = STAGE_TEAMS.get(step_name)
     
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    now_full_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     is_assigned = (pipeline_step['assigned_to'] == session['user_id'])
+    if not is_assigned:
+        cursor.execute("SELECT id FROM daily_assignments WHERE file_id = ? AND user_id = ? AND date = ?", (file_id, session['user_id'], today_str))
+        if cursor.fetchone():
+            is_assigned = True
+
     is_lead = (session['role'] == 'Lead' and session['team'] == target_team)
     is_admin = (session['role'] == 'Admin')
     
@@ -2991,9 +3132,6 @@ def update_status():
         flash("Unauthorized to update status for this stage.", "error")
         return redirect(request.referrer or url_for('dashboard'))
         
-    today_str = datetime.date.today().strftime('%Y-%m-%d')
-    now_full_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
     hold_reason = request.form.get('hold_reason', '').strip()
     status_clean = status.strip()
     if status_clean in ['Hold', 'hold', 'ON HOLD']:
@@ -3018,7 +3156,7 @@ def update_status():
     elif status_clean in ['Done', 'Approved']:
         cursor.execute("""
             UPDATE file_pipeline 
-            SET status = 'Done', start_date = COALESCE(start_date, ?), end_date = COALESCE(end_date, ?), submitted_at = ?
+            SET status = ?, start_date = COALESCE(start_date, ?), end_date = COALESCE(end_date, ?), submitted_at = ?
             WHERE file_id = ? AND step_name = ?
         """, (status_clean, today_str, today_str, now_full_str, file_id, step_name))
     else:
@@ -3032,12 +3170,13 @@ def update_status():
     if status == 'Done':
         submit_time_val = datetime.datetime.now().strftime('%H:%M:%S')
 
-    if pipeline_step['assigned_to']:
+    target_user_for_da = pipeline_step['assigned_to'] or session['user_id']
+    if target_user_for_da:
         cursor.execute("""
             UPDATE daily_assignments 
             SET status = 'Pending', submit_time = ?, submitted_at = ?
             WHERE file_id = ? AND user_id = ? AND date = ?
-        """, (submit_time_val, now_full_str, file_id, pipeline_step['assigned_to'], today_str))
+        """, (submit_time_val, now_full_str, file_id, target_user_for_da, today_str))
     
     log_details = f"Artist updated status of '{pipeline_step['file_name']}' [{step_name}] to '{status}'"
     
@@ -3544,9 +3683,6 @@ def points_page():
         return redirect(url_for('work_reports_page', **request.args))
         
     sub_tab = request.args.get('sub_tab', 'assets')
-    if sub_tab not in ['assets', 'scenes']:
-        sub_tab = 'assets'
-        
     db = get_db()
     cursor = db.cursor()
     
@@ -4080,6 +4216,18 @@ def attendance_page():
     cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
     user_profile = cursor.fetchone()
 
+    active_tab = request.args.get('active_tab', 'calendar')
+    comp_rows = []
+    comp_teams = []
+    filter_team = request.args.get('team', '')
+    comp_month = request.args.get('comp_month', month_prefix)
+    
+    if session['role'] in ['Admin', 'HR']:
+        comp_rows = _comp_summary(db, selected_month=comp_month)
+        comp_teams = sorted(set(r['team'] for r in comp_rows))
+        if filter_team:
+            comp_rows = [r for r in comp_rows if r['team'] == filter_team]
+
     return render_template(
         'attendance.html',
         user=user_profile,
@@ -4092,7 +4240,12 @@ def attendance_page():
         global_today=global_today,
         global_monthly_stats=global_monthly_stats,
         attendance_today=attendance_today,
-        today_str=today_str
+        today_str=today_str,
+        active_tab=active_tab,
+        comp_rows=comp_rows,
+        comp_teams=comp_teams,
+        filter_team=filter_team,
+        comp_month=comp_month
     )
 
 @app.route('/attendance/view/<int:employee_id>')
@@ -4114,6 +4267,124 @@ def attendance_view_user(employee_id):
             return redirect(url_for('attendance_page'))
             
     return redirect(url_for('attendance_page', employee_id=employee_id))
+
+@app.route('/attendance/export-employee-monthly')
+def export_employee_monthly_attendance():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    emp_id = request.args.get('employee_id', type=int) or session['user_id']
+    month_str = request.args.get('month', datetime.date.today().strftime('%Y-%m')).strip()
+    
+    if session['role'] not in ['Admin', 'HR'] and session['user_id'] != emp_id:
+        if session['role'] == 'Lead':
+            db = get_db()
+            c = db.cursor()
+            c.execute("SELECT team FROM users WHERE id=?", (emp_id,))
+            u = c.fetchone()
+            if not u or u['team'] != session['team']:
+                flash("Unauthorized", "error")
+                return redirect(url_for('attendance_page'))
+        else:
+            flash("Unauthorized", "error")
+            return redirect(url_for('attendance_page'))
+            
+    try:
+        year, month = map(int, month_str.split('-'))
+    except Exception:
+        year, month = datetime.date.today().year, datetime.date.today().month
+        month_str = f"{year:04d}-{month:02d}"
+        
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE id=?", (emp_id,))
+    emp = cursor.fetchone()
+    if not emp:
+        flash("Employee not found.", "error")
+        return redirect(url_for('attendance_page'))
+        
+    _, days_in_month = calendar.monthrange(year, month)
+    
+    cursor.execute("""
+        SELECT * FROM attendance 
+        WHERE user_id=? AND date LIKE ? 
+        ORDER BY date ASC
+    """, (emp_id, f"{month_str}-%"))
+    att_dict = {r['date']: dict(r) for r in cursor.fetchall()}
+    
+    cursor.execute("SELECT date, name FROM holidays WHERE date LIKE ?", (f"{month_str}-%",))
+    holidays = {r['date']: r['name'] for r in cursor.fetchall()}
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Attendance_{emp['username']}_{month_str}"
+    
+    ws.append([f"Employee Monthly Attendance Report — {emp['name']} ({month_str})"])
+    ws['A1'].font = Font(bold=True, size=14, color="004080")
+    ws.merge_cells('A1:I1')
+    ws.append([])
+    
+    ws.append([f"Employee ID: {emp['id']}", f"Name: {emp['name']}", f"Username: @{emp['username']}", f"Team: {emp['team']}", f"Role: {emp['role']}"])
+    ws.append([])
+    
+    headers = ['Date', 'Day of Week', 'Status', 'Clock In', 'Clock Out', 'Total Hours', 'Late Mins', 'Extra Hours', 'Remarks / Label']
+    _xl_header_row(ws, 5, headers)
+    
+    r_idx = 6
+    p_cnt, l_cnt, h_cnt, a_cnt = 0, 0, 0, 0
+    tot_hrs, tot_extra, tot_late = 0.0, 0.0, 0
+    
+    for d in range(1, days_in_month + 1):
+        dt_obj = datetime.date(year, month, d)
+        d_str = dt_obj.strftime('%Y-%m-%d')
+        day_name = dt_obj.strftime('%A')
+        
+        off_day = is_weekly_off(dt_obj)
+        hol_name = holidays.get(d_str)
+        rec = att_dict.get(d_str)
+        
+        if rec:
+            st = rec['status']
+            cin = _time12_filter(rec['clock_in'])
+            cout = _time12_filter(rec['clock_out'])
+            thrs = rec['total_hours'] or 0.0
+            lmins = rec['late_minutes'] or 0
+            ehrs = rec['extra_hours'] or 0.0
+            lbl = "Holiday: " + hol_name if hol_name else ("Weekly Off" if off_day else "")
+            
+            if st in ['Present', 'Late']: p_cnt += 1
+            if st == 'Late': l_cnt += 1
+            if st == 'Half Day': h_cnt += 1
+            if st == 'Absent': a_cnt += 1
+            
+            tot_hrs += thrs
+            tot_extra += ehrs
+            tot_late += lmins
+        else:
+            if hol_name:
+                st, cin, cout, thrs, lmins, ehrs, lbl = 'Holiday', '—', '—', 0.0, 0, 0.0, hol_name
+            elif off_day:
+                st, cin, cout, thrs, lmins, ehrs, lbl = 'Off Day', '—', '—', 0.0, 0, 0.0, 'Weekly Off'
+            else:
+                st, cin, cout, thrs, lmins, ehrs, lbl = 'Absent', '—', '—', 0.0, 0, 0.0, 'No Clock In'
+                a_cnt += 1
+                
+        _xl_data_row(ws, r_idx, [
+            d_str, day_name, st, cin, cout, round(thrs, 2), lmins, round(ehrs, 2), lbl
+        ])
+        r_idx += 1
+        
+    ws.append([])
+    ws.append(["SUMMARY METRICS"])
+    ws.append([f"Present Days: {p_cnt}", f"Late Days: {l_cnt}", f"Half Days: {h_cnt}", f"Absent Days: {a_cnt}", f"Total Hours Worked: {round(tot_hrs, 2)}", f"Total Extra Hours: {round(tot_extra, 2)}", f"Total Late Minutes: {tot_late}"])
+    
+    _xl_autowidth(ws)
+    
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"Attendance_{emp['username']}_{month_str}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 # LAYER 5: LEAVES & REUSABLE APPROVAL ENGINE
 
@@ -4800,8 +5071,9 @@ def _comp_summary(db, selected_month=None):
         # 3. Total owed
         total_owed = perm_hours + late_hours
 
-        # 5. Net owed after offset
+        # 5. Net owed & Net credit after offset
         net_owed = max(0.0, total_owed - total_extra)
+        net_credit = max(0.0, total_extra - total_owed)
 
         rows.append({
             'uid': uid,
@@ -4814,6 +5086,7 @@ def _comp_summary(db, selected_month=None):
             'total_owed': round(total_owed, 2),
             'total_extra': round(total_extra, 2),
             'net_owed': round(net_owed, 2),
+            'net_credit': round(net_credit, 2),
         })
     return rows
 
@@ -5109,44 +5382,7 @@ def reject_permission(approval_id):
 def compensation_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] in ['Artist', 'Lead', 'HR']:
-        return redirect(url_for('leaves_page'))
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
-    user_info = cursor.fetchone()
-
-    selected_month = request.args.get('month', '')
-    import re
-    if selected_month and not re.match(r'^\d{4}-\d{2}$', selected_month):
-        selected_month = ''
-
-    all_rows = _comp_summary(db, selected_month=selected_month if selected_month else None)
-
-    # Filter rows based on role
-    if session['role'] == 'Lead':
-        all_rows = [r for r in all_rows if r['team'] == session['team']]
-    elif session['role'] == 'Artist':
-        all_rows = [r for r in all_rows if r['uid'] == session['user_id']]
-
-    # Gather unique teams for the filter dropdown
-    teams = sorted(set(r['team'] for r in all_rows))
-    filter_team = request.args.get('team', '')
-    if filter_team:
-        all_rows = [r for r in all_rows if r['team'] == filter_team]
-
-    today_str = datetime.date.today().strftime('%Y-%m-%d')
-    return render_template(
-        'compensation.html',
-        user=user_info,
-        comp_rows=all_rows,
-        teams=teams,
-        filter_team=filter_team,
-        selected_month=selected_month,
-        today_str=today_str,
-    )
+    return redirect(url_for('attendance_page', active_tab='compensation', **request.args))
 
 
 @app.route('/team-approvals')
@@ -5546,7 +5782,6 @@ def _xl_header_row(ws, row, cols):
         cell.fill = _HDR_FILL; cell.font = _HDR_FONT
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         cell.border = _BORDER
-
 def _xl_data_row(ws, row, vals, fill=None, bold=False):
     for c, v in enumerate(vals, 1):
         cell = ws.cell(row=row, column=c, value=v)
@@ -5566,62 +5801,167 @@ def _xl_autowidth(ws):
             except: pass
         ws.column_dimensions[col_letter].width = min(max(max_len + 2, 10), 40)
 
-# ── Report data helpers ──────────────────────────────────────────────────────
-
-def _report_morning(db, date_str):
-    """Morning Assignment: per artist/lead per team, what was assigned on date_str."""
+def _report_morning(db, date_str, end_date=None):
+    """Morning Assignment Report: Team-wise grouping with Team Lead info."""
     c = db.cursor()
-    c.execute("""
-        SELECT da.id, da.date, da.status as assign_status, da.points, da.task_description,
-               da.submit_time, f.name as file_name,
-               u.name as artist_name, u.team, u.role as artist_role,
-               fp.step_name as stage
-        FROM daily_assignments da
-        JOIN users u ON da.user_id = u.id
-        LEFT JOIN files f ON da.file_id = f.id
-        LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
-        WHERE da.date = ?
-        ORDER BY u.team, u.name, da.id
-    """, (date_str,))
-    rows = c.fetchall()
-    # Find artists & leads who had NO tasks
+    c.execute("SELECT team, name FROM users WHERE role = 'Lead'")
+    leads_by_team = {r['team']: r['name'] for r in c.fetchall()}
+    
+    c.execute("SELECT DISTINCT team FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team")
+    teams = [r[0] for r in c.fetchall()]
+    
+    if end_date and end_date != date_str:
+        c.execute("""
+            SELECT da.id, da.date, da.status as assign_status, da.points, da.task_description,
+                   da.submit_time, f.name as file_name,
+                   u.id as artist_id, u.name as artist_name, u.team, u.role as artist_role,
+                   fp.step_name as stage
+            FROM daily_assignments da
+            JOIN users u ON da.user_id = u.id
+            LEFT JOIN files f ON da.file_id = f.id
+            LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
+            WHERE da.date >= ? AND da.date <= ?
+            ORDER BY u.team, da.date DESC, u.name, da.id
+        """, (date_str, end_date))
+    else:
+        c.execute("""
+            SELECT da.id, da.date, da.status as assign_status, da.points, da.task_description,
+                   da.submit_time, f.name as file_name,
+                   u.id as artist_id, u.name as artist_name, u.team, u.role as artist_role,
+                   fp.step_name as stage
+            FROM daily_assignments da
+            JOIN users u ON da.user_id = u.id
+            LEFT JOIN files f ON da.file_id = f.id
+            LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
+            WHERE da.date = ?
+            ORDER BY u.team, u.name, da.id
+        """, (date_str,))
+    assignments_raw = [dict(r) for r in c.fetchall()]
+    
     c.execute("SELECT id, name, team, role FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team, name")
-    all_staff = c.fetchall()
-    assigned_ids = {r['artist_name'] for r in rows}
-    no_task = [a for a in all_staff if a['name'] not in assigned_ids]
-    return [dict(r) for r in rows], [dict(a) for a in no_task]
+    all_staff = [dict(r) for r in c.fetchall()]
+    
+    team_data = {}
+    for tm in teams:
+        lead_name = leads_by_team.get(tm, 'No Lead Assigned')
+        tm_staff = [s for s in all_staff if s['team'] == tm]
+        tm_assignments = [a for a in assignments_raw if a['team'] == tm]
+        assigned_artist_ids = {a['artist_id'] for a in tm_assignments}
+        unassigned_staff = [s for s in tm_staff if s['id'] not in assigned_artist_ids]
+        
+        if len(tm_assignments) == 0:
+            status_label = "Missed Morning Assignment"
+            status_color = "red"
+        elif len(unassigned_staff) > 0:
+            status_label = f"Partially Assigned ({len(unassigned_staff)} unassigned)"
+            status_color = "warning"
+        else:
+            status_label = "Fully Assigned"
+            status_color = "green"
+            
+        team_data[tm] = {
+            'team': tm,
+            'lead_name': lead_name,
+            'status_label': status_label,
+            'status_color': status_color,
+            'assignments': tm_assignments,
+            'unassigned_staff': unassigned_staff,
+            'total_staff': len(tm_staff)
+        }
+        
+    return team_data, assignments_raw
 
-def _report_eod(db, date_str):
-    """EOD Validation: Done/Pending per file per team on date_str."""
+def _report_eod(db, date_str, end_date=None):
+    """EOD Validation: Team-wise grouping with Team Lead info and validation status."""
     c = db.cursor()
-    c.execute("""
-        SELECT da.id, da.status as assign_status, da.points, da.task_description,
-               da.remarks as pending_reason, f.name as file_name,
-               u.name as artist_name, u.team,
-               fp.step_name as stage
-        FROM daily_assignments da
-        JOIN users u ON da.user_id = u.id
-        LEFT JOIN files f ON da.file_id = f.id
-        LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
-        WHERE da.date = ?
-        ORDER BY u.team, da.status, u.name
-    """, (date_str,))
-    return [dict(r) for r in c.fetchall()]
+    c.execute("SELECT team, name FROM users WHERE role = 'Lead'")
+    leads_by_team = {r['team']: r['name'] for r in c.fetchall()}
+    
+    c.execute("SELECT DISTINCT team FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team")
+    teams = [r[0] for r in c.fetchall()]
+    
+    if end_date and end_date != date_str:
+        c.execute("""
+            SELECT da.id, da.date, da.status as assign_status, da.points, da.task_description,
+                   da.remarks as pending_reason, f.name as file_name,
+                   u.name as artist_name, u.team, u.role as artist_role,
+                   fp.step_name as stage
+            FROM daily_assignments da
+            JOIN users u ON da.user_id = u.id
+            LEFT JOIN files f ON da.file_id = f.id
+            LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
+            WHERE da.date >= ? AND da.date <= ?
+            ORDER BY u.team, da.date DESC, da.status, u.name
+        """, (date_str, end_date))
+    else:
+        c.execute("""
+            SELECT da.id, da.date, da.status as assign_status, da.points, da.task_description,
+                   da.remarks as pending_reason, f.name as file_name,
+                   u.name as artist_name, u.team, u.role as artist_role,
+                   fp.step_name as stage
+            FROM daily_assignments da
+            JOIN users u ON da.user_id = u.id
+            LEFT JOIN files f ON da.file_id = f.id
+            LEFT JOIN file_pipeline fp ON (fp.file_id = da.file_id AND fp.assigned_to = da.user_id)
+            WHERE da.date = ?
+            ORDER BY u.team, da.status, u.name
+        """, (date_str,))
+    assignments_raw = [dict(r) for r in c.fetchall()]
+    
+    team_data = {}
+    for tm in teams:
+        lead_name = leads_by_team.get(tm, 'No Lead Assigned')
+        tm_assignments = [a for a in assignments_raw if a['team'] == tm]
+        done_cnt = sum(1 for a in tm_assignments if a['assign_status'] == 'Done')
+        pending_cnt = sum(1 for a in tm_assignments if a['assign_status'] != 'Done')
+        
+        if len(tm_assignments) == 0:
+            status_label = "No Tasks Submitted"
+            status_color = "muted"
+        elif pending_cnt > 0:
+            status_label = f"Pending Validation ({pending_cnt} pending)"
+            status_color = "warning"
+        else:
+            status_label = "All Tasks Validated & Done"
+            status_color = "green"
+            
+        team_data[tm] = {
+            'team': tm,
+            'lead_name': lead_name,
+            'status_label': status_label,
+            'status_color': status_color,
+            'assignments': tm_assignments,
+            'done_count': done_cnt,
+            'pending_count': pending_cnt
+        }
+        
+    return team_data
 
-def _report_login(db, date_str):
-    """Login Timings: per employee on date_str."""
+def _report_login(db, date_str, end_date=None):
+    """Login Timings: per employee on date_str or date range."""
     c = db.cursor()
-    c.execute("""
-        SELECT u.name, u.team, u.role,
-               a.clock_in, a.clock_out, a.status,
-               a.late_minutes, a.total_hours, a.extra_hours
-        FROM attendance a
-        JOIN users u ON a.user_id = u.id
-        WHERE a.date = ?
-        ORDER BY u.team, u.name
-    """, (date_str,))
+    if end_date and end_date != date_str:
+        c.execute("""
+            SELECT a.date, u.name, u.team, u.role,
+                   a.clock_in, a.clock_out, a.status,
+                   a.late_minutes, a.total_hours, a.extra_hours
+            FROM attendance a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.date >= ? AND a.date <= ?
+            ORDER BY u.team, a.date DESC, u.name
+        """, (date_str, end_date))
+    else:
+        c.execute("""
+            SELECT a.date, u.name, u.team, u.role,
+                   a.clock_in, a.clock_out, a.status,
+                   a.late_minutes, a.total_hours, a.extra_hours
+            FROM attendance a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.date = ?
+            ORDER BY u.team, u.name
+        """, (date_str,))
     day_rows = [dict(r) for r in c.fetchall()]
-    # Weekly grid: Mon–Sun of the week containing date_str
+    
     try:
         d = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
     except:
@@ -5633,17 +5973,24 @@ def _report_login(db, date_str):
     weekly = {}
     for u in all_users:
         weekly[u['name']] = {'team': u['team'], 'days': {}}
-        for wd in week_days:
-            c.execute("SELECT status, clock_in, late_minutes FROM attendance WHERE user_id=? AND date=?",
-                      (u['id'], wd.strftime('%Y-%m-%d')))
-            rec = c.fetchone()
-            weekly[u['name']]['days'][wd.strftime('%a %d')] = dict(rec) if rec else None
-    return day_rows, weekly, [wd.strftime('%a %d') for wd in week_days]
+    week_labels = [wd.strftime('%a %d') for wd in week_days]
+    week_dates  = [wd.strftime('%Y-%m-%d') for wd in week_days]
+
+    for wd_str, label in zip(week_dates, week_labels):
+        c.execute("SELECT user_id, status, clock_in FROM attendance WHERE date=?", (wd_str,))
+        att_map = {r['user_id']: r for r in c.fetchall()}
+        for u in all_users:
+            rec = att_map.get(u['id'])
+            weekly[u['name']]['days'][label] = {
+                'status': rec['status'] if rec else '—',
+                'clock_in': rec['clock_in'] if rec else ''
+            }
+
+    return day_rows, weekly, week_labels
 
 def _report_monthly_points(db, month_str):
     """Monthly Points: per employee breakdown, earned vs target."""
     c = db.cursor()
-    # Get all weeks in month
     try:
         year, mon = map(int, month_str.split('-'))
     except:
@@ -5652,7 +5999,6 @@ def _report_monthly_points(db, month_str):
     _, last_day = calendar.monthrange(year, mon)
     month_start = datetime.date(year, mon, 1)
     month_end   = datetime.date(year, mon, last_day)
-    # Split into weeks
     weeks = []
     wstart = month_start
     while wstart <= month_end:
@@ -5664,12 +6010,10 @@ def _report_monthly_points(db, month_str):
     all_users = c.fetchall()
     results = []
     for u in all_users:
-        # Target
         c.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?",
                   (u['id'], month_str))
         tgt_row = c.fetchone()
         target = tgt_row['target_points'] if tgt_row else 0
-        # Weekly breakdown
         week_pts = []
         total_earned = 0
         for ws_, we_ in weeks:
@@ -5699,42 +6043,50 @@ def reports_page():
         flash("Reports are Admin-only.", "error")
         return redirect(url_for('dashboard'))
 
-    sub_tab = request.args.get('sub_tab', 'assets')
-    if sub_tab not in ['assets', 'scenes']:
-        sub_tab = 'assets'
-
     db = get_db()
     cursor = db.cursor()
     cursor.execute("SELECT * FROM users WHERE id=?", (session['user_id'],))
     user_info = cursor.fetchone()
 
-    today_str   = datetime.date.today().strftime('%Y-%m-%d')
-    month_str   = datetime.date.today().strftime('%Y-%m')
+    today_dt    = datetime.date.today()
+    today_str   = today_dt.strftime('%Y-%m-%d')
+
     tab         = request.args.get('tab', 'morning')
+    if tab not in ['morning', 'eod']:
+        tab = 'morning'
+
+    range_type  = request.args.get('range_type', 'today')
     rdate       = request.args.get('date', today_str)
-    rmonth      = request.args.get('month', month_str)
+
+    if range_type == 'this_week':
+        monday_dt  = today_dt - datetime.timedelta(days=today_dt.weekday())
+        start_date = monday_dt.strftime('%Y-%m-%d')
+        end_date   = today_str
+    elif range_type == 'this_month':
+        start_date = today_dt.replace(day=1).strftime('%Y-%m-%d')
+        end_date   = today_str
+    elif range_type == 'custom':
+        start_date = request.args.get('start_date', rdate)
+        end_date   = request.args.get('end_date', rdate)
+    else:
+        range_type = 'today'
+        start_date = rdate
+        end_date   = rdate
 
     morning_rows, no_task_artists = [], []
     eod_rows = []
-    login_day, login_weekly, week_labels = [], {}, []
-    monthly_rows, monthly_weeks = [], []
 
     if tab == 'morning':
-        morning_rows, no_task_artists = _report_morning(db, rdate)
+        morning_rows, no_task_artists = _report_morning(db, start_date, end_date)
     elif tab == 'eod':
-        eod_rows = _report_eod(db, rdate)
-    elif tab == 'login':
-        login_day, login_weekly, week_labels = _report_login(db, rdate)
-    elif tab == 'monthly':
-        monthly_rows, monthly_weeks = _report_monthly_points(db, rmonth)
+        eod_rows = _report_eod(db, start_date, end_date)
 
     return render_template('reports.html',
-        user=user_info, tab=tab, rdate=rdate, rmonth=rmonth,
+        user=user_info, tab=tab, range_type=range_type,
+        rdate=rdate, start_date=start_date, end_date=end_date,
         morning_rows=morning_rows, no_task_artists=no_task_artists,
         eod_rows=eod_rows,
-        login_day=login_day, login_weekly=login_weekly, week_labels=week_labels,
-        monthly_rows=monthly_rows, monthly_weeks=monthly_weeks,
-        today_str=today_str, month_str=month_str,
+        today_str=today_str,
     )
 
 @app.route('/reports/export/<tab>')
@@ -5743,135 +6095,131 @@ def reports_export(tab):
         return redirect(url_for('login'))
 
     db = get_db()
-    rdate  = request.args.get('date', datetime.date.today().strftime('%Y-%m-%d'))
-    rmonth = request.args.get('month', datetime.date.today().strftime('%Y-%m'))
+    today_dt    = datetime.date.today()
+    today_str   = today_dt.strftime('%Y-%m-%d')
+
+    range_type  = request.args.get('range_type', 'today')
+    rdate       = request.args.get('date', today_str)
+
+    if range_type == 'this_week':
+        monday_dt  = today_dt - datetime.timedelta(days=today_dt.weekday())
+        start_date = monday_dt.strftime('%Y-%m-%d')
+        end_date   = today_str
+    elif range_type == 'this_month':
+        start_date = today_dt.replace(day=1).strftime('%Y-%m-%d')
+        end_date   = today_str
+    elif range_type == 'custom':
+        start_date = request.args.get('start_date', rdate)
+        end_date   = request.args.get('end_date', rdate)
+    else:
+        range_type = 'today'
+        start_date = rdate
+        end_date   = rdate
 
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)  # remove default sheet
+    wb.remove(wb.active)
 
     if tab == 'morning':
-        rows, no_task = _report_morning(db, rdate)
+        team_data, assignments_raw = _report_morning(db, start_date, end_date)
         ws = wb.create_sheet("Morning Assignment")
-        ws.append([f"Morning Assignment Report — {rdate}"])
+        ws.append([f"Morning Assignment Report — Range: {start_date} to {end_date}"])
         ws['A1'].font = Font(bold=True, size=13)
-        ws.merge_cells('A1:G1')
+        ws.merge_cells('A1:I1')
         ws.append([])
-        _xl_header_row(ws, 3, ['Team','Artist','File','Stage','Points','Assign Status','Submit Time'])
+        _xl_header_row(ws, 3, ['Date', 'Team', 'Artist Name', 'Role', 'File / Task Description', 'Pipeline Stage', 'Points', 'Assign Status', 'Submit Time'])
         r = 4
         cur_team = None; team_pts = 0; grand = 0
-        for row in rows:
+        for row in assignments_raw:
             if cur_team and cur_team != row['team']:
-                _xl_data_row(ws, r, [f'{cur_team} Subtotal','','','','', str(team_pts),''], _SUBTTL_FILL, True)
+                _xl_data_row(ws, r, ['Subtotal', cur_team, '', '', '', '', str(team_pts), '', ''], _SUBTTL_FILL, True)
                 r += 1; team_pts = 0
             cur_team = row['team']
-            team_pts += row['points'] or 0; grand += row['points'] or 0
-            _xl_data_row(ws, r, [row['team'], row['artist_name'],
-                row['file_name'] or row['task_description'], row['stage'] or '',
-                row['points'] or 0, row['assign_status'] or '',
-                row['submit_time'] or ''])
+            team_pts += (row['points'] or 0); grand += (row['points'] or 0)
+            _xl_data_row(ws, r, [
+                row.get('date', start_date),
+                row['team'],
+                row['artist_name'],
+                row.get('artist_role', 'Artist'),
+                row['file_name'] or row['task_description'] or '',
+                row['stage'] or '',
+                row['points'] or 0,
+                row['assign_status'] or '',
+                row.get('submit_time', '') or ''
+            ])
             r += 1
         if cur_team:
-            _xl_data_row(ws, r, [f'{cur_team} Subtotal','','','','',str(team_pts),''], _SUBTTL_FILL, True)
+            _xl_data_row(ws, r, ['Subtotal', cur_team, '', '', '', '', str(team_pts), '', ''], _SUBTTL_FILL, True)
             r += 1
-        _xl_data_row(ws, r, ['GRAND TOTAL','','','','',str(grand),''], _SUBTTL_FILL, True)
+        _xl_data_row(ws, r, ['GRAND TOTAL', '', '', '', '', '', str(grand), '', ''], _SUBTTL_FILL, True)
         r += 2
-        if no_task:
-            ws.cell(r, 1, '⚠ Artists & Leads with NO tasks:').font = Font(bold=True, color='CC0000')
+
+        unassigned_list = []
+        for tm, tinfo in team_data.items():
+            for ustaff in tinfo.get('unassigned_staff', []):
+                unassigned_list.append(ustaff)
+
+        if unassigned_list:
+            ws.cell(r, 1, '⚠ Staff with NO tasks assigned:').font = Font(bold=True, color='CC0000')
             r += 1
-            for a in no_task:
-                _xl_data_row(ws, r, [a['team'], f"{a['name']} ({a.get('role', 'Artist')})", 'NO TASKS ASSIGNED','','','',''])
+            for a in unassigned_list:
+                _xl_data_row(ws, r, [start_date, a['team'], f"{a['name']} ({a.get('role', 'Artist')})", 'NO TASKS ASSIGNED', '', '', '', '', ''])
                 r += 1
         _xl_autowidth(ws)
-        fname = f"MorningAssignment_{rdate}.xlsx"
+        fname = f"MorningAssignment_{start_date}_to_{end_date}.xlsx"
 
     elif tab == 'eod':
-        rows = _report_eod(db, rdate)
+        team_data = _report_eod(db, start_date, end_date)
         ws = wb.create_sheet("EOD Validation")
-        ws.append([f"EOD Validation Report — {rdate}"])
+        ws.append([f"EOD Validation Report — Range: {start_date} to {end_date}"])
         ws['A1'].font = Font(bold=True, size=13)
         ws.merge_cells('A1:G1')
         ws.append([])
-        
-        done_rows = [r for r in rows if r['assign_status'] == 'Done']
-        pending_rows = [r for r in rows if r['assign_status'] == 'Pending']
 
-        # Done Files Section
-        ws.cell(3, 1, "Completed / Done Files").font = Font(bold=True, size=11, color="008000")
-        _xl_header_row(ws, 4, ['Team','Artist','File','Stage','Status','Points Credited'])
+        all_assignments = []
+        for tname, tinfo in team_data.items():
+            all_assignments.extend(tinfo.get('assignments', []))
+
+        done_rows = [r for r in all_assignments if r['assign_status'] == 'Done']
+        pending_rows = [r for r in all_assignments if r['assign_status'] != 'Done']
+
+        ws.cell(3, 1, "Completed / Done Work (Points Credited)").font = Font(bold=True, size=11, color="008000")
+        _xl_header_row(ws, 4, ['Date', 'Team', 'Artist Name', 'File / Task Description', 'Pipeline Stage', 'Status', 'Points Credited'])
         r = 5
         done_pts = 0
         for row in done_rows:
             done_pts += (row['points'] or 0)
-            _xl_data_row(ws, r, [row['team'], row['artist_name'],
-                row['file_name'] or '', row['stage'] or '',
-                'Done', row['points'] or 0])
+            _xl_data_row(ws, r, [
+                row.get('date', start_date),
+                row['team'],
+                row['artist_name'],
+                row['file_name'] or row['task_description'] or '',
+                row['stage'] or '',
+                'Done',
+                row['points'] or 0
+            ])
             r += 1
-        _xl_data_row(ws, r, ['DONE TOTALS', '', '', '', f'Count: {len(done_rows)}', f'{done_pts} pts'], _SUBTTL_FILL, True)
+        _xl_data_row(ws, r, ['DONE TOTALS', '', '', '', '', f'Count: {len(done_rows)}', f'{done_pts} pts'], _SUBTTL_FILL, True)
         r += 3
 
-        # Pending (Carry Forward) Section
-        ws.cell(r, 1, "Pending Files (Carry Forward to Tomorrow)").font = Font(bold=True, size=11, color="CC6600")
+        ws.cell(r, 1, "Carry Forwarded Work (Pending / Retake)").font = Font(bold=True, size=11, color="CC6600")
         r += 1
-        _xl_header_row(ws, r, ['Team','Artist','File','Stage','Status','Pending Reason / Remarks'])
+        _xl_header_row(ws, r, ['Date', 'Team', 'Artist Name', 'File / Task Description', 'Pipeline Stage', 'Status', 'Pending Reason / Remarks'])
         r += 1
         for row in pending_rows:
-            _xl_data_row(ws, r, [row['team'], row['artist_name'],
-                row['file_name'] or '', row['stage'] or '',
-                'Pending (CF)', row['pending_reason'] or 'Carried forward to tomorrow'])
+            _xl_data_row(ws, r, [
+                row.get('date', start_date),
+                row['team'],
+                row['artist_name'],
+                row['file_name'] or row['task_description'] or '',
+                row['stage'] or '',
+                row['assign_status'] or 'Pending',
+                row['pending_reason'] or 'Carried forward to tomorrow'
+            ])
             r += 1
-        _xl_data_row(ws, r, ['PENDING CF TOTALS', '', '', '', f'Count: {len(pending_rows)}', ''], _SUBTTL_FILL, True)
+        _xl_data_row(ws, r, ['CARRY FORWARD TOTALS', '', '', '', '', f'Count: {len(pending_rows)}', ''], _SUBTTL_FILL, True)
 
         _xl_autowidth(ws)
-        fname = f"EODValidation_{rdate}.xlsx"
-
-    elif tab == 'login':
-        day_rows, weekly, week_labels = _report_login(db, rdate)
-        # Sheet 1: daily
-        ws1 = wb.create_sheet("Login Timings")
-        ws1.append([f"Login Timings — {rdate}"])
-        ws1['A1'].font = Font(bold=True, size=13); ws1.merge_cells('A1:H1'); ws1.append([])
-        _xl_header_row(ws1, 3, ['Team','Name','Role','Clock In','Clock Out','Total Hours','Status','Late By (min)'])
-        r = 4
-        for row in day_rows:
-            _xl_data_row(ws1, r, [row['team'], row['name'], row['role'],
-                row['clock_in'] or '', row['clock_out'] or '',
-                round(row['total_hours'] or 0, 2), row['status'] or '',
-                row['late_minutes'] or 0])
-            r += 1
-        _xl_autowidth(ws1)
-        # Sheet 2: weekly grid
-        ws2 = wb.create_sheet("Weekly Overview")
-        header = ['Employee','Team'] + week_labels
-        _xl_header_row(ws2, 1, header)
-        r2 = 2
-        for emp, info in weekly.items():
-            row_vals = [emp, info['team']]
-            for lbl in week_labels:
-                d = info['days'].get(lbl)
-                row_vals.append(d['status'] if d else '–')
-            _xl_data_row(ws2, r2, row_vals)
-            r2 += 1
-        _xl_autowidth(ws2)
-        fname = f"LoginTimings_{rdate}.xlsx"
-
-    elif tab == 'monthly':
-        rows, weeks = _report_monthly_points(db, rmonth)
-        ws = wb.create_sheet("Monthly Points")
-        week_hdrs = [f"Wk {i+1}" for i in range(len(weeks))]
-        all_cols = ['Team','Employee'] + week_hdrs + ['Total Earned','Target','% Done','Salary Impact']
-        ws.append([f"Monthly Points Report — {rmonth}"])
-        ws['A1'].font = Font(bold=True, size=13)
-        ws.merge_cells(f'A1:{get_column_letter(len(all_cols))}1')
-        ws.append([])
-        _xl_header_row(ws, 3, all_cols)
-        r = 4
-        for row in rows:
-            vals = [row['team'], row['name']] + row['week_pts'] + \
-                   [row['earned'], row['target'], f"{row['pct']}%", row['salary_impact']]
-            _xl_data_row(ws, r, vals)
-            r += 1
-        _xl_autowidth(ws)
-        fname = f"MonthlyPoints_{rmonth}.xlsx"
+        fname = f"EODValidation_{start_date}_to_{end_date}.xlsx"
     else:
         return redirect(url_for('reports_page'))
 
@@ -6379,110 +6727,45 @@ def check_and_push_morning_reminders(db, user_id):
                             lead_name = lead_res['name'] if lead_res else f"the {stg_team} Lead"
                             _push_notification(db, user_id, "Lead missed morning assignment", 
                                                f"{lead_name} has not allocated {open_cnt} files in {stage} queue.", 
-                                               "warning", link=url_for('dashboard'))
+                                               "warning", link=url_for('reports_page', tab='morning'))
                             db.commit()
     except Exception as e:
         print(f"Error check_and_push_morning_reminders: {e}")
 
 def check_and_push_admin_target_alerts(db, admin_id):
-    """Check if any artist is far below their target and notify admin."""
-    try:
-        now = datetime.datetime.now()
-        today_str = now.strftime('%Y-%m-%d')
-        current_month = now.strftime('%Y-%m')
-        cursor = db.cursor()
-        
-        cursor.execute("""
-            SELECT COUNT(*) FROM notifications
-            WHERE user_id=? AND title = 'Target alert' AND created_at >= ?
-        """, (admin_id, today_str + ' 00:00:00'))
-        if cursor.fetchone()[0] > 0:
-            return
-            
-        cursor.execute("SELECT id, name, role FROM users WHERE role IN ('Artist', 'Lead')")
-        employees = cursor.fetchall()
-        
-        for emp in employees:
-            cursor.execute("SELECT target_points FROM monthly_targets WHERE user_id=? AND month=?", 
-                            (emp['id'], current_month))
-            tgt_row = cursor.fetchone()
-            target = tgt_row['target_points'] if tgt_row else 500
-            
-            cursor.execute("SELECT SUM(points) FROM points WHERE user_id=? AND strftime('%Y-%m', date)=?", 
-                            (emp['id'], current_month))
-            earned = cursor.fetchone()[0] or 0
-            
-            if target > 0 and (earned / target) < 0.3:
-                role_label = "Lead" if emp['role'] == 'Lead' else "Artist"
-                _push_notification(db, admin_id, "Target alert", 
-                                   f"{role_label} {emp['name']} is far below target: earned {earned}/{target} pts.", 
-                                   "warning", link=url_for('points_page'))
-                db.commit()
-                break
-    except Exception as e:
-        print(f"Error check_and_push_admin_target_alerts: {e}")
+    """Target alert notifications have been removed as per user requirements."""
+    pass
 
 @app.context_processor
 def inject_notifications():
-    """Inject unread notification counts (Approvals vs Work-related) and recent list into templates."""
-    count = 0
-    unread_approvals = 0
-    unread_work = 0
-    recent = []
+    """Inject pending_approvals_count into templates for sidebar badges."""
+    pending_approvals = 0
     if 'user_id' in session:
         try:
             db = get_db()
             cursor = db.cursor()
-            cursor.execute("""
-                SELECT id, title, body, link, type, is_read, created_at
-                FROM notifications 
-                WHERE user_id=? 
-                ORDER BY created_at DESC LIMIT 20
-            """, (session['user_id'],))
-            recent_rows = [dict(r) for r in cursor.fetchall()]
-            
-            for n in recent_rows:
-                ntype = (n.get('type') or '').lower()
-                title = (n.get('title') or '').lower()
-                is_approval = ntype in ['approval', 'leave', 'permission'] or any(k in title for k in ['approval', 'leave', 'permission', 'validation'])
-                n['category'] = 'Approvals' if is_approval else 'Work'
-                if not n['is_read']:
-                    count += 1
-                    if is_approval:
-                        unread_approvals += 1
-                    else:
-                        unread_work += 1
-            recent = recent_rows[:10]
+            cursor.execute("SELECT approval_chain, current_index FROM approvals WHERE status = 'Pending'")
+            pending_rows = cursor.fetchall()
+            for app_row in pending_rows:
+                try:
+                    chain = _json.loads(app_row['approval_chain'])
+                    curr_idx = app_row['current_index']
+                    if curr_idx < len(chain) and chain[curr_idx] == session['user_id']:
+                        pending_approvals += 1
+                except Exception:
+                    pass
         except Exception:
-            count = 0
+            pending_approvals = 0
     return dict(
-        unread_notif_count=count, 
-        unread_approvals_count=unread_approvals, 
-        unread_work_count=unread_work, 
-        recent_notifications=recent
+        pending_approvals_count=pending_approvals,
+        unread_notif_count=0, 
+        unread_approvals_count=0, 
+        unread_work_count=0, 
+        recent_notifications=[]
     )
 
 @app.route('/api/notifications/unread_count')
 def api_unread_notifications_count():
-    if 'user_id' not in session:
-        return {'unread_count': 0, 'unread_approvals': 0, 'unread_work': 0}
-    try:
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute("SELECT type, title, is_read FROM notifications WHERE user_id = ? AND is_read = 0", (session['user_id'],))
-        rows = cursor.fetchall()
-        tot = len(rows)
-        appr = 0
-        wrk = 0
-        for r in rows:
-            ntype = (r['type'] or '').lower()
-            title = (r['title'] or '').lower()
-            if ntype in ['approval', 'leave', 'permission'] or any(k in title for k in ['approval', 'leave', 'permission', 'validation']):
-                appr += 1
-            else:
-                wrk += 1
-        return {'unread_count': tot, 'unread_approvals': appr, 'unread_work': wrk}
-    except Exception:
         return {'unread_count': 0, 'unread_approvals': 0, 'unread_work': 0}
 
 @app.route('/notifications')
@@ -6524,7 +6807,23 @@ def click_notification(nid):
     if notif:
         cursor.execute("UPDATE notifications SET is_read=1 WHERE id=?", (nid,))
         db.commit()
-        target_link = notif['link'] or url_for('dashboard')
+        
+        ntype = (notif['type'] or '').lower()
+        title = (notif['title'] or '').lower()
+        link = notif['link']
+        
+        if 'approval' in title or ntype == 'approval' or 'leave' in title or 'permission' in title:
+            if session['role'] == 'Admin':
+                return redirect(url_for('system_approvals_page'))
+            elif session['role'] == 'Lead':
+                return redirect(url_for('team_approvals_page'))
+            else:
+                return redirect(url_for('leaves_page'))
+                
+        if 'morning' in title or 'assignment' in title:
+            return redirect(url_for('reports_page', tab='morning'))
+            
+        target_link = link or url_for('dashboard')
         return redirect(target_link)
     return redirect(url_for('dashboard'))
 
@@ -6610,7 +6909,7 @@ def activity_log_page():
 # LAYER 11: WORK REPORTS (NEW ADMIN FEATURE)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_end='', search_query='', employee_id=None, selected_month='', selected_year='', sub_tab='assets'):
+def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_end='', search_query='', employee_id=None, selected_month='', selected_year='', sub_tab='assets', global_month=''):
     today = datetime.date.today()
     if range_type == 'this_week':
         start_date = today - datetime.timedelta(days=today.weekday())
@@ -6669,28 +6968,41 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
     start_display = start_date.strftime('%d-%m-%Y')
     end_display = end_date.strftime('%d-%m-%Y')
 
+    # Global month calculation (independent of top selection duration)
+    current_month = today.strftime('%Y-%m')
+    if not global_month:
+        global_month = current_month
+    try:
+        g_start_date = datetime.datetime.strptime(global_month, '%Y-%m').date()
+        _, g_last_day = calendar.monthrange(g_start_date.year, g_start_date.month)
+        g_end_date = datetime.date(g_start_date.year, g_start_date.month, g_last_day)
+    except Exception:
+        global_month = current_month
+        g_start_date = today.replace(day=1)
+        _, g_last_day = calendar.monthrange(g_start_date.year, g_start_date.month)
+        g_end_date = datetime.date(g_start_date.year, g_start_date.month, g_last_day)
+
+    g_start_str = g_start_date.strftime('%Y-%m-%d')
+    g_end_str = g_end_date.strftime('%Y-%m-%d')
+
     c = db.cursor()
     query = "SELECT id, name, username, role, team FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team, role, name"
     c.execute(query)
     staff_members = c.fetchall()
 
     staff_reports = []
+    global_scoreboard = {}
+    global_staff_reports = []
     total_tasks_completed = 0
     total_points_earned = 0
 
-    current_month = today.strftime('%Y-%m')
-    global_scoreboard = {}
-
-    if sub_tab == 'scenes':
-        target_stages = ['Voice Over', 'Narration', 'Storyboards', 'Explanation', 'Scene-wise Assets', 'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp & Motion Graphics']
-    else:
-        target_stages = ['Reference', 'Explanation', 'Modeling', 'Texturing', 'Rig']
-
     for s in staff_members:
         sid = s['id']
+        # 1) Selection duration calculations (for top chips & selected employee details)
         c.execute("""
             SELECT da.id, da.date, da.status, da.points, da.task_description, da.remarks, da.submit_time,
-                   f.name as file_name, fp.step_name as stage,
+                   f.name as file_name, f.take_count as file_take_count, f.rework_reason as file_rework_reason, f.hold_reason as file_hold_reason,
+                   fp.step_name as stage, fp.take_count, fp.rework_reason, fp.hold_reason,
                    p.name as project_name, ch.name as chapter_name
             FROM daily_assignments da
             LEFT JOIN files f ON da.file_id = f.id
@@ -6700,9 +7012,7 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
             WHERE da.user_id = ? AND da.date >= ? AND da.date <= ?
             ORDER BY da.date DESC, da.id DESC
         """, (sid, start_str, end_str))
-        all_assignments = [dict(r) for r in c.fetchall()]
-
-        assignments = [a for a in all_assignments if (a.get('stage') in target_stages or a.get('task_description') in target_stages)]
+        assignments = [dict(r) for r in c.fetchall()]
 
         done_assignments = [a for a in assignments if a['status'] == 'Done']
         pending_assignments = [a for a in assignments if a['status'] == 'Pending']
@@ -6718,7 +7028,7 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
         days_worked = att_row['days_worked'] if att_row else 0
         total_hrs = round(att_row['total_hrs'], 1) if att_row else 0.0
 
-        c.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (sid, current_month))
+        c.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (sid, global_month))
         target_res = c.fetchone()
         target_pts = target_res['target_points'] if target_res else 500
         prog_pct = round((pts_sum / target_pts) * 100, 1) if target_pts > 0 else 0
@@ -6750,13 +7060,54 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
         }
         staff_reports.append(staff_info)
 
+        total_tasks_completed += len(done_assignments)
+        total_points_earned += pts_sum
+
+        # 2) Independent Global Monthly calculation (for Global Scoreboard & Global Staff Summary)
+        c.execute("""
+            SELECT da.status, da.points
+            FROM daily_assignments da
+            WHERE da.user_id = ? AND da.date >= ? AND da.date <= ?
+        """, (sid, g_start_str, g_end_str))
+        g_assigns = c.fetchall()
+        g_done = [a for a in g_assigns if a['status'] == 'Done']
+        g_pending = [a for a in g_assigns if a['status'] == 'Pending']
+        g_pts_sum = sum(a['points'] or 0 for a in g_done)
+
+        c.execute("SELECT target_points FROM monthly_targets WHERE user_id = ? AND month = ?", (sid, global_month))
+        target_res = c.fetchone()
+        g_target_pts = target_res['target_points'] if target_res else 500
+        g_prog_pct = round((g_pts_sum / g_target_pts) * 100, 1) if g_target_pts > 0 else 0
+
+        c.execute("""
+            SELECT COUNT(DISTINCT date) as days_worked, COALESCE(SUM(total_hours), 0) as total_hrs
+            FROM attendance
+            WHERE user_id = ? AND date >= ? AND date <= ? AND status IN ('Present', 'Late', 'Half Day')
+        """, (sid, g_start_str, g_end_str))
+        g_att_row = c.fetchone()
+        g_days_worked = g_att_row['days_worked'] if g_att_row else 0
+        g_total_hrs = round(g_att_row['total_hrs'], 1) if g_att_row else 0.0
+
+        g_staff_info = {
+            'id': sid,
+            'name': s['name'],
+            'username': s['username'],
+            'role': s['role'],
+            'team': s['team'],
+            'tasks_completed': len(g_done),
+            'tasks_pending': len(g_pending),
+            'total_points': g_pts_sum,
+            'target_points': g_target_pts,
+            'progress_pct': g_prog_pct,
+            'days_worked': g_days_worked,
+            'total_hours': g_total_hrs
+        }
+        global_staff_reports.append(g_staff_info)
+
         tm = s['team']
         if tm not in global_scoreboard:
             global_scoreboard[tm] = []
-        global_scoreboard[tm].append(staff_info)
-
-        total_tasks_completed += len(done_assignments)
-        total_points_earned += pts_sum
+        global_scoreboard[tm].append(g_staff_info)
 
     c.execute("SELECT id, name, username, role, team FROM users WHERE role IN ('Artist', 'Lead') ORDER BY name")
     all_staff_dropdown = [dict(r) for r in c.fetchall()]
@@ -6773,9 +7124,11 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
         'custom_end': custom_end,
         'selected_month': selected_month or current_month,
         'selected_year': selected_year or str(today.year),
+        'global_month': global_month,
         'available_years': available_years,
         'staff_reports': staff_reports,
         'global_scoreboard': global_scoreboard,
+        'global_staff_reports': global_staff_reports,
         'all_staff': all_staff_dropdown,
         'total_tasks_completed': total_tasks_completed,
         'total_points_earned': total_points_earned,
@@ -6809,8 +7162,9 @@ def work_reports_page():
     employee_id = request.args.get('employee_id', type=int)
     selected_month = request.args.get('selected_month', '')
     selected_year = request.args.get('selected_year', '')
+    global_month = request.args.get('global_month', '')
 
-    data = _get_work_reports_data(db, range_type, custom_start, custom_end, search_query, employee_id, selected_month, selected_year, sub_tab)
+    data = _get_work_reports_data(db, range_type, custom_start, custom_end, search_query, employee_id, selected_month, selected_year, sub_tab, global_month)
 
     selected_staff = None
     if employee_id:
@@ -6846,8 +7200,8 @@ def work_reports_export():
     employee_id = request.args.get('employee_id', type=int)
     selected_month = request.args.get('selected_month', '')
     selected_year = request.args.get('selected_year', '')
-
-    data = _get_work_reports_data(db, range_type, custom_start, custom_end, search_query, employee_id, selected_month, selected_year)
+    global_month = request.args.get('global_month', '')
+    data = _get_work_reports_data(db, range_type, custom_start, custom_end, search_query, employee_id, selected_month, selected_year, 'assets', global_month)
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -6875,15 +7229,27 @@ def work_reports_export():
     ws2['A1'].font = Font(bold=True, size=13)
     ws2.merge_cells('A1:K1')
     ws2.append([])
-    _xl_header_row(ws2, 3, ['Date', 'Employee', 'Role', 'Team', 'Project', 'Chapter', 'File / Task Description', 'Stage', 'Points', 'Status', 'Submit Time / Remarks'])
+    _xl_header_row(ws2, 3, ['Date', 'Employee', 'Role', 'Team', 'Project', 'Chapter', 'File / Task Description', 'Stage', 'Points', 'Status', 'Comments / Remarks', 'Retakes / Rework / Hold Info'])
     r2 = 4
     for s in data['staff_reports']:
         for a in s['assignments']:
+            retake_info_parts = []
+            t_cnt = a.get('take_count') or a.get('file_take_count') or 0
+            if t_cnt > 0:
+                retake_info_parts.append(f"Takes: {t_cnt}")
+            rw_rsn = a.get('rework_reason') or a.get('file_rework_reason')
+            if rw_rsn:
+                retake_info_parts.append(f"Rework: {rw_rsn}")
+            h_rsn = a.get('hold_reason') or a.get('file_hold_reason')
+            if h_rsn:
+                retake_info_parts.append(f"Hold: {h_rsn}")
+            retake_str = " | ".join(retake_info_parts) if retake_info_parts else "—"
+
             _xl_data_row(ws2, r2, [
                 a['date'], s['name'], s['role'], s['team'],
                 a['project_name'] or '—', a['chapter_name'] or '—',
                 a['file_name'] or a['task_description'], a['stage'] or '—',
-                a['points'] or 0, a['status'], a['remarks'] or a['submit_time'] or ''
+                a['points'] or 0, a['status'], a.get('remarks') or a.get('submit_time') or '—', retake_str
             ])
             r2 += 1
     _xl_autowidth(ws2)

@@ -144,7 +144,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                <!-- Sidebar -->
+        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -166,61 +166,41 @@
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-            <ul class="sidebar-menu">
+                                    <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
                 </li>
                 {% endif %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
-                </li>
-                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
-                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                {% if session['role'] == 'Lead' %}
+                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
                 {% endif %}
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-
                 {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
-                    <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
                 </li>
-                {% elif session['role'] == 'HR' %}
-                <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
                 </li>
                 {% endif %}
             </ul>
@@ -248,20 +228,10 @@
                 {% endfor %}{% endif %}
             {% endwith %}
 
-            <!-- PIPELINE SUB-TAB SELECTOR (Asset Pipeline vs Scene Pipeline) -->
-            <div class="report-tabs" style="margin-bottom: 20px; display: flex; gap: 10px;">
-                <a href="{{ url_for('work_reports_page', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id, sub_tab='assets') }}" class="report-tab-btn {% if sub_tab != 'scenes' %}active{% endif %}" style="text-decoration: none; padding: 10px 20px; font-weight: 700; border-radius: 8px;">
-                    📦 Asset Pipeline Work
-                </a>
-                <a href="{{ url_for('work_reports_page', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id, sub_tab='scenes') }}" class="report-tab-btn {% if sub_tab == 'scenes' %}active{% endif %}" style="text-decoration: none; padding: 10px 20px; font-weight: 700; border-radius: 8px;">
-                    🎬 Scene Pipeline Work
-                </a>
-            </div>
-
             <!-- Report Filter Controls -->
             <div class="report-controls-card">
                 <form action="{{ url_for('work_reports_page') }}" method="GET" id="workReportForm">
-                    <input type="hidden" name="sub_tab" value="{{ sub_tab }}">
+                    <input type="hidden" name="global_month" value="{{ data.global_month }}">
                     <!-- Row 1: Duration selection -->
                     <div class="filter-row-block">
                         <div class="filter-field" style="min-width: 220px;">
@@ -323,7 +293,7 @@
                             {% if selected_staff or data.range_type != 'this_week' %}
                                 <a href="{{ url_for('work_reports_page') }}" class="btn btn-outline" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Clear Selection</a>
                             {% endif %}
-                            <a href="{{ url_for('work_reports_export', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id) }}" class="btn btn-success" style="height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;">
+                            <a href="{{ url_for('work_reports_export', range_type=data.range_type, selected_month=data.selected_month, selected_year=data.selected_year, start_date=data.custom_start, end_date=data.custom_end, employee_id=data.selected_employee_id, global_month=data.global_month) }}" class="btn btn-success" style="height: 38px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;">
                                 ⬇ Export .xlsx
                             </a>
                         </div>
@@ -376,11 +346,11 @@
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Earned</div>
                             </div>
                             <div style="background: var(--bg-main); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); text-align: right;">
-                                <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">{{ selected_staff.target_points }} pts</div>
+                                <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">{{ selected_staff.target_points | default(500) }} pts</div>
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Target</div>
                             </div>
                             <div style="background: var(--bg-main); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); text-align: right;">
-                                <div class="{% if selected_staff.progress_pct >= 100 %}txt-green{% else %}txt-blue{% endif %}" style="font-size: 18px; font-weight: 700;">{{ selected_staff.progress_pct }}%</div>
+                                <div class="{% if (selected_staff.progress_pct | default(0)) >= 100 %}txt-green{% else %}txt-blue{% endif %}" style="font-size: 18px; font-weight: 700;">{{ selected_staff.progress_pct | default(0) }}%</div>
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Progress</div>
                             </div>
                             <div style="background: var(--bg-main); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); text-align: right;">
@@ -426,10 +396,18 @@
                                             <td><strong>{{ task.date | ddmmyyyy }}</strong></td>
                                             <td>{{ task.project_name or '—' }}</td>
                                             <td>{{ task.chapter_name or '—' }}</td>
-                                            <td style="max-width: 250px;">
+                                            <td style="max-width: 280px;">
                                                 <strong>{{ task.file_name or task.task_description }}</strong>
                                                 {% if task.remarks %}
-                                                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">{{ task.remarks }}</div>
+                                                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">💬 Comments: {{ task.remarks }}</div>
+                                                {% endif %}
+                                                {% if task.take_count or task.file_take_count or task.rework_reason or task.file_rework_reason or task.hold_reason or task.file_hold_reason %}
+                                                    <div style="font-size: 11px; color: #c2410c; margin-top: 2px; font-weight: 600;">
+                                                        🔄 Retake / Rework: 
+                                                        {% if task.take_count or task.file_take_count %}Takes: {{ task.take_count or task.file_take_count }} {% endif %}
+                                                        {% if task.rework_reason or task.file_rework_reason %}| Reason: {{ task.rework_reason or task.file_rework_reason }} {% endif %}
+                                                        {% if task.hold_reason or task.file_hold_reason %}| Hold: {{ task.hold_reason or task.file_hold_reason }}{% endif %}
+                                                    </div>
                                                 {% endif %}
                                             </td>
                                             <td><span style="font-size: 11px; background: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ task.stage or '—' }}</span></td>
@@ -454,10 +432,34 @@
                 </div>
             {% endif %}
 
+            <!-- Independent Global Month Selector Bar -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🌐</span>
+                    <div>
+                        <strong style="font-size: 14px; color: var(--text-primary);">Global Monthly Overviews</strong>
+                        <div style="font-size: 11.5px; color: var(--text-secondary);">Monthly scoreboard targets &amp; staff summary (independent of top selection duration)</div>
+                    </div>
+                </div>
+                <form method="GET" action="{{ url_for('work_reports_page') }}" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="hidden" name="range_type" value="{{ data.range_type }}">
+                    <input type="hidden" name="selected_month" value="{{ data.selected_month }}">
+                    <input type="hidden" name="selected_year" value="{{ data.selected_year }}">
+                    <input type="hidden" name="start_date" value="{{ data.custom_start }}">
+                    <input type="hidden" name="end_date" value="{{ data.custom_end }}">
+                    {% if data.selected_employee_id %}
+                        <input type="hidden" name="employee_id" value="{{ data.selected_employee_id }}">
+                    {% endif %}
+                    
+                    <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Select Global Month:</label>
+                    <input type="month" name="global_month" class="form-input" value="{{ data.global_month }}" onchange="this.form.submit()" style="padding: 5px 12px; font-size: 13px; width: 170px;">
+                </form>
+            </div>
+
             <!-- Global Scoreboard & Target Points Dropdown (DEFAULT CLOSED) -->
             <details class="global-dropdown-card">
                 <summary>
-                    <span>🎯 Global Scoreboard &amp; Points Target Overview</span>
+                    <span>🎯 Global Scoreboard &amp; Points Target Overview — <strong style="color: var(--color-blue);">Month: {{ data.global_month }}</strong></span>
                     <span class="chevron-badge">Toggle List</span>
                 </summary>
                 <div style="padding: 16px;">
@@ -472,9 +474,9 @@
                                         <thead>
                                             <tr>
                                                 <th>Artist / Lead</th>
-                                                <th style="text-align: right;">Target</th>
+                                                <th style="text-align: right;">Monthly Target</th>
                                                 <th style="text-align: right;">Earned</th>
-                                                <th style="width: 35%;">Progress</th>
+                                                <th style="width: 35%;">Target Progress</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -505,19 +507,19 @@
                             </div>
                         {% endfor %}
                     {% else %}
-                        <div style="text-align: center; padding: 24px; color: var(--text-muted);">No scoreboard data available.</div>
+                        <div style="text-align: center; padding: 24px; color: var(--text-muted);">No scoreboard data available for {{ data.global_month }}.</div>
                     {% endif %}
                 </div>
             </details>
 
-            <!-- Global Staff Work Summary Dropdown (DEFAULT CLOSED & VIEW DETAIL REMOVED) -->
+            <!-- Global Staff Work Summary Dropdown (DEFAULT CLOSED) -->
             <details class="global-dropdown-card">
                 <summary>
-                    <span>📊 Global Staff Work Summary (Artists &amp; Leads)</span>
+                    <span>📊 Global Staff Work Summary (Artists &amp; Leads) — <strong style="color: var(--color-blue);">Month: {{ data.global_month }}</strong></span>
                     <span class="chevron-badge">Toggle List</span>
                 </summary>
                 <div style="padding: 16px;">
-                    {% if data.staff_reports %}
+                    {% if data.global_staff_reports %}
                         <div class="table-responsive">
                             <table class="scoreboard-table">
                                 <thead>
@@ -533,7 +535,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for staff in data.staff_reports %}
+                                    {% for staff in data.global_staff_reports %}
                                         <tr>
                                             <td><strong>{{ staff.team }}</strong></td>
                                             <td><span style="font-size: 11px; background: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ staff.role }}</span></td>
@@ -553,7 +555,7 @@
                         </div>
                     {% else %}
                         <div style="text-align: center; padding: 32px; color: var(--text-muted);">
-                            No staff records found matching your filters.
+                            No staff records found for {{ data.global_month }}.
                         </div>
                     {% endif %}
                 </div>

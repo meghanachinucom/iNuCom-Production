@@ -93,7 +93,7 @@
 </head>
 <body>
     <div class="dashboard-layout">
-                                                                                        <!-- Sidebar -->
+        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
@@ -115,67 +115,41 @@
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-            <ul class="sidebar-menu">
+                                    <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
                 </li>
                 {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Production Sheet</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% else %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') != 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard') }}"><span>Dashboard Overview</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and request.args.get('view') == 'pipeline' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', view='pipeline') }}"><span>Production Sheet</span></a>
-                </li>
-                {% endif %}
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
-                </li>
-                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
-                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                {% if session['role'] == 'Lead' %}
+                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
                 {% endif %}
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-
                 {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
-                    <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
                 </li>
-                {% elif session['role'] == 'HR' %}
-                <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
                 </li>
                 {% endif %}
             </ul>
@@ -192,73 +166,6 @@
             <header class="page-header">
                 <div>
                     <h1>Compensation Overview</h1>
-                </div>
-                <div class="header-actions-wrapper">
-                    <!-- Notification Bell Container -->
-                    <div class="notifications-bell-container" id="notifBellContainer">
-                        <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
-                            <span class="bell-icon">🔔</span>
-                            {% if unread_notif_count > 0 %}
-                                <span class="bell-badge">{{ unread_notif_count }}</span>
-                            {% endif %}
-                        </button>
-                        <div class="notif-dropdown" id="notifDropdown">
-                            <div class="notif-header">
-                                <h3>Notifications</h3>
-                                <button onclick="readAllNotifications(event)" class="btn-clear-all">Mark all read</button>
-                            </div>
-                            <div class="notif-list">
-                                {% if recent_notifications %}
-                                    {% for n in recent_notifications %}
-                                        <a href="{{ url_for('click_notification', nid=n.id) }}" class="notif-item {% if not n.is_read %}unread{% endif %}">
-                                            <div class="notif-icon-wrapper">
-                                                {% if n.type == 'task' %}
-                                                    📝
-                                                {% elif n.type == 'leave' or n.type == 'approval' %}
-                                                    ⏳
-                                                {% elif n.type == 'reminder' %}
-                                                    ⏰
-                                                {% else %}
-                                                    ℹ️
-                                                {% endif %}
-                                            </div>
-                                            <div class="notif-content">
-                                                <div class="notif-title">{{ n.title }}</div>
-                                                <div class="notif-body">{{ n.body }}</div>
-                                                <div class="notif-time">{{ n.created_at | ddmmyyyy }}</div>
-                                            </div>
-                                        </a>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="notif-empty">No notifications</div>
-                                {% endif %}
-                            </div>
-                            <div class="notif-footer">
-                                <a href="{{ url_for('notifications_page') }}">View All History</a>
-                            </div>
-                        </div>
-                    </div>
-                    <script>
-                    function toggleNotifDropdown(event) {
-                        event.stopPropagation();
-                        const dropdown = document.getElementById('notifDropdown');
-                        dropdown.classList.toggle('show');
-                    }
-                    window.addEventListener('click', function(event) {
-                        const dropdown = document.getElementById('notifDropdown');
-                        if (dropdown && !dropdown.contains(event.target) && !event.target.closest('#bellBtn')) {
-                            dropdown.classList.remove('show');
-                        }
-                    });
-                    function readAllNotifications(event) {
-                        event.stopPropagation();
-                        fetch("{{ url_for('read_all_notifications') }}", {
-                            method: "POST"
-                        }).then(response => {
-                            window.location.reload();
-                        });
-                    }
-                    </script>
                 </div>
             </header>
 

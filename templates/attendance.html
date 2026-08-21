@@ -107,61 +107,41 @@
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-            <ul class="sidebar-menu">
+                                    <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
                 </li>
                 {% endif %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
-                </li>
-                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
-                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                {% if session['role'] == 'Lead' %}
+                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
                 {% endif %}
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-
                 {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
-                    <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
                 </li>
-                {% elif session['role'] == 'HR' %}
-                <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
                 </li>
                 {% endif %}
             </ul>
@@ -187,74 +167,19 @@
                     </form>
                     {% endif %}
                 </div>
-                <div class="header-actions-wrapper">
-                    <!-- Notification Bell Container -->
-                    <div class="notifications-bell-container" id="notifBellContainer">
-                        <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
-                            <span class="bell-icon">🔔</span>
-                            {% if unread_notif_count > 0 %}
-                                <span class="bell-badge">{{ unread_notif_count }}</span>
-                            {% endif %}
-                        </button>
-                        <div class="notif-dropdown" id="notifDropdown">
-                            <div class="notif-header">
-                                <h3>Notifications</h3>
-                                <button onclick="readAllNotifications(event)" class="btn-clear-all">Mark all read</button>
-                            </div>
-                            <div class="notif-list">
-                                {% if recent_notifications %}
-                                    {% for n in recent_notifications %}
-                                        <a href="{{ url_for('click_notification', nid=n.id) }}" class="notif-item {% if not n.is_read %}unread{% endif %}">
-                                            <div class="notif-icon-wrapper">
-                                                {% if n.type == 'task' %}
-                                                    📝
-                                                {% elif n.type == 'leave' or n.type == 'approval' %}
-                                                    ⏳
-                                                {% elif n.type == 'reminder' %}
-                                                    ⏰
-                                                {% else %}
-                                                    ℹ️
-                                                {% endif %}
-                                            </div>
-                                            <div class="notif-content">
-                                                <div class="notif-title">{{ n.title }}</div>
-                                                <div class="notif-body">{{ n.body }}</div>
-                                                <div class="notif-time">{{ n.created_at | ddmmyyyy }}</div>
-                                            </div>
-                                        </a>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="notif-empty">No notifications</div>
-                                {% endif %}
-                            </div>
-                            <div class="notif-footer">
-                                <a href="{{ url_for('notifications_page') }}">View All History</a>
-                            </div>
-                        </div>
-                    </div>
-                    <script>
-                    function toggleNotifDropdown(event) {
-                        event.stopPropagation();
-                        const dropdown = document.getElementById('notifDropdown');
-                        dropdown.classList.toggle('show');
-                    }
-                    window.addEventListener('click', function(event) {
-                        const dropdown = document.getElementById('notifDropdown');
-                        if (dropdown && !dropdown.contains(event.target) && !event.target.closest('#bellBtn')) {
-                            dropdown.classList.remove('show');
-                        }
-                    });
-                    function readAllNotifications(event) {
-                        event.stopPropagation();
-                        fetch("{{ url_for('read_all_notifications') }}", {
-                            method: "POST"
-                        }).then(response => {
-                            window.location.reload();
-                        });
-                    }
-                    </script>
-                </div>
             </header>
+
+            <!-- Unified Attendance & Compensation Tabs for Admin/HR -->
+            {% if session['role'] in ['Admin', 'HR'] %}
+            <div class="report-tabs" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                <a href="{{ url_for('attendance_page', active_tab='calendar') }}" class="report-tab-btn {% if active_tab != 'compensation' %}active{% endif %}" style="text-decoration: none; padding: 10px 20px; font-weight: 700; border-radius: 8px;">
+                    📅 Attendance &amp; Calendar Tracker
+                </a>
+                <a href="{{ url_for('attendance_page', active_tab='compensation') }}" class="report-tab-btn {% if active_tab == 'compensation' %}active{% endif %}" style="text-decoration: none; padding: 10px 20px; font-weight: 700; border-radius: 8px;">
+                    💰 Compensation View
+                </a>
+            </div>
+            {% endif %}
 
             <!-- Alerts Block -->
             {% with messages = get_flashed_messages(category_filter=["error"]) %}
@@ -277,6 +202,7 @@
                 {% endif %}
             {% endwith %}
 
+            {% if active_tab != 'compensation' %}
             <div class="attendance-layout">
                 <!-- Clock Widget / Dev Test Panel Row -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
@@ -345,12 +271,26 @@
                     {% set next_month = selected_month + 1 if selected_month < 12 else 1 %}
                     {% set next_year = selected_year if selected_month < 12 else selected_year + 1 %}
 
-                    <div class="calendar-controls">
-                        <a href="{{ url_for('attendance_page', employee_id=target_user['id'], year=prev_year, month=prev_month) }}" class="btn-control">&laquo; Previous Month</a>
-                        <span class="month-year-title">
-                            {% if selected_month == 1 %}January{% elif selected_month == 2 %}February{% elif selected_month == 3 %}March{% elif selected_month == 4 %}April{% elif selected_month == 5 %}May{% elif selected_month == 6 %}June{% elif selected_month == 7 %}July{% elif selected_month == 8 %}August{% elif selected_month == 9 %}September{% elif selected_month == 10 %}October{% elif selected_month == 11 %}November{% else %}December{% endif %} {{ selected_year }}
-                        </span>
-                        <a href="{{ url_for('attendance_page', employee_id=target_user['id'], year=next_year, month=next_month) }}" class="btn-control">Next Month &raquo;</a>
+                    <div class="calendar-controls-bar" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding: 12px 18px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <a href="{{ url_for('attendance_page', employee_id=target_user['id'], year=prev_year, month=prev_month) }}" class="btn btn-outline btn-sm" style="white-space: nowrap; font-weight: 600; width: auto; text-decoration: none; padding: 6px 14px;">
+                            &larr; Previous Month
+                        </a>
+
+                        <div style="background: var(--color-blue-light); border: 1px solid var(--border-focus); border-radius: 20px; padding: 6px 20px; text-align: center; white-space: nowrap;">
+                            <span class="month-year-title" style="margin: 0; font-size: 16px; font-weight: 800; color: var(--color-blue); letter-spacing: 0.02em;">
+                                {% if selected_month == 1 %}January{% elif selected_month == 2 %}February{% elif selected_month == 3 %}March{% elif selected_month == 4 %}April{% elif selected_month == 5 %}May{% elif selected_month == 6 %}June{% elif selected_month == 7 %}July{% elif selected_month == 8 %}August{% elif selected_month == 9 %}September{% elif selected_month == 10 %}October{% elif selected_month == 11 %}November{% else %}December{% endif %} {{ selected_year }}
+                            </span>
+                        </div>
+
+                        <a href="{{ url_for('attendance_page', employee_id=target_user['id'], year=next_year, month=next_month) }}" class="btn btn-outline btn-sm" style="white-space: nowrap; font-weight: 600; width: auto; text-decoration: none; padding: 6px 14px;">
+                            Next Month &rarr;
+                        </a>
+
+                        {% if session['role'] == 'Admin' %}
+                        <a href="{{ url_for('export_employee_monthly_attendance', employee_id=target_user['id'], month='%04d-%02d'|format(selected_year, selected_month)) }}" class="btn btn-success btn-sm" style="white-space: nowrap; font-weight: 600; width: auto; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 6px 14px; font-size: 12px;" title="Download structured monthly attendance report for this employee">
+                            ⬇ Download Monthly (.xlsx)
+                        </a>
+                        {% endif %}
                     </div>
 
                     <!-- Calendar Grid -->
@@ -632,6 +572,134 @@
                     </details>
                 {% endif %}
             </div>
+            {% else %}
+                <!-- COMBINED COMPENSATION VIEW -->
+                {% set total_owed_sum = comp_rows | sum(attribute='total_owed') %}
+                {% set total_extra_sum = comp_rows | sum(attribute='total_extra') %}
+                {% set net_owed_sum = comp_rows | sum(attribute='net_owed') %}
+                {% set net_credit_sum = comp_rows | sum(attribute='net_credit') %}
+                {% set employees_with_debt = comp_rows | selectattr('net_owed', '>', 0) | list | length %}
+                {% set employees_with_credit = comp_rows | selectattr('net_credit', '>', 0) | list | length %}
+
+                <div class="stat-chips-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px;">
+                    <div class="stat-banner-chip">
+                        <div class="stat-banner-val" style="color: var(--text-primary);">{{ comp_rows | length }}</div>
+                        <div class="stat-banner-lbl">Staff Tracked</div>
+                    </div>
+                    <div class="stat-banner-chip">
+                        <div class="stat-banner-val" style="color: var(--color-red);">{{ "%.1f"|format(total_owed_sum) }}h</div>
+                        <div class="stat-banner-lbl">Total Hours Owed</div>
+                    </div>
+                    <div class="stat-banner-chip">
+                        <div class="stat-banner-val" style="color: var(--color-green);">{{ "%.1f"|format(total_extra_sum) }}h</div>
+                        <div class="stat-banner-lbl">Total Extra Banked</div>
+                    </div>
+                    <div class="stat-banner-chip">
+                        <div class="stat-banner-val" style="color: var(--color-blue);">{{ "%.1f"|format(net_owed_sum) }}h</div>
+                        <div class="stat-banner-lbl">Net Hours Debt</div>
+                    </div>
+                    <div class="stat-banner-chip">
+                        <div class="stat-banner-val" style="color: var(--color-green);">{{ "%.1f"|format(net_credit_sum) }}h</div>
+                        <div class="stat-banner-lbl">Net Hours Credit</div>
+                    </div>
+                    <div class="stat-banner-chip">
+                        <div class="stat-banner-val" style="color: var(--text-secondary);">{{ employees_with_debt }} <span style="font-size: 11px; color: var(--color-red);">owed</span> / {{ employees_with_credit }} <span style="font-size: 11px; color: var(--color-green);">credit</span></div>
+                        <div class="stat-banner-lbl">Debt vs Credit Staff</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px; padding: 14px 20px;">
+                    <form method="GET" action="{{ url_for('attendance_page') }}" style="display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                        <input type="hidden" name="active_tab" value="compensation">
+                        <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label for="filter_month" style="font-weight: 700; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">Select Month:</label>
+                                <input type="month" name="comp_month" id="filter_month" class="form-input" style="padding: 4px 10px; font-size: 13px; width: 170px;" value="{{ comp_month }}" onchange="this.form.submit()">
+                            </div>
+
+                            {% if comp_teams %}
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label for="filter_team" style="font-weight: 700; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">Filter by Team:</label>
+                                <select name="team" id="filter_team" class="select-input" style="padding: 4px 10px; font-size: 13px; width: 170px;" onchange="this.form.submit()">
+                                    <option value="">All Teams</option>
+                                    {% for t in comp_teams %}
+                                        <option value="{{ t }}" {% if filter_team == t %}selected{% endif %}>{{ t }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        {% if filter_team or comp_month %}
+                            <a href="{{ url_for('attendance_page', active_tab='compensation') }}" class="btn btn-outline btn-sm" style="text-decoration: none; white-space: nowrap; width: auto; font-weight: 600; padding: 6px 14px;">Clear Filters</a>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">
+                        Compensation Ledger
+                        {% if comp_month %}<span style="font-size: 13px; color: var(--color-blue); font-weight: bold;"> — Monthly View: {{ comp_month }}</span>{% endif %}
+                        {% if filter_team %}<span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;"> ({{ filter_team }} Team)</span>{% endif %}
+                    </h3>
+                    <div class="table-responsive">
+                        <table class="scoreboard-table" style="margin-top: 14px;">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Employee</th>
+                                    <th>Role / Team</th>
+                                    <th style="text-align: right;">Perm Hrs Owed</th>
+                                    <th style="text-align: right;">Late Hrs Owed</th>
+                                    <th style="text-align: right;">Total Hours Owed</th>
+                                    <th style="text-align: right;">Extra Hrs Banked</th>
+                                    <th style="text-align: right;">Net Balance / Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if comp_rows %}
+                                    {% for row in comp_rows %}
+                                        <tr>
+                                            <td style="color: var(--text-muted); font-size: 12px;">{{ loop.index }}</td>
+                                            <td>
+                                                <strong>{{ row['name'] }}</strong>
+                                                <div style="font-size: 11px; color: var(--text-muted);">@{{ row['username'] }}</div>
+                                            </td>
+                                            <td>
+                                                <span style="font-size: 11px; background-color: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['role'] }}</span>
+                                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">{{ row['team'] }}</div>
+                                            </td>
+                                            <td style="text-align: right; font-size: 13px;">
+                                                {% if row['perm_hours'] > 0 %}<span style="color: var(--color-red);">{{ "%.2f"|format(row['perm_hours']) }}h</span>{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+                                            </td>
+                                            <td style="text-align: right; font-size: 13px;">
+                                                {% if row['late_hours'] > 0 %}<span style="color: #f59e0b;">{{ "%.2f"|format(row['late_hours']) }}h</span>{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+                                            </td>
+                                            <td style="text-align: right; font-weight: 700;">
+                                                {% if row['total_owed'] > 0 %}<span style="color: var(--color-red);">{{ "%.2f"|format(row['total_owed']) }}h</span>{% else %}<span style="color: var(--text-muted);">0.00h</span>{% endif %}
+                                            </td>
+                                            <td style="text-align: right; font-weight: 700;">
+                                                {% if row['total_extra'] > 0 %}<span style="color: var(--color-green);">+{{ "%.2f"|format(row['total_extra']) }}h</span>{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+                                            </td>
+                                            <td style="text-align: right;">
+                                                {% if row['net_owed'] > 0 %}
+                                                    <span style="background: #fee2e2; color: var(--color-red); padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">Owes {{ "%.2f"|format(row['net_owed']) }}h</span>
+                                                {% elif row['net_credit'] > 0 %}
+                                                    <span style="background: var(--color-green-light); color: var(--color-green); padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 11px;">+{{ "%.2f"|format(row['net_credit']) }}h Credit ✓</span>
+                                                {% else %}
+                                                    <span style="background: #e2e8f0; color: var(--text-secondary); padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;">0.00h (Clear)</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">No employee compensation records found.</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
         </main>
     </div>
 
@@ -677,10 +745,24 @@
                 <button type="button" class="modal-close-btn" onclick="closeCalendarModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="calendar-controls" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                    <button type="button" class="btn btn-outline btn-sm" onclick="shiftPopupMonth(-1)">&larr; Previous Month</button>
-                    <span id="modal-calendar-month-display" style="font-weight: 700; font-size: 16px; color: var(--color-blue);"></span>
-                    <button type="button" class="btn btn-outline btn-sm" onclick="shiftPopupMonth(1)">Next Month &rarr;</button>
+                <div class="calendar-controls-bar" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding: 12px 18px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="shiftPopupMonth(-1)" style="white-space: nowrap; font-weight: 600; width: auto; padding: 6px 14px;">
+                        &larr; Previous Month
+                    </button>
+                    
+                    <div style="background: var(--color-blue-light); border: 1px solid var(--border-focus); border-radius: 20px; padding: 6px 20px; text-align: center; white-space: nowrap;">
+                        <span id="modal-calendar-month-display" style="font-weight: 800; font-size: 16px; color: var(--color-blue); letter-spacing: 0.02em;"></span>
+                    </div>
+
+                    <button type="button" class="btn btn-outline btn-sm" onclick="shiftPopupMonth(1)" style="white-space: nowrap; font-weight: 600; width: auto; padding: 6px 14px;">
+                        Next Month &rarr;
+                    </button>
+                    
+                    {% if session['role'] == 'Admin' %}
+                    <button type="button" class="btn btn-success btn-sm" onclick="downloadEmployeeMonthlyXlsx()" style="white-space: nowrap; font-weight: 600; width: auto; font-size: 12px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px;">
+                        ⬇ Download Monthly (.xlsx)
+                    </button>
+                    {% endif %}
                 </div>
                 <div id="modal-calendar-container" class="calendar-card" style="border: 0; box-shadow: none; padding: 0;">
                     <!-- Dynamically populated -->
@@ -693,6 +775,12 @@
         let currentPopupEmployeeId = null;
         let currentPopupYear = null;
         let currentPopupMonth = null;
+
+        function downloadEmployeeMonthlyXlsx() {
+            if (!currentPopupEmployeeId || !currentPopupYear || !currentPopupMonth) return;
+            const mStr = `${currentPopupYear}-${String(currentPopupMonth).padStart(2, '0')}`;
+            window.location.href = `/attendance/export-employee-monthly?employee_id=${currentPopupEmployeeId}&month=${mStr}`;
+        }
 
         function formatTime12(timeStr) {
             if (!timeStr) return '';

@@ -25,6 +25,9 @@
             padding:7px 12px; border:1px solid var(--border-color); border-radius:6px;
             background:var(--bg-main); font-size:13px; cursor:pointer;
         }
+        .filter-single-wrapper { display: inline-flex; align-items: center; gap: 6px; }
+        .filter-custom-wrapper { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .filter-single-wrapper.hide-filter, .filter-custom-wrapper.hide-filter { display: none !important; }
 
         /* Export button */
         .btn-export {
@@ -112,61 +115,41 @@
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-            <ul class="sidebar-menu">
+                                    <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
                 </li>
                 {% endif %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
-                </li>
-                {% endif %}
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
                 </li>
-                {% if session['role'] in ['Artist', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                {% if session['role'] == 'Lead' %}
+                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
                     <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
                 </li>
                 {% endif %}
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <a href="{{ url_for('notifications_page') }}">
-                        <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-
                 {% if session['role'] == 'Admin' %}
-                <li class="menu-section-title">Admin Management</li>
                 <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>Leave Approvals</span></a>
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'compensation_page' %}active{% endif %}">
-                    <a href="{{ url_for('compensation_page') }}"><span>Compensation View</span></a>
+                {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
                 </li>
-                {% elif session['role'] == 'HR' %}
-                <li class="menu-section-title">HR Management</li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
                 </li>
                 {% endif %}
             </ul>
@@ -184,73 +167,6 @@
             <div>
                 <h1>Admin Reports</h1>
             </div>
-            <div class="header-actions-wrapper">
-                <!-- Notification Bell Container -->
-                <div class="notifications-bell-container" id="notifBellContainer">
-                    <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown(event)" title="Notifications">
-                        <span class="bell-icon">🔔</span>
-                        {% if unread_notif_count > 0 %}
-                            <span class="bell-badge">{{ unread_notif_count }}</span>
-                        {% endif %}
-                    </button>
-                    <div class="notif-dropdown" id="notifDropdown">
-                        <div class="notif-header">
-                            <h3>Notifications</h3>
-                            <button onclick="readAllNotifications(event)" class="btn-clear-all">Mark all read</button>
-                        </div>
-                        <div class="notif-list">
-                            {% if recent_notifications %}
-                                {% for n in recent_notifications %}
-                                    <a href="{{ url_for('click_notification', nid=n.id) }}" class="notif-item {% if not n.is_read %}unread{% endif %}">
-                                        <div class="notif-icon-wrapper">
-                                            {% if n.type == 'task' %}
-                                                📝
-                                            {% elif n.type == 'leave' or n.type == 'approval' %}
-                                                ⏳
-                                            {% elif n.type == 'reminder' %}
-                                                ⏰
-                                            {% else %}
-                                                ℹ️
-                                            {% endif %}
-                                        </div>
-                                        <div class="notif-content">
-                                            <div class="notif-title">{{ n.title }}</div>
-                                            <div class="notif-body">{{ n.body }}</div>
-                                            <div class="notif-time">{{ n.created_at | ddmmyyyy }}</div>
-                                        </div>
-                                    </a>
-                                {% endfor %}
-                            {% else %}
-                                <div class="notif-empty">No notifications</div>
-                            {% endif %}
-                        </div>
-                        <div class="notif-footer">
-                            <a href="{{ url_for('notifications_page') }}">View All History</a>
-                        </div>
-                    </div>
-                </div>
-                <script>
-                function toggleNotifDropdown(event) {
-                    event.stopPropagation();
-                    const dropdown = document.getElementById('notifDropdown');
-                    dropdown.classList.toggle('show');
-                }
-                window.addEventListener('click', function(event) {
-                    const dropdown = document.getElementById('notifDropdown');
-                    if (dropdown && !dropdown.contains(event.target) && !event.target.closest('#bellBtn')) {
-                        dropdown.classList.remove('show');
-                    }
-                });
-                function readAllNotifications(event) {
-                    event.stopPropagation();
-                    fetch("{{ url_for('read_all_notifications') }}", {
-                        method: "POST"
-                    }).then(response => {
-                        window.location.reload();
-                    });
-                }
-                </script>
-            </div>
         </header>
 
 
@@ -266,486 +182,341 @@
             {% endfor %}{% endif %}
         {% endwith %}
 
+        <!-- Unified Filter Bar -->
+        <form method="GET" action="{{ url_for('reports_page') }}" class="card" style="padding: 16px 20px; margin-bottom: 20px; border-top: 3px solid var(--color-blue);">
+            <input type="hidden" name="tab" value="{{ tab }}">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                    <div>
+                        <label style="font-weight: 700; font-size: 13px; margin-right: 6px; color: var(--text-primary);">Duration:</label>
+                        <select name="range_type" id="range_type_select" onchange="toggleReportFilterFields()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); font-weight: 600; font-size: 13px;">
+                            <option value="today" {% if range_type == 'today' %}selected{% endif %}>Today</option>
+                            <option value="this_week" {% if range_type == 'this_week' %}selected{% endif %}>This Week</option>
+                            <option value="this_month" {% if range_type == 'this_month' %}selected{% endif %}>This Month</option>
+                            <option value="custom" {% if range_type == 'custom' %}selected{% endif %}>Custom Date Range</option>
+                        </select>
+                    </div>
+
+                    <!-- Single Date (when range_type == 'today') -->
+                    <div id="single_date_wrapper" class="filter-single-wrapper {% if range_type != 'today' %}hide-filter{% endif %}">
+                        <label style="font-weight: 700; font-size: 13px; color: var(--text-primary);">Date:</label>
+                        <input type="date" name="date" value="{{ rdate }}" max="{{ today_str }}" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px;">
+                    </div>
+
+                    <!-- Custom Date Range (when range_type == 'custom') -->
+                    <div id="custom_range_wrapper" class="filter-custom-wrapper {% if range_type != 'custom' %}hide-filter{% endif %}">
+                        <label style="font-weight: 700; font-size: 13px; color: var(--text-primary);">From:</label>
+                        <input type="date" name="start_date" value="{{ start_date }}" max="{{ today_str }}" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px;">
+                        <label style="font-weight: 700; font-size: 13px; color: var(--text-primary);">To:</label>
+                        <input type="date" name="end_date" value="{{ end_date }}" max="{{ today_str }}" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px;">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm" style="padding: 6px 16px; font-weight: 700;">
+                        🔍 Apply Filter
+                    </button>
+                </div>
+
+                <div>
+                    <a href="{{ url_for('reports_export', tab=tab, range_type=range_type, date=rdate, start_date=start_date, end_date=end_date) }}" class="btn-export" style="font-weight: 700; padding: 7px 16px;">
+                        ⬇ Export .xlsx
+                    </a>
+                </div>
+            </div>
+        </form>
+
         <!-- Tab Bar -->
         <div class="report-tabs">
             <button id="tab-morning" class="report-tab-btn {% if tab=='morning' %}active{% endif %}"
                 onclick="switchTab('morning')">📋 Morning Assignment</button>
             <button id="tab-eod" class="report-tab-btn {% if tab=='eod' %}active{% endif %}"
                 onclick="switchTab('eod')">✅ EOD Validation</button>
-            <button id="tab-login" class="report-tab-btn {% if tab=='login' %}active{% endif %}"
-                onclick="switchTab('login')">🕐 Login Timings</button>
-            <button id="tab-monthly" class="report-tab-btn {% if tab=='monthly' %}active{% endif %}"
-                onclick="switchTab('monthly')">📈 Monthly Points</button>
         </div>
 
         <!-- ───────────── TAB 1: MORNING ASSIGNMENT ───────────── -->
         <div id="panel-morning" class="tab-panel {% if tab=='morning' %}active{% endif %}">
-            <div class="rpt-filter-bar">
-                <label>Date:</label>
-                <input type="date" id="morning-date" value="{{ rdate }}" max="{{ today_str }}"
-                    onchange="reloadTab('morning',this.value)">
-                <a id="morning-export" class="btn-export"
-                    href="{{ url_for('reports_export', tab='morning', date=rdate) }}">
-                    ⬇ Export .xlsx
-                </a>
-            </div>
-
             <!-- Summary chips -->
-            {% set morning_done  = morning_rows | selectattr('assign_status','equalto','Done') | list | length %}
-            {% set morning_total = morning_rows | length %}
-            {% set morning_pts   = morning_rows | sum(attribute='points') %}
+            {% set m_stat = namespace(total=0, done=0, pts=0) %}
+            {% if morning_rows %}
+                {% for tname, tinfo in morning_rows.items() %}
+                    {% set m_stat.total = m_stat.total + (tinfo.assignments | length) %}
+                    {% for a in tinfo.assignments %}
+                        {% if a.assign_status == 'Done' %}{% set m_stat.done = m_stat.done + 1 %}{% endif %}
+                        {% set m_stat.pts = m_stat.pts + (a.points or 0) %}
+                    {% endfor %}
+                {% endfor %}
+            {% endif %}
             <div class="stat-chip-row">
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ morning_total }}</div><div class="stat-chip-lbl">Tasks Assigned</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ morning_done }}</div><div class="stat-chip-lbl">Completed</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ m_stat.total }}</div><div class="stat-chip-lbl">Tasks Assigned</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ m_stat.done }}</div><div class="stat-chip-lbl">Completed</div></div>
                 <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-red);">{{ no_task_artists | length }}</div><div class="stat-chip-lbl">No Tasks</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ morning_pts }}</div><div class="stat-chip-lbl">Total Points</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ m_stat.pts }}</div><div class="stat-chip-lbl">Total Points</div></div>
             </div>
 
-            <div class="card">
-                {% if morning_rows %}
-                <div class="table-responsive">
-                <table class="scoreboard-table">
-                    <thead><tr>
-                        <th>Team</th><th>Artist</th><th>File / Task</th>
-                        <th>Stage</th><th style="text-align:right">Points</th>
-                        <th>Status</th><th>Submit Time</th>
-                    </tr></thead>
-                    <tbody>
-                    {% set ns = namespace(cur_team='', team_pts=0, grand=0) %}
-                    {% for row in morning_rows %}
-                        {% if ns.cur_team != '' and ns.cur_team != row['team'] %}
-                        <tr class="subtotal-row">
-                            <td colspan="4" style="text-align:right;padding-right:12px;">{{ ns.cur_team }} Subtotal</td>
-                            <td style="text-align:right;">{{ ns.team_pts }} pts</td>
-                            <td colspan="2"></td>
-                        </tr>
-                        {% set ns.team_pts = 0 %}
-                        {% endif %}
-                        {% if ns.cur_team != row['team'] %}
-                        <tr class="team-group-hdr"><td colspan="7">{{ row['team'] }} Team</td></tr>
-                        {% set ns.cur_team = row['team'] %}
-                        {% endif %}
-                        {% set ns.team_pts = ns.team_pts + (row['points'] or 0) %}
-                        {% set ns.grand    = ns.grand    + (row['points'] or 0) %}
-                        <tr>
-                            <td>{{ row['team'] }}</td>
-                            <td><strong>{{ row['artist_name'] }}</strong></td>
-                            <td style="font-size:12.5px;">{{ row['file_name'] or row['task_description'] }}</td>
-                            <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['stage'] or '—' }}</span></td>
-                            <td style="text-align:right;font-weight:700;color:var(--color-blue);">{{ row['points'] or 0 }}</td>
-                            <td>
-                                {% set s = (row['assign_status'] or '') | lower %}
-                                <span class="rpt-badge {% if s=='done' %}done{% elif s=='in progress' %}progress{% else %}pending{% endif %}">
-                                    {{ row['assign_status'] or '—' }}
-                                </span>
-                            </td>
-                            <td style="font-size:12px;color:var(--text-secondary);">{{ row['submit_time'] or '—' }}</td>
-                        </tr>
-                    {% endfor %}
-                    {% if ns.cur_team %}
-                    <tr class="subtotal-row">
-                        <td colspan="4" style="text-align:right;padding-right:12px;">{{ ns.cur_team }} Subtotal</td>
-                        <td style="text-align:right;">{{ ns.team_pts }} pts</td>
-                        <td colspan="2"></td>
-                    </tr>
-                    {% endif %}
-                    <tr class="grand-row">
-                        <td colspan="4" style="text-align:right;padding-right:12px;">GRAND TOTAL</td>
-                        <td style="text-align:right;">{{ ns.grand }} pts</td>
-                        <td colspan="2"></td>
-                    </tr>
-                    </tbody>
-                </table>
-                </div>
-                {% else %}
-                <div class="rpt-empty">
-                    <div class="rpt-empty-icon">📋</div>
-                    No assignments found for {{ rdate | ddmmyyyy }}. Try a different date.
-                </div>
-                {% endif %}
+            {% if morning_rows %}
+                {% for team, team_info in morning_rows.items() %}
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 class="card-title" style="margin-bottom: 2px;">
+                                    {{ team_info.team }} Department
+                                </h3>
+                                <div style="font-size: 13px; color: var(--text-secondary);">
+                                    Team Lead: <strong>{{ team_info.lead_name }}</strong>
+                                </div>
+                            </div>
+                            <div>
+                                {% if team_info.status_color == 'green' %}
+                                    <span class="rpt-badge done" style="font-size: 12px; padding: 4px 12px;">✅ {{ team_info.status_label }}</span>
+                                {% elif team_info.status_color == 'warning' %}
+                                    <span class="rpt-badge progress" style="font-size: 12px; padding: 4px 12px; background: #fffbeb; color: #b45309; border: 1px solid #fde68a;">⚠️ {{ team_info.status_label }}</span>
+                                {% else %}
+                                    <span class="rpt-badge pending" style="font-size: 12px; padding: 4px 12px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;">❌ {{ team_info.status_label }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
 
-                {% if no_task_artists %}
-                <div style="margin-top:20px;padding:14px;background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;">
-                    <strong style="color:var(--color-red);">⚠ Artists &amp; Leads with NO tasks on {{ rdate | ddmmyyyy }}:</strong>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
-                    {% for a in no_task_artists %}
-                        <span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;">
-                            {{ a['name'] }} <span style="opacity:.7;font-size:11px;">({{ a['team'] }}{% if a['role'] == 'Lead' %} - Lead{% endif %})</span>
-                        </span>
-                    {% endfor %}
+                        {% if team_info.assignments %}
+                            <div class="table-responsive">
+                                <table class="scoreboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Artist / Lead</th>
+                                            <th>File / Task Description</th>
+                                            <th>Stage</th>
+                                            <th style="text-align: right;">Points</th>
+                                            <th>Status</th>
+                                            <th>Submit Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in team_info.assignments %}
+                                            <tr>
+                                                <td><span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">{{ row['date'] or start_date }}</span></td>
+                                                <td>
+                                                    <strong>{{ row['artist_name'] }}</strong>
+                                                    {% if row['artist_role'] == 'Lead' %}
+                                                        <span style="font-size: 9px; background: var(--color-blue-light); color: var(--color-blue); padding: 1px 6px; border-radius: 6px; margin-left: 4px; font-weight: 700;">LEAD</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td style="font-size: 12.5px;">{{ row['file_name'] or row['task_description'] }}</td>
+                                                <td><span style="font-size: 11px; background: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['stage'] or '—' }}</span></td>
+                                                <td style="text-align: right; font-weight: 700; color: var(--color-blue);">{{ row['points'] or 0 }}</td>
+                                                <td>
+                                                    {% set s = (row['assign_status'] or '') | lower %}
+                                                    <span class="rpt-badge {% if s=='done' %}done{% elif s=='in progress' %}progress{% else %}pending{% endif %}">
+                                                        {{ row['assign_status'] or 'Pending' }}
+                                                    </span>
+                                                </td>
+                                                <td style="font-size: 12px; color: var(--text-secondary);">{{ row['submit_time'] or '—' }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div style="padding: 16px; text-align: center; color: #dc2626; background: #fef2f2; border-radius: 6px; border: 1px dashed #fca5a5;">
+                                ⚠️ <strong>Team Lead {{ team_info.lead_name }} has not assigned morning tasks for {{ team_info.team }} team.</strong>
+                            </div>
+                        {% endif %}
+
+                        {% if team_info.unassigned_staff %}
+                            <div style="margin-top: 14px; padding: 10px 14px; background: #fff5f5; border: 1px solid #fca5a5; border-radius: 6px; font-size: 12px;">
+                                <strong style="color: #dc2626;">Unassigned Team Members:</strong>
+                                {% for u in team_info.unassigned_staff %}
+                                    <span style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 10px; margin-left: 6px; font-weight: 600;">
+                                        {{ u['name'] }} {% if u['role'] == 'Lead' %}(Lead){% endif %}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="rpt-empty">
+                        <div class="rpt-empty-icon">📋</div>
+                        No assignments found for range {{ start_date }} to {{ end_date }}.
                     </div>
                 </div>
-                {% endif %}
-            </div>
+            {% endif %}
         </div><!-- /morning -->
 
 
         <!-- ───────────── TAB 2: EOD VALIDATION ───────────── -->
         <div id="panel-eod" class="tab-panel {% if tab=='eod' %}active{% endif %}">
-            <div class="rpt-filter-bar">
-                <label>Date:</label>
-                <input type="date" id="eod-date" value="{{ rdate }}" max="{{ today_str }}"
-                    onchange="reloadTab('eod',this.value)">
-                <a id="eod-export" class="btn-export"
-                    href="{{ url_for('reports_export', tab='eod', date=rdate) }}">
-                    ⬇ Export .xlsx
-                </a>
-            </div>
-
-            {% set eod_done_list    = eod_rows | selectattr('assign_status','equalto','Done')    | list %}
-            {% set eod_pending_list = eod_rows | selectattr('assign_status','equalto','Pending') | list %}
-            {% set eod_done         = eod_done_list | length %}
-            {% set eod_pending      = eod_pending_list | length %}
-            {% set eod_pts          = eod_done_list | sum(attribute='points') %}
+            {% set e_stat = namespace(done=0, pending=0, pts=0) %}
+            {% if eod_rows %}
+                {% for tname, tinfo in eod_rows.items() %}
+                    {% set e_stat.done = e_stat.done + tinfo.done_count %}
+                    {% set e_stat.pending = e_stat.pending + tinfo.pending_count %}
+                    {% for a in tinfo.assignments %}
+                        {% if a.assign_status == 'Done' %}{% set e_stat.pts = e_stat.pts + (a.points or 0) %}{% endif %}
+                    {% endfor %}
+                {% endfor %}
+            {% endif %}
             
             <div class="stat-chip-row">
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ eod_done }}</div><div class="stat-chip-lbl">Done Files</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-orange,#f59e0b);">{{ eod_pending }}</div><div class="stat-chip-lbl">Pending (CF to Tomorrow)</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ eod_pts }}</div><div class="stat-chip-lbl">Points Credited</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ e_stat.done }}</div><div class="stat-chip-lbl">Done Files</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-orange,#f59e0b);">{{ e_stat.pending }}</div><div class="stat-chip-lbl">Pending (CF to Tomorrow)</div></div>
+                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ e_stat.pts }}</div><div class="stat-chip-lbl">Points Credited</div></div>
             </div>
 
             {% if eod_rows %}
-                <!-- SECTION 1: COMPLETED / DONE FILES -->
-                <div class="card" style="margin-bottom: 24px;">
-                    <h3 class="card-title" style="color: var(--color-green); margin-bottom: 14px;">
-                        ✅ Completed / Done Files ({{ eod_done }})
-                    </h3>
-                    {% if eod_done_list %}
-                    <div class="table-responsive">
-                    <table class="scoreboard-table">
-                        <thead><tr>
-                            <th>Team</th><th>Artist / Lead</th><th>File</th>
-                            <th>Stage</th><th>Status</th>
-                            <th style="text-align:right">Points Credited</th>
-                        </tr></thead>
-                        <tbody>
-                        {% set ns_done = namespace(cur_team='') %}
-                        {% for row in eod_done_list %}
-                            {% if ns_done.cur_team != row['team'] %}
-                            <tr class="team-group-hdr"><td colspan="6">{{ row['team'] }} Team</td></tr>
-                            {% set ns_done.cur_team = row['team'] %}
-                            {% endif %}
-                            <tr>
-                                <td>{{ row['team'] }}</td>
-                                <td><strong>{{ row['artist_name'] }}</strong></td>
-                                <td style="font-size:12.5px;">{{ row['file_name'] or '—' }}</td>
-                                <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['stage'] or '—' }}</span></td>
-                                <td>
-                                    <span class="rpt-badge done">Done</span>
-                                </td>
-                                <td class="txt-green" style="text-align:right;font-weight:700;">
-                                    +{{ row['points'] or 0 }}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        <tr class="subtotal-row">
-                            <td colspan="4"></td>
-                            <td style="font-weight:700;">Done Total: {{ eod_done }}</td>
-                            <td style="text-align:right;font-weight:800;color:var(--color-green);">{{ eod_pts }} pts</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                    </div>
-                    {% else %}
-                    <div style="text-align:center;padding:20px;color:var(--text-muted);">No done files for this date.</div>
-                    {% endif %}
-                </div>
+                {% for team, team_info in eod_rows.items() %}
+                    {% set done_assignments = team_info.assignments | selectattr('assign_status', 'equalto', 'Done') | list %}
+                    {% set pending_assignments = team_info.assignments | rejectattr('assign_status', 'equalto', 'Done') | list %}
 
-                <!-- SECTION 2: PENDING FILES (CARRY FORWARD TO TOMORROW) -->
-                <div class="card">
-                    <h3 class="card-title" style="color: var(--color-orange,#f59e0b); margin-bottom: 14px;">
-                        ⏳ Pending Files — Carry Forward (CF) to Tomorrow ({{ eod_pending }})
-                    </h3>
-                    {% if eod_pending_list %}
-                    <div class="table-responsive">
-                    <table class="scoreboard-table">
-                        <thead><tr>
-                            <th>Team</th><th>Artist / Lead</th><th>File</th>
-                            <th>Stage</th><th>Status</th>
-                            <th>Carry-Forward Pending Reason</th>
-                        </tr></thead>
-                        <tbody>
-                        {% set ns_pend = namespace(cur_team='') %}
-                        {% for row in eod_pending_list %}
-                            {% if ns_pend.cur_team != row['team'] %}
-                            <tr class="team-group-hdr"><td colspan="6">{{ row['team'] }} Team</td></tr>
-                            {% set ns_pend.cur_team = row['team'] %}
+                    <div class="card" style="margin-bottom: 24px; border-top: 3px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 class="card-title" style="margin-bottom: 2px;">
+                                    {{ team_info.team }} Department
+                                </h3>
+                                <div style="font-size: 13px; color: var(--text-secondary);">
+                                    Team Lead: <strong>{{ team_info.lead_name }}</strong> | Completed: <strong style="color: var(--color-green);">{{ done_assignments | length }}</strong> | Carry Forwarded: <strong style="color: #b45309;">{{ pending_assignments | length }}</strong>
+                                </div>
+                            </div>
+                            <div>
+                                {% if team_info.status_color == 'green' %}
+                                    <span class="rpt-badge done" style="font-size: 12px; padding: 4px 12px;">✅ {{ team_info.status_label }}</span>
+                                {% elif team_info.status_color == 'warning' %}
+                                    <span class="rpt-badge progress" style="font-size: 12px; padding: 4px 12px; background: #fffbeb; color: #b45309; border: 1px solid #fde68a;">⚠️ {{ team_info.status_label }}</span>
+                                {% else %}
+                                    <span class="rpt-badge pending" style="font-size: 12px; padding: 4px 12px;">{{ team_info.status_label }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- SECTION 1: COMPLETED WORK -->
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="font-size: 14px; color: var(--color-green); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                <span>✅ Completed Work (Done Today)</span>
+                                <span style="background: #dcfce7; color: #15803d; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 700;">{{ done_assignments | length }} Files</span>
+                            </h4>
+                            {% if done_assignments %}
+                                <div class="table-responsive">
+                                    <table class="scoreboard-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Artist / Lead</th>
+                                                <th>File / Task Description</th>
+                                                <th>Stage</th>
+                                                <th>Status</th>
+                                                <th style="text-align: right;">Points Credited</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in done_assignments %}
+                                                <tr>
+                                                    <td><span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">{{ row['date'] or start_date }}</span></td>
+                                                    <td>
+                                                        <strong>{{ row['artist_name'] }}</strong>
+                                                        {% if row['artist_role'] == 'Lead' %}
+                                                            <span style="font-size: 9px; background: var(--color-blue-light); color: var(--color-blue); padding: 1px 6px; border-radius: 6px; margin-left: 4px; font-weight: 700;">LEAD</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="font-size: 12.5px;">{{ row['file_name'] or row['task_description'] or '—' }}</td>
+                                                    <td><span style="font-size: 11px; background: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['stage'] or '—' }}</span></td>
+                                                    <td><span class="rpt-badge done">Done</span></td>
+                                                    <td style="text-align: right; font-weight: 700;" class="txt-green">+{{ row['points'] or 0 }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div style="padding: 12px 16px; text-align: center; color: var(--text-muted); background: var(--bg-main); border-radius: 6px; font-size: 12.5px;">
+                                    No files marked as Completed/Done for {{ team_info.team }} department.
+                                </div>
                             {% endif %}
-                            <tr>
-                                <td>{{ row['team'] }}</td>
-                                <td><strong>{{ row['artist_name'] }}</strong></td>
-                                <td style="font-size:12.5px;">{{ row['file_name'] or '—' }}</td>
-                                <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['stage'] or '—' }}</span></td>
-                                <td>
-                                    <span class="rpt-badge pending">Pending (CF)</span>
-                                </td>
-                                <td style="font-size:12px;color:var(--color-red);font-weight:600;">
-                                    {{ row['pending_reason'] or 'Carried forward to tomorrow' }}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        <tr class="subtotal-row">
-                            <td colspan="4"></td>
-                            <td style="font-weight:700;color:var(--color-orange,#f59e0b);">Pending CF Total: {{ eod_pending }}</td>
-                            <td></td>
-                        </tr>
-                        </tbody>
-                    </table>
+                        </div>
+
+                        <!-- SECTION 2: CARRY FORWARDED WORK -->
+                        <div>
+                            <h4 style="font-size: 14px; color: #b45309; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                <span>↪️ Carry Forwarded Work (Pending / Retake)</span>
+                                <span style="background: #fef3c7; color: #b45309; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 700;">{{ pending_assignments | length }} Files</span>
+                            </h4>
+                            {% if pending_assignments %}
+                                <div class="table-responsive">
+                                    <table class="scoreboard-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Artist / Lead</th>
+                                                <th>File / Task Description</th>
+                                                <th>Stage</th>
+                                                <th>Status</th>
+                                                <th>Remarks / Carry-Forward Reason</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in pending_assignments %}
+                                                <tr>
+                                                    <td><span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">{{ row['date'] or start_date }}</span></td>
+                                                    <td>
+                                                        <strong>{{ row['artist_name'] }}</strong>
+                                                        {% if row['artist_role'] == 'Lead' %}
+                                                            <span style="font-size: 9px; background: var(--color-blue-light); color: var(--color-blue); padding: 1px 6px; border-radius: 6px; margin-left: 4px; font-weight: 700;">LEAD</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="font-size: 12.5px;">{{ row['file_name'] or row['task_description'] or '—' }}</td>
+                                                    <td><span style="font-size: 11px; background: var(--bg-main); padding: 2px 6px; border-radius: 4px;">{{ row['stage'] or '—' }}</span></td>
+                                                    <td><span class="rpt-badge pending">{{ row['assign_status'] or 'Pending' }}</span></td>
+                                                    <td style="font-size: 12px; color: var(--text-secondary);">{{ row['pending_reason'] or 'Carried forward to tomorrow' }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div style="padding: 12px 16px; text-align: center; color: var(--text-muted); background: var(--bg-main); border-radius: 6px; font-size: 12.5px;">
+                                    No pending or carry-forwarded files for {{ team_info.team }} department.
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
-                    {% else %}
-                    <div style="text-align:center;padding:20px;color:var(--text-muted);">No pending carry-forward files for this date.</div>
-                    {% endif %}
-                </div>
+                {% endfor %}
             {% else %}
                 <div class="card">
                     <div class="rpt-empty">
                         <div class="rpt-empty-icon">✅</div>
-                        No EOD data found for {{ rdate | ddmmyyyy }}. Try a different date.
+                        No EOD data found for date range {{ start_date }} to {{ end_date }}.
                     </div>
                 </div>
             {% endif %}
         </div><!-- /eod -->
-
-
-        <!-- ───────────── TAB 3: LOGIN TIMINGS ───────────── -->
-        <div id="panel-login" class="tab-panel {% if tab=='login' %}active{% endif %}">
-            <div class="rpt-filter-bar">
-                <label>Date:</label>
-                <input type="date" id="login-date" value="{{ rdate }}" max="{{ today_str }}"
-                    onchange="reloadTab('login',this.value)">
-                <a id="login-export" class="btn-export"
-                    href="{{ url_for('reports_export', tab='login', date=rdate) }}">
-                    ⬇ Export .xlsx
-                </a>
-            </div>
-
-            <div class="card" style="margin-bottom:24px;">
-                <h3 class="card-title">Daily Login Details — {{ rdate | ddmmyyyy }}</h3>
-                {% if login_day %}
-                <div class="table-responsive">
-                <table class="scoreboard-table" style="margin-top:12px;">
-                    <thead><tr>
-                        <th>Team</th><th>Name</th><th>Role</th>
-                        <th>Clock In</th><th>Clock Out</th>
-                        <th style="text-align:right">Hours</th>
-                        <th>Status</th>
-                        <th style="text-align:right">Late By</th>
-                    </tr></thead>
-                    <tbody>
-                    {% set ns3 = namespace(cur_team='') %}
-                    {% for row in login_day %}
-                        {% if ns3.cur_team != row['team'] %}
-                        <tr class="team-group-hdr"><td colspan="8">{{ row['team'] }} Team</td></tr>
-                        {% set ns3.cur_team = row['team'] %}
-                        {% endif %}
-                        <tr>
-                            <td>{{ row['team'] }}</td>
-                            <td><strong>{{ row['name'] }}</strong></td>
-                            <td><span style="font-size:11px;background:var(--bg-main);padding:2px 6px;border-radius:4px;">{{ row['role'] }}</span></td>
-                            <td style="font-family:monospace;">{{ row['clock_in']|time12 if row['clock_in'] else '—' }}</td>
-                            <td style="font-family:monospace;">{{ row['clock_out']|time12 if row['clock_out'] else 'Active' }}</td>
-                            <td style="text-align:right;font-weight:700;">{{ "%.2f"|format(row['total_hours'] or 0) }}h</td>
-                            <td>
-                                {% set s = (row['status'] or '') | lower %}
-                                <span class="att-badge {% if s=='present' %}present{% elif s=='late' %}late{% elif s=='half day' %}half{% elif s=='absent' %}absent{% else %}present{% endif %}">
-                                    {{ row['status'] or '—' }}
-                                </span>
-                            </td>
-                            <td class="{% if (row['late_minutes'] or 0) > 0 %}txt-red{% else %}txt-green{% endif %}" style="text-align:right;">
-                                {% if (row['late_minutes'] or 0) > 0 %}+{{ row['late_minutes'] }} min{% else %}—{% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                {% else %}
-                <div class="rpt-empty">
-                    <div class="rpt-empty-icon">🕐</div>
-                    No attendance records for {{ rdate | ddmmyyyy }}.
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Weekly Overview Grid -->
-            {% if login_weekly %}
-            <div class="card">
-                <h3 class="card-title">Weekly Overview (week containing {{ rdate | ddmmyyyy }})</h3>
-                <div style="overflow-x:auto;margin-top:12px;">
-                <table class="scoreboard-table weekly-grid">
-                    <thead><tr>
-                        <th>Employee</th><th>Team</th>
-                        {% for lbl in week_labels %}<th style="text-align:center;">{{ lbl }}</th>{% endfor %}
-                    </tr></thead>
-                    <tbody>
-                    {% for emp_name, info in login_weekly.items() %}
-                    <tr>
-                        <td><strong>{{ emp_name }}</strong></td>
-                        <td style="font-size:11px;color:var(--text-secondary);">{{ info['team'] }}</td>
-                        {% for lbl in week_labels %}
-                            {% set d = info['days'].get(lbl) %}
-                            {% if d %}
-                                {% set sc = (d.status or '') | lower %}
-                                <td class="weekly-cell-{% if sc=='present' %}present{% elif sc=='late' %}late{% elif sc=='half day' %}halfday{% elif sc=='absent' %}absent{% else %}off{% endif %}"
-                                    style="text-align:center;font-size:11px;">
-                                    {% if sc=='present' %}✓{% elif sc=='late' %}L{% elif sc=='half day' %}½{% elif sc=='absent' %}✗{% else %}—{% endif %}
-                                </td>
-                            {% else %}
-                                <td class="weekly-cell-off" style="text-align:center;font-size:11px;">–</td>
-                            {% endif %}
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                <div style="display:flex;gap:12px;margin-top:12px;font-size:11px;flex-wrap:wrap;">
-                    <span class="weekly-cell-present" style="padding:3px 8px;border-radius:4px;">✓ Present</span>
-                    <span class="weekly-cell-late" style="padding:3px 8px;border-radius:4px;">L Late</span>
-                    <span class="weekly-cell-halfday" style="padding:3px 8px;border-radius:4px;">½ Half Day</span>
-                    <span class="weekly-cell-absent" style="padding:3px 8px;border-radius:4px;">✗ Absent</span>
-                    <span class="weekly-cell-off" style="padding:3px 8px;border-radius:4px;">– Off/Future</span>
-                </div>
-            </div>
-            {% endif %}
-        </div><!-- /login -->
-
-
-        <!-- ───────────── TAB 4: MONTHLY POINTS ───────────── -->
-        <div id="panel-monthly" class="tab-panel {% if tab=='monthly' %}active{% endif %}">
-            <div class="rpt-filter-bar">
-                <label>Month:</label>
-                <input type="month" id="monthly-month" value="{{ rmonth }}"
-                    onchange="reloadTabMonth(this.value)">
-                <a id="monthly-export" class="btn-export"
-                    href="{{ url_for('reports_export', tab='monthly', month=rmonth) }}">
-                    ⬇ Export .xlsx
-                </a>
-            </div>
-
-            {% if monthly_rows %}
-            {% set grand_earned = monthly_rows | sum(attribute='earned') %}
-            {% set grand_target = monthly_rows | sum(attribute='target') %}
-            {% set on_track_cnt = monthly_rows | selectattr('salary_impact','equalto','On Track') | list | length %}
-            <div class="stat-chip-row">
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-blue);">{{ monthly_rows | length }}</div><div class="stat-chip-lbl">Employees</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ grand_earned }}</div><div class="stat-chip-lbl">Total Earned</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--text-secondary);">{{ grand_target }}</div><div class="stat-chip-lbl">Total Target</div></div>
-                <div class="stat-chip"><div class="stat-chip-val" style="color:var(--color-green);">{{ on_track_cnt }}</div><div class="stat-chip-lbl">On Track</div></div>
-            </div>
-            {% endif %}
-
-            <div class="card">
-                {% if monthly_rows %}
-                <div style="overflow-x:auto;">
-                <table class="scoreboard-table">
-                    <thead><tr>
-                        <th>Team</th><th>Employee</th>
-                        {% for ws_, we_ in monthly_weeks %}
-                        <th style="text-align:right;white-space:nowrap;">Wk {{ loop.index }}<br><span style="font-weight:400;font-size:10px;color:rgba(255,255,255,.75);">{{ ws_.strftime('%d/%m') }}–{{ we_.strftime('%d/%m') }}</span></th>
-                        {% endfor %}
-                        <th style="text-align:right;">Total</th>
-                        <th style="text-align:right;">Target</th>
-                        <th style="text-align:center;">Progress</th>
-                        <th style="text-align:center;">Salary Impact</th>
-                    </tr></thead>
-                    <tbody>
-                    {% set ns4 = namespace(cur_team='', team_earned=0, team_target=0) %}
-                    {% for row in monthly_rows %}
-                        {% if ns4.cur_team != '' and ns4.cur_team != row['team'] %}
-                        <tr class="subtotal-row">
-                            <td colspan="{% if monthly_weeks %}{{ monthly_weeks|length + 2 }}{% else %}3{% endif %}">{{ ns4.cur_team }} Subtotal</td>
-                            <td style="text-align:right;font-weight:800;">{{ ns4.team_earned }}</td>
-                            <td style="text-align:right;">{{ ns4.team_target }}</td>
-                            <td></td><td></td>
-                        </tr>
-                        {% set ns4.team_earned = 0 %}
-                        {% set ns4.team_target = 0 %}
-                        {% endif %}
-                        {% if ns4.cur_team != row['team'] %}
-                        <tr class="team-group-hdr"><td colspan="{% if monthly_weeks %}{{ monthly_weeks|length + 6 }}{% else %}7{% endif %}">{{ row['team'] }} Team</td></tr>
-                        {% set ns4.cur_team = row['team'] %}
-                        {% endif %}
-                        {% set ns4.team_earned = ns4.team_earned + row['earned'] %}
-                        {% set ns4.team_target = ns4.team_target + row['target'] %}
-                        <tr>
-                            <td>{{ row['team'] }}</td>
-                            <td>
-                                <strong>{{ row['name'] }}</strong>
-                                <div style="font-size:10px;color:var(--text-muted);">@{{ row['username'] }}</div>
-                            </td>
-                            {% for wpts in row['week_pts'] %}
-                            <td class="{% if wpts > 0 %}txt-blue{% else %}txt-muted{% endif %}" style="text-align:right;">
-                                {{ wpts if wpts > 0 else '—' }}
-                            </td>
-                            {% endfor %}
-                            <td style="text-align:right;font-weight:700;color:var(--color-blue);">{{ row['earned'] }}</td>
-                            <td style="text-align:right;color:var(--text-secondary);">{{ row['target'] }}</td>
-                            <td>
-                                <div class="mini-bar-wrap">
-                                    <div style="font-size:10.5px;font-weight:700;margin-bottom:3px;text-align:right;">{{ row['pct'] }}%</div>
-                                    <div class="mini-bar"><div class="mini-bar-fill" data-width="{{ [row['pct']|int, 100]|min }}"></div></div>
-                                </div>
-                            </td>
-                            <td style="text-align:center;">
-                                {% set si = row['salary_impact'] | lower | replace(' ','') %}
-                                <span class="rpt-badge {% if si=='ontrack' %}ontarget{% elif si=='atrisk' %}atrisk{% else %}below{% endif %}">
-                                    {{ row['salary_impact'] }}
-                                </span>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    {% if ns4.cur_team %}
-                    <tr class="subtotal-row">
-                        <td colspan="{% if monthly_weeks %}{{ monthly_weeks|length + 2 }}{% else %}3{% endif %}">{{ ns4.cur_team }} Subtotal</td>
-                        <td style="text-align:right;font-weight:800;">{{ ns4.team_earned }}</td>
-                        <td style="text-align:right;">{{ ns4.team_target }}</td>
-                        <td colspan="2"></td>
-                    </tr>
-                    {% endif %}
-                    <tr class="grand-row">
-                        <td colspan="{% if monthly_weeks %}{{ monthly_weeks|length + 2 }}{% else %}3{% endif %}">GRAND TOTAL</td>
-                        <td style="text-align:right;font-weight:800;">{{ grand_earned }}</td>
-                        <td style="text-align:right;">{{ grand_target }}</td>
-                        <td colspan="2"></td>
-                    </tr>
-                    </tbody>
-                </table>
-                </div>
-                {% else %}
-                <div class="rpt-empty">
-                    <div class="rpt-empty-icon">📈</div>
-                    No points data for {{ rmonth }}.
-                </div>
-                {% endif %}
-            </div>
-        </div><!-- /monthly -->
 
     </main>
 </div>
 
 <script>
 function switchTab(tab) {
-    const date  = document.getElementById('morning-date')?.value || '{{ rdate }}';
-    const month = document.getElementById('monthly-month')?.value || '{{ rmonth }}';
-    const dateParam  = (tab !== 'monthly') ? date : '{{ rdate }}';
-    const monthParam = month;
-    window.location.href = `/reports?tab=${tab}&date=${dateParam}&month=${monthParam}`;
+    const rangeType = document.getElementById('range_type_select')?.value || '{{ range_type }}';
+    const singleDate = document.querySelector('input[name="date"]')?.value || '{{ rdate }}';
+    const startDate  = document.querySelector('input[name="start_date"]')?.value || '{{ start_date }}';
+    const endDate    = document.querySelector('input[name="end_date"]')?.value || '{{ end_date }}';
+
+    window.location.href = `/reports?tab=${tab}&range_type=${rangeType}&date=${singleDate}&start_date=${startDate}&end_date=${endDate}`;
 }
-function reloadTab(tab, val) {
-    const month = document.getElementById('monthly-month')?.value || '{{ rmonth }}';
-    window.location.href = `/reports?tab=${tab}&date=${val}&month=${month}`;
-    // Also update export link
-    const el = document.getElementById(tab + '-export');
-    if (el) el.href = `/reports/export/${tab}?date=${val}`;
+
+function toggleReportFilterFields() {
+    const rangeType = document.getElementById('range_type_select').value;
+    const singleWrapper = document.getElementById('single_date_wrapper');
+    const customWrapper = document.getElementById('custom_range_wrapper');
+    if (rangeType === 'today') {
+        singleWrapper.classList.remove('hide-filter');
+        customWrapper.classList.add('hide-filter');
+    } else if (rangeType === 'custom') {
+        singleWrapper.classList.add('hide-filter');
+        customWrapper.classList.remove('hide-filter');
+    } else {
+        singleWrapper.classList.add('hide-filter');
+        customWrapper.classList.add('hide-filter');
+    }
 }
-function reloadTabMonth(val) {
-    window.location.href = `/reports?tab=monthly&date={{ rdate }}&month=${val}`;
-}
-// Progress bar widths
-document.querySelectorAll('.mini-bar-fill[data-width]').forEach(el => {
-    el.style.width = Math.min(parseInt(el.dataset.width || '0', 10), 100) + '%';
-});
 </script>
 </body>
 </html>

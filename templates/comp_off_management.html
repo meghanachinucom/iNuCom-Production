@@ -23,23 +23,32 @@
             
             <div class="sidebar-user">
                 <div class="user-name">{{ session['name'] }}</div>
-                <div class="user-designation">HR Manager</div>
+                <div class="user-designation">
+                    {% if session['role'] == 'Admin' %}
+                        Admin
+                    {% elif session['role'] == 'HR' %}
+                        HR
+                    {% elif session['role'] == 'Lead' %}
+                        Lead
+                    {% else %}
+                        Artist
+                    {% endif %}
+                </div>
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-            <ul class="sidebar-menu">
+                                    <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                {% endif %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
                     <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
@@ -47,20 +56,24 @@
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-
-                <li class="menu-section-title">HR Management</li>
+                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
+                </li>
+                {% endif %}
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                </li>
+                {% endif %}
+                {% if session['role'] in ['Admin', 'HR'] %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
+                </li>
                 <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
                     <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
-                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
-                </li>
+                {% endif %}
             </ul>
             
             <div class="sidebar-footer">
