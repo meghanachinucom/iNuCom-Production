@@ -3,7 +3,8 @@ import sqlite3
 import datetime
 import calendar
 import re
-from flask import Flask, render_template, request, redirect, url_for, session, g, flash, jsonify
+import uuid
+from flask import Flask, render_template, request, redirect, url_for, session, g, flash, jsonify, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 
 DATABASE = 'production.db'
@@ -50,12 +51,36 @@ def _time12_filter(value):
         except Exception:
             return value
 
+@app.context_processor
+def inject_pending_approvals_count():
+    if 'user_id' not in session:
+        return {'pending_approvals_count': 0}
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        user_id = session['user_id']
+        cursor.execute("SELECT approval_chain, current_index FROM approvals WHERE status = 'Pending'")
+        rows = cursor.fetchall()
+        count = 0
+        import json
+        for r in rows:
+            try:
+                chain = json.loads(r['approval_chain'])
+                idx = r['current_index']
+                if idx < len(chain) and chain[idx] == user_id:
+                    count += 1
+            except Exception:
+                pass
+        return {'pending_approvals_count': count}
+    except Exception:
+        return {'pending_approvals_count': 0}
+
 # Pipeline Constants
 ASSET_STAGES = ['Reference', 'Explanation', 'Modeling', 'Texturing', 'Rig']
 
 SCENE_STAGES_FULL = [
     'Voice Over', 'Narration', 'Storyboards', 'Explanation', 'Scene-wise Assets',
-    'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp & Motion Graphics'
+    'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering', '3D Comp & Motion Graphics', 'VR'
 ]
 
 SCENE_STAGES_COMPAI = [
@@ -64,15 +89,17 @@ SCENE_STAGES_COMPAI = [
 ]
 
 PIPELINE_STAGES = [
+    # Asset Flow (First)
     'Reference',
     'Explanation',
+    'Modeling',
+    'Texturing',
+    'Rig',
+    # Scene Flow (Next)
     'Voice Over',
     'Narration',
     'Storyboards',
     'Scene-wise Assets',
-    'Modeling',
-    'Texturing',
-    'Rig',
     'Animation',
     'FBX export',
     'VFX',
@@ -126,6 +153,7 @@ def get_clean_base_name(name):
     if not name:
         return ""
     cleaned = re.sub(r'_take\d+(_[a-zA-Z0-9]+)?$', '', name, flags=re.IGNORECASE)
+    cleaned = re.sub(r'_(compo_AI|compo_ai|comp_ai)$', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'_(ref|exp|vo|nar|sb|sa|mdl|tex|rig|anim|fbx|vfx|lgt|rnd|comp|vr)$', '', cleaned, flags=re.IGNORECASE)
     return cleaned.strip()
 
@@ -145,20 +173,16 @@ def compute_file_display_name(base_name, take_count, stage_name=None):
 def get_file_pipeline_sequence(db, file_id):
     cursor = db.cursor()
     cursor.execute("""
-        SELECT c.name as chapter_name
+        SELECT c.name as chapter_name, f.file_type, f.name as file_name
         FROM files f
         JOIN chapters c ON f.chapter_id = c.id
         WHERE f.id = ?
     """, (file_id,))
     row = cursor.fetchone()
     
-    cursor.execute("SELECT step_name FROM file_pipeline WHERE file_id = ?", (file_id,))
-    existing_steps = set(r[0] for r in cursor.fetchall())
-    
-    if 'Modeling' in existing_steps or 'Rig' in existing_steps or 'Reference' in existing_steps:
-        if 'Animation' not in existing_steps and 'Voice Over' not in existing_steps:
-            return ASSET_STAGES
-            
+    if row and (row['file_type'] == 'Asset' or (row['chapter_name'] and 'asset' in row['chapter_name'].lower())):
+        return ASSET_STAGES
+
     if row and row['chapter_name'] in ['Chapter 13', 'Chapter 14', 'Chapter 15']:
         return SCENE_STAGES_COMPAI
     return SCENE_STAGES_FULL
@@ -294,6 +318,52 @@ def calculate_attendance_metrics(db, user_id, date_str, clock_in_str, clock_out_
             
     return status, late_minutes, early_minutes, total_hours, extra_hours
 
+def auto_credit_comp_off_for_attendance(db, user_id, date_str, status):
+    """Automatically credit Comp-Off balance when attendance is lodged on a declared Extra Working Day, Working Saturday, Sunday, or Holiday."""
+    try:
+        cursor = db.cursor()
+        dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        off_day = is_weekly_off(dt_obj)
+        
+        cursor.execute("SELECT COUNT(*) FROM holidays WHERE date = ?", (date_str,))
+        is_holiday = cursor.fetchone()[0] > 0
+        
+        cursor.execute("SELECT * FROM working_days_config WHERE date = ?", (date_str,))
+        wday_cfg = cursor.fetchone()
+        
+        is_extra_working = bool(wday_cfg) or off_day or is_holiday
+        
+        if is_extra_working:
+            credits = 1.0 if status in ['Present', 'Late', 'Done', 'Approved'] else (0.5 if status in ['Half Day', 'Partial'] else 0.0)
+            if credits > 0:
+                # Check if already credited for this user and date
+                cursor.execute("SELECT id FROM comp_off_ledger WHERE user_id = ? AND date = ? AND credits > 0", (user_id, date_str))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        UPDATE users
+                        SET comp_off_balance = COALESCE(comp_off_balance, 0.0) + ?
+                        WHERE id = ?
+                    """, (credits, user_id))
+                    
+                    reason_msg = f"Auto Comp-Off credited for attendance on Extra Working Day ({date_str})"
+                    if wday_cfg and wday_cfg['remarks']:
+                        reason_msg += f": {wday_cfg['remarks']}"
+                        
+                    cursor.execute("""
+                        INSERT INTO comp_off_ledger (user_id, date, credits, reason, status)
+                        VALUES (?, ?, ?, ?, 'Approved')
+                    """, (user_id, date_str, credits, reason_msg))
+                    
+                    cursor.execute("""
+                        UPDATE attendance
+                        SET comp_off_status = 'Auto-Credited'
+                        WHERE user_id = ? AND date = ?
+                    """, (user_id, date_str))
+                    db.commit()
+    except Exception as e:
+        print(f"Error in auto_credit_comp_off_for_attendance: {e}")
+
+
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
@@ -386,6 +456,28 @@ def recalculate_file_metadata(db, file_id):
                     WHERE file_id = ? AND step_name = ?
                 """, (today_str, today_str, file_id, c_stg))
                 steps_map[c_stg]['status'] = 'Done'
+
+    # Check 2D Comp AI status for this file
+    cursor.execute("SELECT is_comp_ai FROM files WHERE id = ?", (file_id,))
+    f_ai_row = cursor.fetchone()
+    file_is_comp_ai = (f_ai_row and f_ai_row['is_comp_ai'] == 1)
+
+    # Sequential team handover unlocking: Step i opens ONLY when preceding Step i-1 is 'Done' or 'Approved'
+    comp_ai_bypassed_stages = {'Modeling', 'Texturing', 'Rig', 'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering'}
+    for idx, step in enumerate(ordered_steps):
+        if idx == 0:
+            if step['status'] in ['Yts', None, '']:
+                cursor.execute("UPDATE file_pipeline SET status = 'Open' WHERE file_id = ? AND step_name = ?", (file_id, step['step_name']))
+                step['status'] = 'Open'
+        else:
+            if file_is_comp_ai and step['step_name'] in comp_ai_bypassed_stages:
+                continue
+            prev_step = ordered_steps[idx - 1]
+            prev_is_bypassed = (file_is_comp_ai and prev_step['step_name'] in comp_ai_bypassed_stages)
+            prev_done = (prev_step['status'] in ['Done', 'Approved', 'Not Applicable', 'Skipped']) or prev_is_bypassed
+            if prev_done and step['status'] in ['Yts', None, '']:
+                cursor.execute("UPDATE file_pipeline SET status = 'Open' WHERE file_id = ? AND step_name = ?", (file_id, step['step_name']))
+                step['status'] = 'Open'
 
     # b. Start and End Dates
     # Auto-ensure steps that are 'In Progress' or 'Done' have a start_date set if missing
@@ -523,19 +615,45 @@ def record_rtk_event(db, file_id, stage_name, rework_reason, target_team=None, a
     now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     user_id = session.get('user_id')
     user_name = session.get('name') or 'System'
+    creator_team = session.get('team') or ''
+    creator_role = session.get('role') or ''
+    if creator_team and creator_role:
+        creator_label = f"{user_name} ({creator_team} {creator_role})"
+    elif creator_team:
+        creator_label = f"{user_name} ({creator_team})"
+    else:
+        creator_label = user_name
     
+    # 1. Update files table (reset review approval statuses to Pending)
     cursor.execute("""
         UPDATE files
-        SET take_count = ?, rework_reason = ?, rework_target_team = ?, status = 'RTK'
+        SET take_count = ?, rework_reason = ?, rework_target_team = ?, status = 'RTK',
+            internal_lead_status = 'Pending', internal_content_status = 'Pending', final_review_status = 'Pending'
         WHERE id = ?
     """, (new_take, rework_reason, target_team, file_id))
     
+    # 2. Update target stage (reset assigned_to, end_date, submitted_at, set status = 'RTK')
     cursor.execute("""
         UPDATE file_pipeline
-        SET status = 'RTK', take_count = ?, rework_reason = ?, rework_target_team = ?
+        SET status = 'RTK', take_count = ?, rework_reason = ?, rework_target_team = ?,
+            assigned_to = NULL, end_date = NULL, submitted_at = NULL
         WHERE file_id = ? AND step_name = ?
     """, (new_take, rework_reason, target_team, file_id, stage_name))
+
+    # 3. Reset all downstream pipeline stages (steps occurring after stage_name) to 'Yts'
+    pipeline_seq = get_file_pipeline_sequence(db, file_id)
+    if stage_name in pipeline_seq:
+        target_idx = pipeline_seq.index(stage_name)
+        downstream_stages = pipeline_seq[target_idx + 1:]
+        for ds_stg in downstream_stages:
+            cursor.execute("""
+                UPDATE file_pipeline
+                SET status = 'Yts', take_count = ?, rework_reason = NULL, rework_target_team = NULL,
+                    assigned_to = NULL, start_date = NULL, end_date = NULL, submitted_at = NULL
+                WHERE file_id = ? AND step_name = ?
+            """, (new_take, file_id, ds_stg))
     
+    # 4. Insert RTK History Record
     cursor.execute("""
         INSERT INTO rtk_history (
             file_id, take_number, stage_name, target_team, assigned_to,
@@ -545,9 +663,12 @@ def record_rtk_event(db, file_id, stage_name, rework_reason, target_team=None, a
     """, (
         file_id, new_take, stage_name, target_team, assigned_to_user_id,
         artist_name, artist_username, old_file_name, new_file_name,
-        rework_reason or "Rework Requested", now_str, user_id, user_name
+        rework_reason or "Rework Requested", now_str, user_id, creator_label
     ))
     db.commit()
+
+    # 5. Recalculate file metadata so active stage, status, and handover rules refresh immediately
+    recalculate_file_metadata(db, file_id)
 
 
 def init_db():
@@ -761,6 +882,16 @@ def init_db():
                 )
             """, (today_str, today_str))
 
+            # Reset and sync take_count with rtk_history count
+            cursor.execute("""
+                UPDATE files
+                SET take_count = (SELECT COUNT(*) FROM rtk_history WHERE rtk_history.file_id = files.id)
+            """)
+            cursor.execute("""
+                UPDATE file_pipeline
+                SET take_count = (SELECT COUNT(*) FROM rtk_history WHERE rtk_history.file_id = file_pipeline.file_id)
+            """)
+
             conn.commit()
             conn.close()
             print("Migrated: ensured file_pipeline, daily_assignments, and files columns for timestamps and rework routing.")
@@ -866,6 +997,12 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN device_id TEXT")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS working_days_config (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -922,8 +1059,9 @@ def init_db():
             
             cursor.execute("SELECT id, name FROM files WHERE is_comp_ai = 1")
             for fid, fname in cursor.fetchall():
-                if fname and 'compo' not in fname.lower() and 'comp ai' not in fname.lower():
-                    cursor.execute("UPDATE files SET name = ? WHERE id = ?", (f"{fname}_compo_AI", fid))
+                if fname and ('compo_ai' in fname.lower() or 'comp_ai' in fname.lower()):
+                    clean_fname = re.sub(r'_(compo_AI|compo_ai|comp_ai)$', '', fname, flags=re.IGNORECASE)
+                    cursor.execute("UPDATE files SET name = ? WHERE id = ?", (clean_fname, fid))
             conn.commit()
             
             # Migrate file pipeline stages for standard projects (preserve custom stages for Promo Videos)
@@ -1130,13 +1268,33 @@ def enforce_auth_and_password_change():
 @app.route('/')
 def index():
     if 'user_id' in session:
+        if session.get('role') == 'Admin':
+            return redirect(url_for('reports_page'))
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'user_id' in session:
-        return redirect(url_for('dashboard'))
+    device_token = request.cookies.get('device_token')
+    cookie_to_set = None
+    if not device_token:
+        device_token = uuid.uuid4().hex
+        cookie_to_set = device_token
+
+    if request.method == 'GET':
+        if 'user_id' in session:
+            if session.get('role') == 'Admin':
+                resp = make_response(redirect(url_for('reports_page')))
+            else:
+                resp = make_response(redirect(url_for('dashboard')))
+            if cookie_to_set:
+                resp.set_cookie('device_token', cookie_to_set, max_age=315360000, httponly=True, samesite='Lax')
+            return resp
+            
+        resp = make_response(render_template('login.html'))
+        if cookie_to_set:
+            resp.set_cookie('device_token', cookie_to_set, max_age=315360000, httponly=True, samesite='Lax')
+        return resp
         
     if request.method == 'POST':
         username = request.form.get('username', '').strip().lower()
@@ -1144,7 +1302,10 @@ def login():
         
         if not username or not password:
             flash("Please enter both username and password.", "error")
-            return render_template('login.html')
+            resp = make_response(render_template('login.html'))
+            if cookie_to_set:
+                resp.set_cookie('device_token', cookie_to_set, max_age=315360000, httponly=True, samesite='Lax')
+            return resp
             
         db = get_db()
         cursor = db.cursor()
@@ -1152,24 +1313,49 @@ def login():
         user = cursor.fetchone()
         
         if user and check_password_hash(user['password_hash'], password):
+            # 1. Device Lock Check (Applies to EVERY role: Artist, Lead, HR, Admin)
+            user_device_id = user['device_id']
+            if not user_device_id:
+                cursor.execute("UPDATE users SET device_id = ? WHERE id = ?", (device_token, user['id']))
+                db.commit()
+            elif user_device_id != device_token:
+                flash("This account is locked to a different registered browser/device. Please contact HR or Admin to reset your device registration.", "error")
+                resp = make_response(render_template('login.html'))
+                if cookie_to_set:
+                    resp.set_cookie('device_token', cookie_to_set, max_age=315360000, httponly=True, samesite='Lax')
+                return resp
+
+            # 2. Session Invalidation (Fully clear any prior session state/residual role permissions)
+            session.clear()
+            
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['name'] = user['name']
             session['role'] = user['role']
             session['team'] = user['team']
+            session['logged_in'] = True
             
             cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)", 
                            (user['id'], 'User Login', f"User {user['username']} logged in successfully."))
             db.commit()
             
             if user['must_change_password'] == 1:
-                return redirect(url_for('change_password'))
-                
-            return redirect(url_for('dashboard'))
+                target_url = url_for('change_password')
+            elif user['role'] == 'Admin':
+                target_url = url_for('reports_page')
+            else:
+                target_url = url_for('dashboard')
+
+            resp = make_response(redirect(target_url))
+            if cookie_to_set:
+                resp.set_cookie('device_token', cookie_to_set, max_age=315360000, httponly=True, samesite='Lax')
+            return resp
         else:
             flash("Invalid username or password.", "error")
-            
-    return render_template('login.html')
+            resp = make_response(render_template('login.html'))
+            if cookie_to_set:
+                resp.set_cookie('device_token', cookie_to_set, max_age=315360000, httponly=True, samesite='Lax')
+            return resp
 
 @app.route('/change-password', methods=['GET', 'POST'])
 def change_password():
@@ -1210,6 +1396,10 @@ def change_password():
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+
+    sub_tab = request.args.get('sub_tab', '')
+    if session['role'] == 'Admin' and sub_tab not in ['assets', 'scenes']:
+        return redirect(url_for('reports_page'))
         
     db = get_db()
     cursor = db.cursor()
@@ -2360,10 +2550,9 @@ def assign_comp_ai(file_id):
             return jsonify({'error': 'Unauthorized'}), 401
         return redirect(url_for('login'))
 
-    # ONLY Content team members (or Admin/Lead) can assign 2D Comp AI
+    # ONLY Content team members can assign 2D Comp AI
     user_team = session.get('team')
-    user_role = session.get('role')
-    if user_team != 'Content' and user_role not in ['Admin', 'Lead']:
+    if user_team != 'Content':
         err_msg = "Forbidden: Only Content team can assign 2D Comp AI."
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'error': err_msg}), 403
@@ -2506,10 +2695,11 @@ def get_file_details(file_id):
     """, (file_id,))
     pipeline_steps = [dict(r) for r in cursor.fetchall()]
     
-    # Sort steps by PIPELINE_STAGES order
+    # Filter & sort steps by exact file pipeline sequence (Asset stages for Assets, Scene stages for Scenes)
+    seq_stages = get_file_pipeline_sequence(db, file_id)
     steps_map = {s['step_name']: s for s in pipeline_steps}
     sorted_steps = []
-    for stage in PIPELINE_STAGES:
+    for stage in seq_stages:
         if stage in steps_map:
             sorted_steps.append(steps_map[stage])
     
@@ -2562,13 +2752,15 @@ def get_file_details(file_id):
     file_data['pending_team'] = pending_team
 
     raw_name = file_data['name']
-    file_data['dynamic_name'] = raw_name
+    clean_base = get_clean_base_name(raw_name)
     
     # Take count & retake versioning details (Take 0 = Original File, Take 1 = 1st Rework)
-    cursor.execute("SELECT MAX(take_count) FROM file_pipeline WHERE file_id = ?", (file_id,))
-    max_take_row = cursor.fetchone()
-    current_take = (max_take_row[0] if max_take_row and max_take_row[0] is not None else 0)
+    cursor.execute("SELECT COUNT(*) FROM rtk_history WHERE file_id = ?", (file_id,))
+    current_take = cursor.fetchone()[0] or 0
     file_data['take_count'] = current_take
+
+    dynamic_name = compute_file_display_name(clean_base, current_take)
+    file_data['dynamic_name'] = dynamic_name
 
     # Format 12-hour submission time if final_approval_date or end_date exists
     sub_time_12 = ""
@@ -2602,6 +2794,27 @@ def get_file_details(file_id):
         'submission_time_12': sub_time_12
     }
 
+    # Fetch Comp AI artist details if assigned
+    comp_ai_artist_name = ""
+    comp_ai_artist_username = ""
+    if file_data.get('comp_ai_artist_id'):
+        cursor.execute("SELECT name, username FROM users WHERE id = ?", (file_data['comp_ai_artist_id'],))
+        ca_row = cursor.fetchone()
+        if ca_row:
+            comp_ai_artist_name = ca_row['name']
+            comp_ai_artist_username = ca_row['username']
+    file_data['comp_ai_artist_name'] = comp_ai_artist_name
+    file_data['comp_ai_artist_username'] = comp_ai_artist_username
+
+    # Calculate initial start date from first team stage
+    first_start_date = file_data.get('start_date') or ""
+    if sorted_steps:
+        for stp in sorted_steps:
+            if stp.get('start_date'):
+                first_start_date = stp['start_date']
+                break
+    file_data['first_team_start_date'] = first_start_date or 'N/A'
+
     # Fetch RTK history records
     cursor.execute("""
         SELECT id, file_id, take_number, stage_name, target_team, assigned_to,
@@ -2612,6 +2825,18 @@ def get_file_details(file_id):
         ORDER BY take_number ASC, id ASC
     """, (file_id,))
     rtk_history_rows = [dict(r) for r in cursor.fetchall()]
+
+    latest_rework_info = None
+    if rtk_history_rows:
+        last_rtk = rtk_history_rows[-1]
+        latest_rework_info = {
+            'take_number': last_rtk['take_number'],
+            'origin_lead': last_rtk['created_by_name'] or 'Team Lead',
+            'target_team': last_rtk['target_team'] or 'N/A',
+            'reason': last_rtk['reason'] or 'Rework Requested',
+            'created_at': last_rtk['created_at']
+        }
+    file_data['latest_rework_info'] = latest_rework_info
 
     # Fetch all artists for dropdown selection
     cursor.execute("SELECT id, name, username, team FROM users WHERE role = 'Artist' ORDER BY name")
@@ -2906,14 +3131,14 @@ def assign_file():
     cursor.execute("SELECT points, take_count, rework_reason FROM file_pipeline WHERE file_id = ? AND step_name = ?", (file_id, step_name))
     existing_step = cursor.fetchone()
     existing_points = existing_step['points'] if existing_step and existing_step['points'] else 0
-    take_count = existing_step['take_count'] if existing_step and existing_step['take_count'] else 1
+    take_count = existing_step['take_count'] if existing_step and existing_step['take_count'] is not None else 0
     rework_reason = existing_step['rework_reason'] if existing_step else None
     
-    is_rework_or_take2 = (take_count > 1) or bool(rework_reason)
+    is_rework = (take_count >= 1) or bool(rework_reason)
     
     if artist_id:
-        if is_rework_or_take2 and existing_points > 0:
-            points = existing_points  # Points locked only when Take 2+ is happening or rework from another team
+        if is_rework and existing_points > 0:
+            points = existing_points  # Points locked on Retake / Rework
         elif points <= 0:
             flash("A file stage cannot be assigned to an artist or lead until complexity points are specified (> 0).", "error")
             return redirect(request.referrer or url_for('dashboard'))
@@ -2941,9 +3166,9 @@ def assign_file():
         if artist_id:
             cursor.execute("""
                 UPDATE file_pipeline 
-                SET assigned_to = ?, status = ?, points = ?, start_date = COALESCE(start_date, ?), end_date = ?
+                SET assigned_to = ?, status = ?, points = ?, start_date = COALESCE(start_date, ?)
                 WHERE file_id = ? AND step_name = ?
-            """, (artist_id, new_status, points, today_str, end_date, file_id, step_name))
+            """, (artist_id, new_status, points, today_str, file_id, step_name))
         else:
             cursor.execute("""
                 UPDATE file_pipeline 
@@ -3401,17 +3626,10 @@ def validate_assignment():
         if not target_stage:
             target_stage = 'Modeling'
             
-        cursor.execute("""
-            UPDATE file_pipeline 
-            SET take_count = COALESCE(take_count, 1) + 1, status = 'Open', assigned_to = NULL, remarks = ?, rework_reason = ?, rework_target_team = ? 
-            WHERE file_id = ? AND step_name = ?
-        """, (remarks, remarks, rework_team, da['file_id'], target_stage))
+        record_rtk_event(db, da['file_id'], target_stage, remarks, rework_team)
         
         cursor.execute("UPDATE daily_assignments SET status = 'Rework', remarks = ? WHERE id = ?", 
                        (remarks, assignment_id))
-                       
-        cursor.execute("UPDATE files SET rework_reason = ?, rework_target_team = ?, status = 'In Progress' WHERE id = ?",
-                       (remarks, rework_team, da['file_id']))
                        
         cursor.execute("SELECT id FROM users WHERE team = ? AND role = 'Lead'", (rework_team,))
         target_leads = cursor.fetchall()
@@ -3423,7 +3641,6 @@ def validate_assignment():
         cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'EOD Validation Rework', ?)",
                        (session['user_id'], f"Sent task for Rework to {rework_team} team on '{da['file_name']}'. Reason: {remarks}"))
         db.commit()
-        recalculate_file_metadata(db, da['file_id'])
         flash(f"Task sent for Rework to {rework_team} team. Stage is OPEN for target lead to assign. Take counter incremented, points unchanged!", "warning")
 
     return redirect(request.referrer or url_for('dashboard'))
@@ -4404,7 +4621,7 @@ def get_approval_chain(db, user_id, role, reports_to_username):
     if role == 'Artist':
         lead_id = None
         if reports_to_username:
-            cursor.execute("SELECT id FROM users WHERE username = ?", (reports_to_username,))
+            cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (reports_to_username,))
             lead_row = cursor.fetchone()
             if lead_row:
                 lead_id = lead_row['id']
@@ -4564,6 +4781,7 @@ def leaves_page():
             return redirect(url_for('leaves_page'))
         start_date_str = request.form.get('start_date', '').strip()
         end_date_str = request.form.get('end_date', '').strip()
+        leave_type = request.form.get('leave_type', 'General').strip()
         reason = request.form.get('reason', '').strip()
         
         if not start_date_str or not end_date_str or not reason:
@@ -4588,66 +4806,72 @@ def leaves_page():
         cursor.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
         user_info = cursor.fetchone()
         
-        # Calculate Approved Used Days in the current year
-        current_year = start_date.year
-        year_start = f"{current_year}-01-01"
-        year_end = f"{current_year}-12-31"
-        
-        cursor.execute("""
-            SELECT start_date, end_date FROM leaves
-            WHERE user_id = ? AND status = 'Approved'
-              AND NOT (end_date < ? OR start_date > ?)
-        """, (session['user_id'], year_start, year_end))
-        approved_leaves = cursor.fetchall()
-        
-        approved_used = 0
-        for lv in approved_leaves:
-            lv_start = datetime.datetime.strptime(lv['start_date'], '%Y-%m-%d').date()
-            lv_end = datetime.datetime.strptime(lv['end_date'], '%Y-%m-%d').date()
-            intersect_start = max(lv_start, datetime.date(current_year, 1, 1))
-            intersect_end = min(lv_end, datetime.date(current_year, 12, 31))
-            approved_used += (intersect_end - intersect_start).days + 1
-            
-        allowed_leaves = 18.0 + float(user_info['carry_forward'] or 0.0)
-        remaining_balance = allowed_leaves - approved_used
-        
-        if requested_days > remaining_balance:
-            flash(f"Insufficient leave balance. Requested: {requested_days} days, Remaining: {remaining_balance:.1f} days.", "error")
-            return redirect(url_for('leaves_page'))
-            
-        # Monthly limit check: max 2 leaves per month (spanned months count)
-        spanned_months = {}
-        curr_day = start_date
-        while curr_day <= end_date:
-            month_key = curr_day.strftime('%Y-%m')
-            spanned_months[month_key] = spanned_months.get(month_key, 0) + 1
-            curr_day += datetime.timedelta(days=1)
-            
-        # Check limit for each month in spanned_months
-        for m_key, days_in_req_month in spanned_months.items():
-            month_start_str = f"{m_key}-01"
-            y, m = map(int, m_key.split('-'))
-            last_day = calendar.monthrange(y, m)[1]
-            month_end_str = f"{m_key}-{last_day:02d}"
+        # Comp-Off Specific Validation
+        if leave_type == 'Comp Off':
+            comp_off_bal = float(user_info['comp_off_balance'] or 0.0)
+            if requested_days > comp_off_bal:
+                flash(f"Insufficient Comp-Off balance. You requested {requested_days} day(s), but have {comp_off_bal:.1f} Comp-Off day(s) available.", "error")
+                return redirect(url_for('leaves_page'))
+        else:
+            # Calculate Approved Used Days in the current year for General Leave Pool
+            current_year = start_date.year
+            year_start = f"{current_year}-01-01"
+            year_end = f"{current_year}-12-31"
             
             cursor.execute("""
                 SELECT start_date, end_date FROM leaves
-                WHERE user_id = ? AND status = 'Approved'
+                WHERE user_id = ? AND status = 'Approved' AND (leave_type IS NULL OR leave_type != 'Comp Off')
                   AND NOT (end_date < ? OR start_date > ?)
-            """, (session['user_id'], month_start_str, month_end_str))
-            month_approved_leaves = cursor.fetchall()
+            """, (session['user_id'], year_start, year_end))
+            approved_leaves = cursor.fetchall()
             
-            month_approved_days = 0
-            for lv in month_approved_leaves:
+            approved_used = 0
+            for lv in approved_leaves:
                 lv_start = datetime.datetime.strptime(lv['start_date'], '%Y-%m-%d').date()
                 lv_end = datetime.datetime.strptime(lv['end_date'], '%Y-%m-%d').date()
-                intersect_start = max(lv_start, datetime.date(y, m, 1))
-                intersect_end = min(lv_end, datetime.date(y, m, last_day))
-                month_approved_days += (intersect_end - intersect_start).days + 1
+                intersect_start = max(lv_start, datetime.date(current_year, 1, 1))
+                intersect_end = min(lv_end, datetime.date(current_year, 12, 31))
+                approved_used += (intersect_end - intersect_start).days + 1
                 
-            if month_approved_days + days_in_req_month > 2:
-                flash(f"Leave policy violation: Leaves in {y}-{m:02d} exceed the monthly limit of 2 days. (Approved in month: {month_approved_days} days, Requested in month: {days_in_req_month} days)", "error")
+            allowed_leaves = 18.0 + float(user_info['carry_forward'] or 0.0)
+            remaining_balance = allowed_leaves - approved_used
+            
+            if requested_days > remaining_balance:
+                flash(f"Insufficient leave balance. Requested: {requested_days} days, Remaining Pool: {remaining_balance:.1f} days.", "error")
                 return redirect(url_for('leaves_page'))
+                
+            # Monthly limit check for General Leaves: max 2 leaves per month
+            spanned_months = {}
+            curr_day = start_date
+            while curr_day <= end_date:
+                month_key = curr_day.strftime('%Y-%m')
+                spanned_months[month_key] = spanned_months.get(month_key, 0) + 1
+                curr_day += datetime.timedelta(days=1)
+                
+            for m_key, days_in_req_month in spanned_months.items():
+                month_start_str = f"{m_key}-01"
+                y, m = map(int, m_key.split('-'))
+                last_day = calendar.monthrange(y, m)[1]
+                month_end_str = f"{m_key}-{last_day:02d}"
+                
+                cursor.execute("""
+                    SELECT start_date, end_date FROM leaves
+                    WHERE user_id = ? AND status = 'Approved' AND (leave_type IS NULL OR leave_type != 'Comp Off')
+                      AND NOT (end_date < ? OR start_date > ?)
+                """, (session['user_id'], month_start_str, month_end_str))
+                month_approved_leaves = cursor.fetchall()
+                
+                month_approved_days = 0
+                for lv in month_approved_leaves:
+                    lv_start = datetime.datetime.strptime(lv['start_date'], '%Y-%m-%d').date()
+                    lv_end = datetime.datetime.strptime(lv['end_date'], '%Y-%m-%d').date()
+                    intersect_start = max(lv_start, datetime.date(y, m, 1))
+                    intersect_end = min(lv_end, datetime.date(y, m, last_day))
+                    month_approved_days += (intersect_end - intersect_start).days + 1
+                    
+                if month_approved_days + days_in_req_month > 2:
+                    flash(f"Leave policy violation: Leaves in {y}-{m:02d} exceed the monthly limit of 2 days. (Approved in month: {month_approved_days} days, Requested in month: {days_in_req_month} days)", "error")
+                    return redirect(url_for('leaves_page'))
                 
         # Planned Leave Pre-Assignment check for Team Leads applying for future leave
         today_date = datetime.date.today()
@@ -4683,24 +4907,36 @@ def leaves_page():
         try:
             cursor.execute("""
                 INSERT INTO leaves (user_id, start_date, end_date, leave_type, reason, status)
-                VALUES (?, ?, ?, 'General', ?, 'Pending')
-            """, (session['user_id'], start_date_str, end_date_str, reason))
+                VALUES (?, ?, ?, ?, ?, 'Pending')
+            """, (session['user_id'], start_date_str, end_date_str, leave_type, reason))
             leave_id = cursor.lastrowid
             
             chain = get_approval_chain(db, session['user_id'], user_info['role'], user_info['reports_to'])
             
             if not chain:
                 cursor.execute("UPDATE leaves SET status = 'Approved' WHERE id = ?", (leave_id,))
+                
+                if leave_type == 'Comp Off':
+                    cursor.execute("""
+                        UPDATE users
+                        SET comp_off_balance = MAX(0.0, COALESCE(comp_off_balance, 0.0) - ?)
+                        WHERE id = ?
+                    """, (requested_days, session['user_id']))
+                    cursor.execute("""
+                        INSERT INTO comp_off_ledger (user_id, date, credits, reason, status)
+                        VALUES (?, ?, ?, ?, 'Approved')
+                    """, (session['user_id'], datetime.date.today().strftime('%Y-%m-%d'), -float(requested_days), f"Used Comp-Off Leave from {start_date_str} to {end_date_str}"))
+                    
                 cursor.execute("""
                     INSERT INTO activity_log (user_id, action, details)
                     VALUES (?, 'Leave Request', ?)
-                """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} (Auto-Approved)."))
+                """, (session['user_id'], f"{leave_type} Leave applied from {start_date_str} to {end_date_str} (Auto-Approved)."))
                 db.commit()
                 flash("Leave request submitted and auto-approved successfully!", "success")
             else:
                 import json
                 chain_json = json.dumps(chain)
-                details_str = f"Leave Request from {start_date_str} to {end_date_str} ({requested_days} days). Reason: {reason}"
+                details_str = f"{leave_type} Leave Request from {start_date_str} to {end_date_str} ({requested_days} days). Reason: {reason}"
                 
                 cursor.execute("""
                     INSERT INTO approvals (requester_id, type, reference_id, approval_chain, current_index, details, status)
@@ -4710,11 +4946,11 @@ def leaves_page():
                 cursor.execute("""
                     INSERT INTO activity_log (user_id, action, details)
                     VALUES (?, 'Leave Request', ?)
-                """, (session['user_id'], f"Leave applied from {start_date_str} to {end_date_str} ({requested_days} days) - Pending approval chain {chain_json}"))
+                """, (session['user_id'], f"{leave_type} Leave applied from {start_date_str} to {end_date_str} ({requested_days} days) - Pending approval chain {chain_json}"))
                 
                 _push_notification(db, chain[0], "Pending Approval Waiting", f"Leave request from {session['name']} needs your approval.", "approval", link=url_for('leaves_page'))
                 db.commit()
-                flash("Leave request submitted successfully, pending approval chain.", "success")
+                flash(f"{leave_type} Leave request submitted successfully, pending approval chain.", "success")
                 
         except Exception as e:
             db.rollback()
@@ -4919,6 +5155,25 @@ def approve_leave(approval_id):
                     SET status = 'Approved', approved_by = ?
                     WHERE id = ?
                 """, (session['user_id'], approval['reference_id']))
+                
+                cursor.execute("SELECT user_id, start_date, end_date, leave_type FROM leaves WHERE id = ?", (approval['reference_id'],))
+                lv_info = cursor.fetchone()
+                if lv_info and lv_info['leave_type'] == 'Comp Off':
+                    lv_start = datetime.datetime.strptime(lv_info['start_date'], '%Y-%m-%d').date()
+                    lv_end = datetime.datetime.strptime(lv_info['end_date'], '%Y-%m-%d').date()
+                    req_days = (lv_end - lv_start).days + 1
+                    
+                    cursor.execute("""
+                        UPDATE users
+                        SET comp_off_balance = MAX(0.0, COALESCE(comp_off_balance, 0.0) - ?)
+                        WHERE id = ?
+                    """, (req_days, lv_info['user_id']))
+                    
+                    cursor.execute("""
+                        INSERT INTO comp_off_ledger (user_id, date, credits, reason, status)
+                        VALUES (?, ?, ?, ?, 'Approved')
+                    """, (lv_info['user_id'], datetime.date.today().strftime('%Y-%m-%d'), -float(req_days), f"Used Comp-Off Leave from {lv_info['start_date']} to {lv_info['end_date']}"))
+                
                 _push_notification(db, approval['requester_id'], "Leave Approved", f"Your leave request has been approved.", "leave", link=url_for('leaves_page'))
                 
             cursor.execute("""
@@ -6438,15 +6693,34 @@ def comp_off_management_page():
                             remarks = excluded.remarks
                     """, (w_date, day_type, working_teams, remarks))
                     
+                    # Retroactively auto-credit Comp-Off for any employees who already lodged attendance on this working day
+                    cursor.execute("SELECT user_id, status FROM attendance WHERE date = ? AND status IN ('Present', 'Late', 'Half Day')", (w_date,))
+                    atts = cursor.fetchall()
+                    credited_cnt = 0
+                    for att in atts:
+                        auto_credit_comp_off_for_attendance(db, att['user_id'], w_date, att['status'])
+                        credited_cnt += 1
+
                     cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Set Working Day Config', ?)",
-                                   (session['user_id'], f"Set {w_date} as {day_type} working day."))
+                                   (session['user_id'], f"Set {w_date} as {day_type} working day. Auto-credited {credited_cnt} employee(s)."))
                     db.commit()
-                    flash(f"Working day configuration saved for {w_date} as {day_type} working day.", "success")
+                    flash(f"Working day configuration saved for {w_date} ({day_type}). Auto-credited Comp-Off to {credited_cnt} employee(s) who lodged attendance!", "success")
                 except Exception as e:
                     db.rollback()
                     flash(f"Error setting working day config: {e}", "error")
             else:
                 flash("Date is required.", "error")
+
+        elif action == 'delete_working_day':
+            w_id = request.form.get('w_id', type=int)
+            if w_id:
+                try:
+                    cursor.execute("DELETE FROM working_days_config WHERE id = ?", (w_id,))
+                    db.commit()
+                    flash("Working day configuration deleted.", "success")
+                except Exception as e:
+                    db.rollback()
+                    flash(f"Error deleting working day: {e}", "error")
 
         elif action == 'approve_comp_off':
             att_id = request.form.get('att_id', type=int)
@@ -6536,7 +6810,7 @@ def comp_off_management_page():
     """)
     ledger_history = cursor.fetchall()
 
-    cursor.execute("SELECT id, name, username, team, role, COALESCE(comp_off_balance, 0.0) as comp_off_balance FROM users ORDER BY team, name")
+    cursor.execute("SELECT id, name, username, team, role, COALESCE(comp_off_balance, 0.0) as comp_off_balance, device_id FROM users ORDER BY team, name")
     all_users_raw = cursor.fetchall()
     all_users = []
     for u in all_users_raw:
@@ -6554,6 +6828,31 @@ def comp_off_management_page():
         ledger_history=ledger_history,
         all_users=all_users
     )
+
+
+@app.route('/hr/reset-device/<int:target_user_id>', methods=['POST'])
+def reset_device_lock(target_user_id):
+    if 'user_id' not in session or session.get('role') not in ['Admin', 'HR']:
+        flash("Unauthorized action.", "error")
+        return redirect(url_for('login'))
+        
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT id, name, username FROM users WHERE id = ?", (target_user_id,))
+    target_user = cursor.fetchone()
+    
+    if not target_user:
+        flash("User not found.", "error")
+        return redirect(url_for('comp_off_management_page'))
+        
+    cursor.execute("UPDATE users SET device_id = NULL WHERE id = ?", (target_user_id,))
+    cursor.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)",
+                   (session['user_id'], 'Reset Device Lock', 
+                    f"Reset device lock for user {target_user['name']} (@{target_user['username']})."))
+    db.commit()
+    
+    flash(f"Device lock reset for {target_user['name']} (@{target_user['username']}). They can now register a new device on login.", "success")
+    return redirect(request.referrer or url_for('comp_off_management_page'))
 
 
 @app.route('/attendance/submit-partial', methods=['POST'])

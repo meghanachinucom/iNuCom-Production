@@ -43,14 +43,63 @@
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-                                    <ul class="sidebar-menu">
+                                                            <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}">
+                        <span>Leave Approvals{% if pending_approvals_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ pending_approvals_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+                {% elif session['role'] == 'HR' %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
+                </li>
+                <li class="menu-section-title" style="margin-top: 15px;">HR Management</li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
+                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
+                </li>
+                {% elif session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
@@ -62,22 +111,23 @@
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
+                    <a href="{{ url_for('team_approvals_page') }}">
+                        <span>Team Approvals{% if pending_approvals_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ pending_approvals_count }}</span>{% endif %}</span>
+                    </a>
                 </li>
-                {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                {% else %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% endif %}
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
                 {% endif %}
             </ul>
@@ -422,9 +472,15 @@
                                                     {% if session['role'] in ['Admin', 'HR', 'Lead'] %}
                                                         <div class="clickable-filename" data-file-id="{{ file['id'] }}" onclick="openFileDetailsModal(this.dataset.fileId)" style="cursor: pointer; color: var(--color-blue); text-decoration: underline;" title="View File Details &amp; Reviews">
                                                             {{ file['display_name'] or file['name'] }}
+                                                            {% if file['is_comp_ai'] == 1 %}
+                                                                <span style="font-size: 10px; font-weight: 800; color: #b45309; background: #fffbeb; padding: 1px 6px; border-radius: 4px; border: 1px solid #fde68a; text-decoration: none; display: inline-block; margin-left: 4px;">(Comp AI)</span>
+                                                            {% endif %}
                                                         </div>
                                                     {% else %}
                                                         {{ file['display_name'] or file['name'] }}
+                                                        {% if file['is_comp_ai'] == 1 %}
+                                                            <span style="font-size: 10px; font-weight: 800; color: #b45309; background: #fffbeb; padding: 1px 6px; border-radius: 4px; border: 1px solid #fde68a; margin-left: 4px;">(Comp AI)</span>
+                                                        {% endif %}
                                                     {% endif %}
                                                     <div style="font-size: 10px; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
                                                         {{ file['description'] }}
@@ -842,16 +898,16 @@
                                             </div>
                                             {% if item['rework_reason'] %}
                                                 <div style="background: #fff7ed; border: 1.5px solid #fed7aa; color: #c2410c; padding: 5px 8px; border-radius: 6px; font-size: 11px; margin-top: 6px; font-weight: 700;">
-                                                    🛠️ <strong>{% if item['take_count'] and item['take_count'] > 1 %}Take {{ item['take_count'] }}{% else %}Take 1{% endif %} - Rework from {{ item['rework_target_team'] or 'Review' }} Team</strong>
+                                                    🛠️ <strong>{% if item['take_count'] and item['take_count'] >= 1 %}Take {{ item['take_count'] }}{% else %}Take 1{% endif %} - Rework from {{ item['rework_target_team'] or 'Review' }} Team</strong>
                                                     <div style="font-size: 10px; font-weight: 600; color: #9a3412; margin-top: 2px;">Reason: {{ item['rework_reason'] }}</div>
                                                 </div>
-                                            {% elif item['take_count'] and item['take_count'] > 1 %}
+                                            {% elif item['take_count'] and item['take_count'] >= 1 %}
                                                 <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1d4ed8; padding: 4px 8px; border-radius: 6px; font-size: 10.5px; margin-top: 6px; font-weight: 700;">
                                                     🔄 <strong>Take {{ item['take_count'] }} (Retake Iteration)</strong>
                                                 </div>
                                             {% else %}
                                                 <div style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; padding: 3px 6px; border-radius: 6px; font-size: 10px; margin-top: 6px; font-weight: 700; display: inline-block;">
-                                                    🟢 <strong>Take 1 (Initial Stage Assignment)</strong>
+                                                    🟢 <strong>Take 0 (Original File)</strong>
                                                 </div>
                                             {% endif %}
                                         </div>
@@ -1314,26 +1370,31 @@
 
             
             <!-- File Details and Review Workflow Modal -->
-            <div id="fileDetailsModal" class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
-                <div class="modal-card" style="max-width: 900px; width: 92%; max-height: 88vh; display: flex; flex-direction: column; padding: 22px 26px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15); background: var(--bg-card); border: 1px solid var(--border-color); overflow: hidden;">
+            <div id="fileDetailsModal" class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; display: none;">
+                <div class="modal-card" style="max-width: 980px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 22px 28px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); background: var(--bg-card); border: 1px solid var(--border-color); overflow: hidden;">
                     <!-- Fixed Header -->
-                    <div class="modal-header" style="flex-shrink: 0; margin-bottom: 12px; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color);">
-                        <h3 style="font-weight: 700; color: var(--color-blue); display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px;">
-                            🎬 <span id="modal-file-title">File Details</span>
-                            <button id="modal-rename-btn" type="button" class="btn btn-sm" onclick="openRenamePrompt()" style="display: none; padding: 3px 10px; font-size: 11px; margin-left: 8px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 4px; font-weight: 700; cursor: pointer;">✏️ Rename File</button>
-                            <button id="modal-comp-ai-btn" type="button" class="btn btn-sm" onclick="openCompAiPrompt()" style="display: none; padding: 3px 10px; font-size: 11px; margin-left: 8px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; border-radius: 4px; font-weight: 700; cursor: pointer;">🤖 Mark 2D Comp AI</button>
-                            <span id="modal-comp-ai-badge" style="display: none; padding: 3px 10px; font-size: 11px; margin-left: 8px; background: #fef3c7; color: #b45309; border: 1px solid #fde047; border-radius: 4px; font-weight: 800;">🤖 2D COMP AI</span>
-                        </h3>
-                        <button type="button" class="modal-close-btn" onclick="closeFileDetailsModal()" style="font-size: 22px; background: none; border: none; cursor: pointer; color: var(--text-secondary);">&times;</button>
+                    <div class="modal-header" style="flex-shrink: 0; margin-bottom: 14px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color);">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h3 style="font-weight: 800; color: var(--color-blue); display: flex; align-items: center; gap: 8px; margin: 0; font-size: 18px; letter-spacing: -0.01em;">
+                                🎬 <span id="modal-file-title">File Details</span>
+                            </h3>
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <button id="modal-rename-btn" type="button" class="btn btn-sm" onclick="openRenamePrompt()" style="display: none; padding: 3px 10px; font-size: 11px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 6px; font-weight: 700; cursor: pointer;">✏️ Rename File</button>
+                                <button id="modal-comp-ai-btn" type="button" class="btn btn-sm" onclick="openCompAiPrompt()" style="display: none; padding: 3px 10px; font-size: 11px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; border-radius: 6px; font-weight: 700; cursor: pointer;">🤖 Mark 2D Comp AI</button>
+                                <span id="modal-comp-ai-badge" style="display: none; padding: 3px 10px; font-size: 11px; background: #fef3c7; color: #b45309; border: 1px solid #fde047; border-radius: 6px; font-weight: 800;">🤖 2D COMP AI</span>
+                            </div>
+                        </div>
+                        <button type="button" class="modal-close-btn" onclick="closeFileDetailsModal()" style="font-size: 24px; line-height: 1; background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0 4px;">&times;</button>
                     </div>
                     
                     <input type="hidden" id="modal-file-id" name="file_id">
                     
                     <!-- Scrollable Modal Body -->
-                    <div style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 8px;">
-                        <!-- Prominent Hold Alert Banner (shown dynamically when file or any stage is on Hold) -->
-                        <div id="modal-hold-alert-banner" style="display: none; background: #fff7ed; border: 2px solid #ea580c; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; align-items: flex-start; gap: 12px; box-shadow: 0 2px 8px rgba(234,88,12,0.15);">
-                            <span style="font-size: 22px; line-height: 1;">🛑</span>
+                    <div style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 18px;">
+                        
+                        <!-- Hold Alert Banner -->
+                        <div id="modal-hold-alert-banner" style="display: none; background: #fff7ed; border: 2px solid #ea580c; border-radius: 10px; padding: 12px 16px; align-items: flex-start; gap: 12px; box-shadow: 0 4px 12px rgba(234,88,12,0.15);">
+                            <span style="font-size: 24px; line-height: 1;">🛑</span>
                             <div style="flex: 1;">
                                 <div style="font-size: 13px; font-weight: 800; color: #c2410c; text-transform: uppercase; letter-spacing: 0.04em;">THIS FILE IS CURRENTLY ON HOLD</div>
                                 <div style="font-size: 12px; font-weight: 700; color: #9a3412; margin-top: 4px; line-height: 1.4;">
@@ -1342,195 +1403,242 @@
                             </div>
                         </div>
 
-                        <!-- File Metadata Grid -->
-                        <div class="metadata-section" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 16px; background: var(--bg-main); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 18px;">
-                            <div>
-                                <span style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 3px;">Project</span>
-                                <span id="modal-project-name-txt" style="font-size: 13px; font-weight: 700; color: var(--text-primary);">-</span>
-                            </div>
-                            <div>
-                                <span style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 3px;">Assigned Artist</span>
-                                <span id="modal-assigned-artist-txt" style="font-size: 13px; font-weight: 700; color: var(--text-primary);">-</span>
-                            </div>
-                            <div>
-                                <span style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 3px;">Pending at Team</span>
-                                <span id="modal-pending-team-txt" style="font-size: 13px; font-weight: 700; color: var(--color-blue); background: rgba(37,99,235,0.08); padding: 2px 10px; border-radius: 4px; display: inline-block;">-</span>
-                            </div>
-                            <div>
-                                <span style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 3px;">Active Stage</span>
-                                <span id="modal-active-stage-txt" style="font-size: 13px; font-weight: 700; color: var(--text-primary);">-</span>
+                        <!-- Rework / Retake Alert Banner showing originating lead -->
+                        <div id="modal-rework-alert-banner" style="display: none; background: #fef2f2; border: 2px solid #ef4444; border-radius: 10px; padding: 12px 16px; align-items: flex-start; gap: 12px; box-shadow: 0 4px 12px rgba(239,68,68,0.15);">
+                            <span style="font-size: 24px; line-height: 1;">🔄</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 13px; font-weight: 800; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.04em;">THIS FILE IS UNDER REWORK / RETAKE</div>
+                                <div style="font-size: 12px; font-weight: 700; color: #991b1b; margin-top: 4px; line-height: 1.4;">
+                                    Requested By: <span id="modal-rework-origin-lead-txt" style="color: #7f1d1d; font-weight: 800; background: #fee2e2; padding: 2px 8px; border-radius: 4px; border: 1px solid #fca5a5;">-</span>
+                                </div>
+                                <div style="font-size: 12px; font-weight: 600; color: #7f1d1d; margin-top: 4px;">
+                                    Reason / Feedback: <span id="modal-rework-reason-banner-txt" style="font-style: italic;">-</span>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Side-by-Side Original File vs Current Retake Version -->
-                        <div style="margin-bottom: 18px;">
-                            <h4 style="font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin: 0 0 10px 0; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
-                                📄 File Version Comparison (Original File vs Rework Take)
+                        <!-- 1. Executive Summary & File Metadata (4 Cards) -->
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                            <!-- Project & Chapter -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border-color); padding: 12px 14px; border-radius: 8px;">
+                                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">📁 Project / Chapter</div>
+                                <div id="modal-project-name-txt" style="font-size: 12.5px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px;">-</div>
+                                <div id="modal-chapter-name-txt" style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">-</div>
+                            </div>
+
+                            <!-- Start Date from First Team -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border-color); padding: 12px 14px; border-radius: 8px;">
+                                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">📅 Pipeline Start Date</div>
+                                <div id="modal-first-start-txt" style="font-size: 13px; font-weight: 800; color: #0284c7;">-</div>
+                                <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 2px;">First Team Start Date</div>
+                            </div>
+
+                            <!-- Active Stage & Pending Team -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border-color); padding: 12px 14px; border-radius: 8px;">
+                                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">🎯 Active Stage &amp; Team</div>
+                                <div id="modal-active-stage-txt" style="font-size: 12.5px; font-weight: 800; color: var(--text-primary); margin-bottom: 3px;">-</div>
+                                <span id="modal-pending-team-txt" style="font-size: 10.5px; font-weight: 800; color: var(--color-blue); background: rgba(37,99,235,0.1); padding: 2px 8px; border-radius: 4px; display: inline-block;">-</span>
+                            </div>
+
+                            <!-- Comp AI Status & Artist -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border-color); padding: 12px 14px; border-radius: 8px;">
+                                <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">🤖 Comp AI Status</div>
+                                <div id="modal-comp-ai-status-txt" style="margin-bottom: 3px;">
+                                    <span class="status-pill" style="font-size: 10px; padding: 2px 6px; background: #e2e8f0; color: #475569;">Standard Pipeline</span>
+                                </div>
+                                <div id="modal-comp-ai-details-txt" style="font-size: 10.5px; color: var(--text-secondary); font-weight: 600;">-</div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Team-Wise Execution & Flow Dependency Timeline / Table -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; background: var(--bg-card);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                                <h4 style="font-size: 12.5px; font-weight: 800; margin: 0; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;">
+                                    ⛓️ Team-Wise Execution &amp; Flow Dependency
+                                </h4>
+                                <div style="font-size: 10.5px; font-weight: 700; color: var(--color-blue); background: rgba(37,99,235,0.08); padding: 3px 10px; border-radius: 12px; border: 1px solid rgba(37,99,235,0.2);">
+                                    Flow: Stage Sequence ➔ Team Handover
+                                </div>
+                            </div>
+
+                            <div style="overflow-x: auto; max-height: 220px; border: 1px solid var(--border-color); border-radius: 8px;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                                    <thead>
+                                        <tr style="border-bottom: 1.5px solid var(--border-color); color: var(--text-secondary); font-weight: 800; background-color: var(--bg-main); position: sticky; top: 0; z-index: 2;">
+                                            <th style="padding: 8px 10px; width: 40px; text-align: center;">#</th>
+                                            <th style="padding: 8px 10px; width: 150px;">Stage &amp; Team</th>
+                                            <th style="padding: 8px 10px;">Flow Dependency</th>
+                                            <th style="padding: 8px 10px;">Assigned Artist</th>
+                                            <th style="padding: 8px 10px; width: 95px;">Start Date</th>
+                                            <th style="padding: 8px 10px; width: 100px;">End Date</th>
+                                            <th style="padding: 8px 10px; width: 90px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="modal-pipeline-steps-body">
+                                        <!-- Dynamically populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 3. Retakes & Rework Audit History (Only shown if file has undergone rework) -->
+                        <div id="modal-retakes-comparison-section" style="border: 1.5px solid #fed7aa; border-radius: 10px; padding: 14px 16px; background: #fffdfb; display: none;">
+                            <h4 style="font-size: 12.5px; font-weight: 800; margin: 0 0 12px 0; color: #c2410c; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;">
+                                🛠️ Retakes &amp; Version Comparison
                             </h4>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+                            
+                            <!-- Version Comparison Card -->
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 14px;">
                                 <!-- Original Version -->
                                 <div style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px;">
-                                    <div style="font-size: 10.5px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Original File (Initial Stage Flow)</div>
+                                    <div style="font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Original File (Take 0)</div>
                                     <div id="modal-orig-name-txt" style="font-size: 13px; font-weight: 700; color: var(--text-primary); word-break: break-all; margin-bottom: 6px;">-</div>
                                     <div style="font-size: 11px; color: var(--text-secondary);">Start: <span id="modal-orig-start-txt" style="font-weight:600;">-</span> | End: <span id="modal-orig-end-txt" style="font-weight:600;">-</span></div>
-                                    <div style="margin-top: 8px;"><span class="status-pill status-done" style="font-size: 10px; padding: 3px 8px;">🟢 Original File</span></div>
+                                    <div style="margin-top: 8px;"><span class="status-pill status-done" style="font-size: 10px; padding: 2px 8px;">🟢 Take 0 (Original)</span></div>
                                 </div>
+
                                 <!-- Current Retake Version -->
                                 <div style="background: var(--bg-main); border: 1.5px solid var(--color-blue); border-radius: 8px; padding: 12px 14px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <span style="font-size: 10.5px; font-weight: 800; color: var(--color-blue); text-transform: uppercase;">Current Rework Version</span>
-                                        <span id="modal-retake-label-badge" style="font-size: 10.5px; font-weight: 800; background: var(--color-blue); color: #fff; padding: 2px 8px; border-radius: 4px;">Original File</span>
+                                        <span style="font-size: 10px; font-weight: 800; color: var(--color-blue); text-transform: uppercase;">Latest Retake Version</span>
+                                        <span id="modal-retake-label-badge" style="font-size: 10px; font-weight: 800; background: var(--color-blue); color: #fff; padding: 2px 8px; border-radius: 4px;">Original File</span>
                                     </div>
                                     <div id="modal-retake-name-txt" style="font-size: 13px; font-weight: 700; color: var(--color-blue); word-break: break-all; margin: 6px 0;">-</div>
-                                    <div style="font-size: 11px; color: var(--text-secondary);">Start: <span id="modal-retake-start-txt" style="font-weight:600;">-</span> | End: <span id="modal-retake-end-txt" style="font-weight:600;">-</span></div>
-                                    <div style="font-size: 11px; color: var(--color-green); font-weight: 700; margin-top: 6px;" id="modal-submission-time-container">
-                                        Done Timestamp (12h): <span id="modal-sub-time-txt">-</span>
-                                    </div>
+                                    <div style="font-size: 11px; color: var(--text-secondary);">Start: <span id="modal-retake-start-txt" style="font-weight:600;">-</span> | End: <span id="modal-retake-end-txt" style="font-weight:600;">Pending</span></div>
+                                </div>
+                            </div>
+
+                            <!-- RTK Audit Log Table -->
+                            <div id="modal-rtk-history-section" style="display: none;">
+                                <div style="font-size: 11px; font-weight: 800; color: #9a3412; margin-bottom: 6px; text-transform: uppercase;">
+                                    📋 Retake Audit Events Log (<span id="modal-rtk-count-txt">0</span> Events)
+                                </div>
+                                <div style="overflow-x: auto; max-height: 160px; border: 1px solid #fed7aa; border-radius: 6px; background: #fff7ed;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                                        <thead>
+                                            <tr style="border-bottom: 1.5px solid #fdba74; color: #9a3412; font-weight: 800; background-color: #ffedd5; position: sticky; top: 0; z-index: 1;">
+                                                <th style="padding: 6px 8px; width: 60px;">Take #</th>
+                                                <th style="padding: 6px 8px; width: 90px;">Date</th>
+                                                <th style="padding: 6px 8px;">Stage &amp; Team</th>
+                                                <th style="padding: 6px 8px;">Assigned Artist</th>
+                                                <th style="padding: 6px 8px;">Take 1 File Name Transition</th>
+                                                <th style="padding: 6px 8px;">Retake Reason</th>
+                                                <th style="padding: 6px 8px; width: 90px;">Initiated By</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="modal-rtk-history-body">
+                                            <!-- Dynamically populated by JS -->
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Review Pipeline Section -->
-                        <div style="margin-bottom: 18px;">
-                            <h4 style="font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin: 0 0 10px 0; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">
+                        <!-- 4. Review Pipeline & Approvals Section -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; background: var(--bg-card);">
+                            <h4 style="font-size: 12.5px; font-weight: 800; margin: 0 0 10px 0; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.04em;">
                                 🚦 Review Pipeline &amp; Approvals
                             </h4>
                             
                             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
                                 <!-- Respective Team Lead -->
-                                <div class="card" style="padding: 10px 12px; border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 8px; box-shadow: none; margin: 0; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px;">
+                                <div class="card" style="padding: 12px; border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 8px; box-shadow: none; margin: 0; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px;">
                                     <div>
-                                        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-primary);">1. Lead Review</div>
-                                        <div style="font-size: 9.5px; color: var(--text-muted); margin-top: 2px;" id="desc-lead-review">
+                                        <div style="font-size: 11.5px; font-weight: 800; color: var(--text-primary);">1. Team Lead Review</div>
+                                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;" id="desc-lead-review">
                                             Lead: -
                                         </div>
                                     </div>
-                                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px;">
-                                        <span id="badge-lead-review" class="status-pill" style="font-size: 9.5px; padding: 2px 6px; width: 100%; text-align: center; min-width: auto;">Pending</span>
+                                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 8px;">
+                                        <span id="badge-lead-review" class="status-pill" style="font-size: 10px; padding: 2px 6px; width: 100%; text-align: center; min-width: auto;">Pending</span>
                                         <div id="actions-lead-review" style="display: flex; gap: 4px; width: 100%;">
-                                            <button type="button" class="btn btn-success btn-sm" onclick="submitReviewAction('lead', 'Approve')" style="padding: 3px 6px; font-size: 10px; height: 22px; flex: 1;">Approve</button>
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="submitReviewAction('lead', 'Reject')" style="padding: 3px 6px; font-size: 10px; height: 22px; flex: 1;">Reject</button>
+                                            <button type="button" class="btn btn-success btn-sm" onclick="submitReviewAction('lead', 'Approve')" style="padding: 3px 6px; font-size: 10.5px; height: 24px; flex: 1; font-weight: 700;">Approve</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="submitReviewAction('lead', 'Reject')" style="padding: 3px 6px; font-size: 10.5px; height: 24px; flex: 1; font-weight: 700;">Reject</button>
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <!-- Content Lead -->
-                                <div class="card" style="padding: 10px 12px; border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 8px; box-shadow: none; margin: 0; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px;">
+                                <div class="card" style="padding: 12px; border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 8px; box-shadow: none; margin: 0; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px;">
                                     <div>
-                                        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-primary);">2. Content Lead</div>
-                                        <div style="font-size: 9.5px; color: var(--text-muted); margin-top: 2px;">
+                                        <div style="font-size: 11.5px; font-weight: 800; color: var(--text-primary);">2. Content Lead</div>
+                                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
                                             Lead: @pooja
                                         </div>
                                     </div>
-                                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px;">
-                                        <span id="badge-content-review" class="status-pill" style="font-size: 9.5px; padding: 2px 6px; width: 100%; text-align: center; min-width: auto;">Pending</span>
+                                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 8px;">
+                                        <span id="badge-content-review" class="status-pill" style="font-size: 10px; padding: 2px 6px; width: 100%; text-align: center; min-width: auto;">Pending</span>
                                         <div id="actions-content-review" style="display: flex; gap: 4px; width: 100%;">
-                                            <button type="button" class="btn btn-success btn-sm" onclick="submitReviewAction('content', 'Approve')" style="padding: 3px 6px; font-size: 10px; height: 22px; flex: 1;">Approve</button>
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="submitReviewAction('content', 'Reject')" style="padding: 3px 6px; font-size: 10px; height: 22px; flex: 1;">Reject</button>
+                                            <button type="button" class="btn btn-success btn-sm" onclick="submitReviewAction('content', 'Approve')" style="padding: 3px 6px; font-size: 10.5px; height: 24px; flex: 1; font-weight: 700;">Approve</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="submitReviewAction('content', 'Reject')" style="padding: 3px 6px; font-size: 10.5px; height: 24px; flex: 1; font-weight: 700;">Reject</button>
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <!-- Final Review -->
-                                <div class="card" style="padding: 10px 12px; border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 8px; box-shadow: none; margin: 0; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px;">
+                                <div class="card" style="padding: 12px; border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 8px; box-shadow: none; margin: 0; display: flex; flex-direction: column; justify-content: space-between; min-height: 100px;">
                                     <div>
-                                        <div style="font-size: 11.5px; font-weight: 700; color: var(--text-primary);">3. Final Review</div>
-                                        <div style="font-size: 9.5px; color: var(--text-muted); margin-top: 2px;">
+                                        <div style="font-size: 11.5px; font-weight: 800; color: var(--text-primary);">3. Final Admin Review</div>
+                                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
                                             Admin: @vasu
                                         </div>
                                     </div>
-                                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px;">
-                                        <span id="badge-final-review" class="status-pill" style="font-size: 9.5px; padding: 2px 6px; width: 100%; text-align: center; min-width: auto;">Pending</span>
+                                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 8px;">
+                                        <span id="badge-final-review" class="status-pill" style="font-size: 10px; padding: 2px 6px; width: 100%; text-align: center; min-width: auto;">Pending</span>
                                         <div id="actions-final-review" style="display: flex; gap: 4px; width: 100%;">
-                                            <button type="button" class="btn btn-success btn-sm" onclick="submitReviewAction('final', 'Approve')" style="padding: 3px 6px; font-size: 10px; height: 22px; flex: 1;">Approve</button>
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="submitReviewAction('final', 'Reject')" style="padding: 3px 6px; font-size: 10px; height: 22px; flex: 1;">Reject</button>
+                                            <button type="button" class="btn btn-success btn-sm" onclick="submitReviewAction('final', 'Approve')" style="padding: 3px 6px; font-size: 10.5px; height: 24px; flex: 1; font-weight: 700;">Approve</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="submitReviewAction('final', 'Reject')" style="padding: 3px 6px; font-size: 10.5px; height: 24px; flex: 1; font-weight: 700;">Reject</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Bottom Section: Pipeline Stages Status Table -->
-                        <div style="margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 12px;">
-                            <h4 style="font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                                ⚙️ Full Pipeline Stages Status ({{ all_stages|length }} Stages)
-                            </h4>
-                            <div style="overflow-y: auto; max-height: 180px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
-                                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
-                                    <thead>
-                                        <tr style="border-bottom: 1.5px solid var(--border-color); color: var(--text-secondary); font-weight: 700; background-color: var(--bg-main); position: sticky; top: 0; z-index: 1;">
-                                            <th style="padding: 6px 10px;">Stage</th>
-                                            <th style="padding: 6px 10px; width: 90px;">Status</th>
-                                            <th style="padding: 6px 10px;">Assigned Artist / Lead</th>
-                                            <th style="padding: 6px 10px; width: 90px;">Start Date</th>
-                                            <th style="padding: 6px 10px; width: 135px;">End / Submission Time</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="modal-pipeline-steps-body">
-                                        <!-- Populated dynamically by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- RTK / Retake Audit History Section -->
-                        <div id="modal-rtk-history-section" style="margin-top: 18px; border-top: 1.5px solid #fed7aa; padding-top: 12px; display: none;">
-                            <h4 style="font-size: 12px; font-weight: 800; margin-bottom: 8px; color: #c2410c; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                                🛠️ RTK / Retake Audit History (<span id="modal-rtk-count-txt">0</span> RTK Events)
-                            </h4>
-                            <div style="overflow-y: auto; max-height: 160px; border: 1px solid #fed7aa; border-radius: var(--radius-sm); background: #fff7ed;">
-                                <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
-                                    <thead>
-                                        <tr style="border-bottom: 1.5px solid #fdba74; color: #9a3412; font-weight: 700; background-color: #ffedd5; position: sticky; top: 0; z-index: 1;">
-                                            <th style="padding: 5px 8px; width: 60px;">Take #</th>
-                                            <th style="padding: 5px 8px; width: 120px;">Date &amp; Time</th>
-                                            <th style="padding: 5px 8px;">Stage &amp; Target Team</th>
-                                            <th style="padding: 5px 8px;">Assigned Artist</th>
-                                            <th style="padding: 5px 8px;">Old Name ➔ New Name</th>
-                                            <th style="padding: 5px 8px;">RTK Reason</th>
-                                            <th style="padding: 5px 8px;">Initiated By</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="modal-rtk-history-body">
-                                        <!-- Populated dynamically by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
 
                         {% if session['role'] in ['Admin', 'Lead'] %}
-                        <!-- Request Rework / Retake Section for Leads -->
-                        <div style="margin-top: 18px; border-top: 1.5px solid #fed7aa; background: #fff7ed; padding: 12px 14px; border-radius: 8px;">
-                            <h4 style="font-size: 11.5px; font-weight: 800; color: #b45309; margin: 0 0 8px 0; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
-                                🛠️ Request Rework / Retake (Opens File for Target Team Lead)
-                            </h4>
-                            <form action="{{ url_for('file_rework') }}" method="POST" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- 5. Request Rework / Forwarding Section -->
+                        <div style="border: 1px solid var(--border-color); background: var(--bg-card); padding: 16px; border-radius: 10px; box-shadow: var(--shadow-sm);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="font-size: 12.5px; font-weight: 800; color: var(--text-primary); margin: 0; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 8px;">
+                                    🔄 Forward File for Rework / Review
+                                </h4>
+                                <span style="font-size: 10px; font-weight: 700; color: #b45309; background: #fffbeb; padding: 2px 8px; border-radius: 4px; border: 1px solid #fde68a;">
+                                    Routes to Target Team Lead
+                                </span>
+                            </div>
+                            
+                            <form action="{{ url_for('file_rework') }}" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
                                 <input type="hidden" id="modal-rework-file-id" name="file_id" value="">
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <div style="flex: 1; min-width: 180px;">
-                                        <label style="font-size: 10.5px; font-weight: 700; color: #7c2d12; display: block; margin-bottom: 2px;">TARGET TEAM FOR REWORK:</label>
-                                        <select name="rework_team" class="select-input" style="font-size: 11.5px; padding: 5px 8px; width: 100%;" required>
+                                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 14px;">
+                                    <div>
+                                        <label style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 5px;">Target Rework Team:</label>
+                                        <select name="rework_team" class="select-input" style="font-size: 11.5px; padding: 7px 10px; width: 100%; border-radius: 6px;" required>
                                             {% for stg in all_stages %}
                                                 <option value="{{ STAGE_TEAMS.get(stg, stg) }}">Route to {{ STAGE_TEAMS.get(stg, stg) }} Team ({{ stg }})</option>
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div style="flex: 2; min-width: 240px;">
-                                        <label style="font-size: 10.5px; font-weight: 700; color: #7c2d12; display: block; margin-bottom: 2px;">REWORK REASON / FEEDBACK (REQUIRED):</label>
-                                        <input type="text" name="rework_reason" class="form-input" placeholder="Explain what needs to be fixed..." style="font-size: 11.5px; padding: 5px 8px; width: 100%;" required>
+                                    <div>
+                                        <label style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 5px;">Rework Reason &amp; Feedback (Required):</label>
+                                        <input type="text" name="rework_reason" class="form-input" placeholder="Specify exact changes needed or review notes..." style="font-size: 11.5px; padding: 7px 10px; width: 100%; border-radius: 6px;" required>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-danger btn-sm" style="align-self: flex-end; padding: 5px 14px; font-size: 11.5px; font-weight: 700; margin-top: 2px;">
-                                    🔄 Send for Rework &amp; Open for Target Lead
-                                </button>
+                                <div style="display: flex; justify-content: flex-end;">
+                                    <button type="submit" class="btn btn-danger btn-sm" style="padding: 6px 18px; font-size: 11.5px; font-weight: 800; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
+                                        🔄 Issue Rework &amp; Open Stage
+                                    </button>
+                                </div>
                             </form>
                         </div>
                         {% endif %}
+
                     </div>
 
                     <!-- Fixed Footer -->
-                    <div class="modal-footer" style="flex-shrink: 0; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 10px;">
-                        <button type="button" class="btn" style="background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary); height: 32px; padding: 0 16px; margin: 0; font-size: 12px; font-weight: 600;" onclick="closeFileDetailsModal()">Close</button>
+                    <div class="modal-footer" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 4px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">
+                            Final Approval Date: <span id="modal-final-approval-date-txt" style="font-weight: 800; color: var(--text-primary);">-</span>
+                        </div>
+                        <button type="button" class="btn" style="background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary); height: 32px; padding: 0 18px; margin: 0; font-size: 12px; font-weight: 700; border-radius: 6px;" onclick="closeFileDetailsModal()">Close</button>
                     </div>
                 </div>
             </div>
@@ -1569,7 +1677,8 @@
                         document.getElementById('modal-file-id').value = file.id;
                         const modalReworkId = document.getElementById('modal-rework-file-id');
                         if (modalReworkId) modalReworkId.value = file.id;
-                        document.getElementById('modal-file-title').textContent = "Details: " + (file.dynamic_name || file.name);
+                        const fileBaseTitle = file.dynamic_name || file.name;
+                        document.getElementById('modal-file-title').textContent = "Details: " + fileBaseTitle + (file.is_comp_ai ? " (Comp AI)" : "");
                         
                         window.compAiArtists = data.comp_artists || [];
 
@@ -1583,7 +1692,7 @@
                             }
                         }
 
-                        // 2D Comp AI button & badge
+                        // 2D Comp AI button & badge (Only visible to Content team)
                         const compAiBtn = document.getElementById('modal-comp-ai-btn');
                         const compAiBadge = document.getElementById('modal-comp-ai-badge');
                         if (compAiBadge) {
@@ -1591,19 +1700,46 @@
                         }
                         if (compAiBtn) {
                             const isNotAsset = (file.file_type !== 'Asset');
-                            const isAuthorized = data.current_user && (data.current_user.team === 'Content' || data.current_user.role === 'Admin' || data.current_user.role === 'Lead');
-                            if (isAuthorized && isNotAsset && !file.is_comp_ai) {
+                            const isContentTeam = data.current_user && (data.current_user.team === 'Content');
+                            if (isContentTeam && isNotAsset && !file.is_comp_ai) {
                                 compAiBtn.style.display = 'inline-block';
                             } else {
                                 compAiBtn.style.display = 'none';
                             }
                         }
                         
-                        // Set text labels
+                        // Set Executive Summary text labels
                         document.getElementById('modal-project-name-txt').textContent = file.project_name || '-';
-                        document.getElementById('modal-assigned-artist-txt').textContent = file.artist_name ? (file.artist_name + " (@" + file.artist_username + ")") : 'Unassigned';
+                        document.getElementById('modal-chapter-name-txt').textContent = file.chapter_name ? ("Chapter: " + file.chapter_name) : '-';
                         document.getElementById('modal-pending-team-txt').textContent = file.pending_team || '-';
                         document.getElementById('modal-active-stage-txt').textContent = file.active_stage || '-';
+                        
+                        function formatDDMMYYYY(dateStr) {
+                            if (!dateStr || dateStr === '-' || dateStr === 'N/A') return '-';
+                            var parts = dateStr.trim().split(' ')[0].split('T')[0].split('-');
+                            if (parts.length === 3 && parts[0].length === 4) {
+                                return parts[2] + '-' + parts[1] + '-' + parts[0];
+                            }
+                            return dateStr;
+                        }
+
+                        // Pipeline Start Date from First Team
+                        document.getElementById('modal-first-start-txt').textContent = formatDDMMYYYY(file.first_team_start_date);
+
+                        // Comp AI details
+                        const compAiStatusTxt = document.getElementById('modal-comp-ai-status-txt');
+                        const compAiDetailsTxt = document.getElementById('modal-comp-ai-details-txt');
+                        if (file.is_comp_ai) {
+                            compAiStatusTxt.innerHTML = '<span class="status-pill" style="font-size: 10px; padding: 2px 8px; background: #fef3c7; color: #b45309; border: 1px solid #fde047; font-weight: 800;">🤖 YES (2D Comp AI)</span>';
+                            if (file.comp_ai_artist_name) {
+                                compAiDetailsTxt.textContent = "Assigned Artist: " + file.comp_ai_artist_name + " (@" + file.comp_ai_artist_username + ")";
+                            } else {
+                                compAiDetailsTxt.textContent = "Assigned Artist: 3D Comp Team";
+                            }
+                        } else {
+                            compAiStatusTxt.innerHTML = '<span class="status-pill" style="font-size: 10px; padding: 2px 8px; background: #e2e8f0; color: #475569; font-weight: 700;">⚡ NO (Standard Pipeline)</span>';
+                            compAiDetailsTxt.textContent = "Standard 3D stage progression";
+                        }
                         
                         // Check Hold status and reason
                         const holdBanner = document.getElementById('modal-hold-alert-banner');
@@ -1623,14 +1759,28 @@
                         } else {
                             holdBanner.style.display = 'none';
                         }
-                        
-                        function formatDDMMYYYY(dateStr) {
-                            if (!dateStr || dateStr === '-') return '-';
-                            var parts = dateStr.trim().split(' ')[0].split('T')[0].split('-');
-                            if (parts.length === 3 && parts[0].length === 4) {
-                                return parts[2] + '-' + parts[1] + '-' + parts[0];
+
+                        // Check Rework status and originating lead info
+                        const reworkBanner = document.getElementById('modal-rework-alert-banner');
+                        const reworkOriginTxt = document.getElementById('modal-rework-origin-lead-txt');
+                        const reworkReasonBannerTxt = document.getElementById('modal-rework-reason-banner-txt');
+
+                        if (file.latest_rework_info && (file.take_count >= 1 || file.rework_reason || file.status === 'RTK')) {
+                            reworkBanner.style.display = 'flex';
+                            reworkOriginTxt.textContent = file.latest_rework_info.origin_lead || 'Team Lead';
+                            reworkReasonBannerTxt.textContent = file.latest_rework_info.reason || 'Rework requested';
+                        } else {
+                            reworkBanner.style.display = 'none';
+                        }
+
+                        // Show Retakes Comparison section ONLY if file has actual rework history or take_count >= 1
+                        const retakesSec = document.getElementById('modal-retakes-comparison-section');
+                        if (retakesSec) {
+                            if (file.take_count >= 1 || (data.rtk_history && data.rtk_history.length > 0)) {
+                                retakesSec.style.display = 'block';
+                            } else {
+                                retakesSec.style.display = 'none';
                             }
-                            return dateStr;
                         }
 
                         // Populate Side-by-Side Original vs Retake Version
@@ -1643,8 +1793,13 @@
                             document.getElementById('modal-retake-label-badge').textContent = file.retake_version.take_label;
                             document.getElementById('modal-retake-name-txt').textContent = file.retake_version.name;
                             document.getElementById('modal-retake-start-txt').textContent = formatDDMMYYYY(file.retake_version.start_date);
-                            document.getElementById('modal-retake-end-txt').textContent = formatDDMMYYYY(file.retake_version.end_date);
-                            document.getElementById('modal-sub-time-txt').textContent = file.retake_version.submission_time_12 || 'Pending';
+                            const rEnd = (file.retake_version.end_date && file.retake_version.end_date !== 'N/A' && file.status === 'Done') ? formatDDMMYYYY(file.retake_version.end_date) : 'Pending';
+                            document.getElementById('modal-retake-end-txt').textContent = rEnd;
+                        }
+
+                        const finalAppDateTxt = document.getElementById('modal-final-approval-date-txt');
+                        if (finalAppDateTxt) {
+                            finalAppDateTxt.textContent = file.final_approval_date ? formatDDMMYYYY(file.final_approval_date) : '-';
                         }
                         
                         // Set review status values
@@ -1657,177 +1812,123 @@
                         // Render review workflow statuses & action buttons
                         renderReviewWorkflow();
                         
-                        // Populate pipeline steps table
+                        // Populate pipeline steps table with Flow Dependency & Step Numbers
                         const stepsBody = document.getElementById('modal-pipeline-steps-body');
                         stepsBody.innerHTML = '';
                         
                         if (data.pipeline_steps && data.pipeline_steps.length > 0) {
-                            data.pipeline_steps.forEach(step => {
+                            data.pipeline_steps.forEach((step, idx) => {
                                 const tr = document.createElement('tr');
                                 tr.style.borderBottom = '1px solid var(--border-color)';
                                 
-                                const tdStage = document.createElement('td');
-                                tdStage.style.padding = '6px 8px';
-                                tdStage.style.fontWeight = '600';
-                                tdStage.textContent = step.step_name;
-                                tr.appendChild(tdStage);
-                                
-                                const tdStatus = document.createElement('td');
-                                tdStatus.style.padding = '6px 8px';
-                                
+                                // 1. Seq #
+                                const tdIdx = document.createElement('td');
+                                tdIdx.style.padding = '8px 10px';
+                                tdIdx.style.textAlign = 'center';
+                                tdIdx.style.fontWeight = '800';
+                                tdIdx.style.color = 'var(--text-secondary)';
+                                tdIdx.textContent = (idx + 1);
+                                tr.appendChild(tdIdx);
+
                                 const STAGE_TEAMS_JS = {
                                     'Reference': 'Content', 'Explanation': 'Content', 'Voice Over': 'Content', 'Narration': 'Content', 'Storyboards': 'Content', 'Scene-wise Assets': 'Content',
                                     'Modeling': 'Modeling', 'Texturing': 'Texturing', 'Rig': 'Rig', 'Animation': 'Animation', 'FBX export': 'Animation',
                                     'VFX': 'VFX', 'Lightning': 'Lightning', 'Rendering': 'Rendering', '3D Comp & Motion Graphics': '3D Comp & Motion Graphics', 'VR': 'VR'
                                 };
+                                const targetTeam = STAGE_TEAMS_JS[step.step_name] || 'Production';
 
-                                const isLeadOrAdmin = (data.current_user.role === 'Admin' || (data.current_user.role === 'Lead' && data.current_user.team === STAGE_TEAMS_JS[step.step_name]));
-
-                                if (isLeadOrAdmin) {
-                                    const form = document.createElement('form');
-                                    form.method = 'POST';
-                                    form.action = `/files/${file.id}/stage-status`;
-                                    form.style.display = 'flex';
-                                    form.style.flexDirection = 'column';
-                                    form.style.gap = '3px';
-                                    form.onsubmit = function() { return validateHoldReason(this); };
-
-                                    const stepInput = document.createElement('input');
-                                    stepInput.type = 'hidden';
-                                    stepInput.name = 'step_name';
-                                    stepInput.value = step.step_name;
-                                    form.appendChild(stepInput);
-
-                                    const sel = document.createElement('select');
-                                    sel.name = 'status';
-                                    sel.className = 'select-input';
-                                    sel.style.fontSize = '10.5px';
-                                    sel.style.height = '24px';
-                                    sel.style.padding = '0 4px';
-                                    sel.onchange = function() { toggleModalHoldInput(this); };
-
-                                    const statuses = [
-                                        { val: 'Yts', label: 'Yts' },
-                                        { val: 'Wip', label: 'Wip' },
-                                        { val: 'Review', label: 'Review' },
-                                        { val: 'RTK', label: 'RTK' },
-                                        { val: 'Done', label: 'Done' },
-                                        { val: 'Hold', label: 'Hold' }
-                                    ];
-
-                                    let curNorm = 'Yts';
-                                    if (step.status === 'Done' || step.status === 'Approved') curNorm = 'Done';
-                                    else if (step.status === 'In Progress' || step.status === 'WIP' || step.status === 'Wip' || step.status === 'Open') curNorm = 'Wip';
-                                    else if (step.status === 'Review') curNorm = 'Review';
-                                    else if (step.status === 'Rework' || step.status === 'RTK' || step.status === 'Re-take') curNorm = 'RTK';
-                                    else if (step.status === 'Hold' || step.status === 'ON HOLD' || step.status === 'On Hold') curNorm = 'Hold';
-
-                                    statuses.forEach(s => {
-                                        const opt = document.createElement('option');
-                                        opt.value = s.val;
-                                        opt.textContent = s.label;
-                                        if (s.val === curNorm) opt.selected = true;
-                                        sel.appendChild(opt);
-                                    });
-                                    form.appendChild(sel);
-
-                                    const holdWrap = document.createElement('div');
-                                    holdWrap.className = 'modal-hold-input-wrap';
-                                    holdWrap.style.display = (curNorm === 'Hold') ? 'block' : 'none';
-                                    holdWrap.style.marginTop = '2px';
-
-                                    const holdInp = document.createElement('input');
-                                    holdInp.type = 'text';
-                                    holdInp.name = 'hold_reason';
-                                    holdInp.placeholder = 'Mandatory Hold Reason...';
-                                    holdInp.value = step.hold_reason || (step.status === 'Hold' ? step.remarks : '') || '';
-                                    holdInp.style.fontSize = '10px';
-                                    holdInp.style.padding = '2px 4px';
-                                    holdInp.style.width = '100%';
-                                    holdInp.style.border = '1px solid #f97316';
-                                    holdInp.style.borderRadius = '4px';
-                                    holdWrap.appendChild(holdInp);
-                                    form.appendChild(holdWrap);
-
-                                    const saveBtn = document.createElement('button');
-                                    saveBtn.type = 'submit';
-                                    saveBtn.className = 'btn btn-primary btn-sm';
-                                    saveBtn.style.fontSize = '9px';
-                                    saveBtn.style.height = '20px';
-                                    saveBtn.style.padding = '0 5px';
-                                    saveBtn.style.marginTop = '2px';
-                                    saveBtn.textContent = 'Save Status';
-                                    form.appendChild(saveBtn);
-
-                                    tdStatus.appendChild(form);
-                                } else {
-                                    const statusSpan = document.createElement('span');
-                                    statusSpan.className = 'status-pill';
-                                    let displayStatus = 'Yts';
-                                    if (step.status === 'Done' || step.status === 'Approved') {
-                                        displayStatus = 'Done';
-                                        statusSpan.classList.add('status-done');
-                                    } else if (step.status === 'In Progress' || step.status === 'WIP' || step.status === 'Wip' || step.status === 'Open') {
-                                        displayStatus = 'Wip';
-                                        statusSpan.classList.add('status-progress');
-                                    } else if (step.status === 'Review') {
-                                        displayStatus = 'Review';
-                                        statusSpan.classList.add('status-open');
-                                    } else if (step.status === 'RTK' || step.status === 'Rework' || step.status === 'Re-take') {
-                                        displayStatus = 'RTK';
-                                        statusSpan.classList.add('status-pending');
-                                    } else if (step.status === 'Hold' || step.status === 'ON HOLD' || step.status === 'On Hold') {
-                                        displayStatus = 'Hold';
-                                        statusSpan.style.background = '#ffedd5';
-                                        statusSpan.style.color = '#c2410c';
-                                        statusSpan.style.border = '1px solid #fdba74';
-                                    } else {
-                                        statusSpan.classList.add('status-pending');
-                                    }
-                                    statusSpan.textContent = displayStatus;
-                                    statusSpan.style.fontSize = '9px';
-                                    statusSpan.style.padding = '2px 4px';
-                                    statusSpan.style.minWidth = 'auto';
-                                    tdStatus.appendChild(statusSpan);
-
-                                    if (step.status === 'Hold' || displayStatus === 'Hold') {
-                                        const hReasonDiv = document.createElement('div');
-                                        hReasonDiv.style.fontSize = '9px';
-                                        hReasonDiv.style.color = '#c2410c';
-                                        hReasonDiv.style.fontWeight = '700';
-                                        hReasonDiv.style.marginTop = '2px';
-                                        hReasonDiv.textContent = `🛑 Reason: ${step.hold_reason || step.remarks || 'On Hold'}`;
-                                        tdStatus.appendChild(hReasonDiv);
-                                    }
-                                }
-                                tr.appendChild(tdStatus);
+                                // 2. Stage & Team
+                                const tdStage = document.createElement('td');
+                                tdStage.style.padding = '8px 10px';
+                                tdStage.innerHTML = `
+                                    <div style="font-weight: 800; color: var(--text-primary); font-size: 12px;">${step.step_name}</div>
+                                    <span style="font-size: 9.5px; font-weight: 700; color: #475569; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block; margin-top: 2px;">${targetTeam} Team</span>
+                                `;
+                                tr.appendChild(tdStage);
                                 
+                                // 3. Flow Dependency
+                                const tdDep = document.createElement('td');
+                                tdDep.style.padding = '8px 10px';
+                                const isCompAiBypassed = (file.is_comp_ai && ['Modeling', 'Texturing', 'Rig', 'Animation', 'FBX export', 'VFX', 'Lightning', 'Rendering'].includes(step.step_name));
+                                if (isCompAiBypassed) {
+                                    tdDep.innerHTML = `<span style="font-size: 10px; font-weight: 800; color: #b45309; background: #fffbeb; padding: 2px 6px; border-radius: 4px; border: 1px solid #fde68a;">⚡ Bypassed for 2D Comp AI</span>`;
+                                } else if (idx === 0) {
+                                    tdDep.innerHTML = `<span style="font-size: 10px; font-weight: 700; color: #0284c7;">Initial Entry Step</span>`;
+                                } else {
+                                    const prevStepName = data.pipeline_steps[idx - 1].step_name;
+                                    tdDep.innerHTML = `<span style="font-size: 10px; color: var(--text-secondary);">Depends on <strong>${prevStepName}</strong></span>`;
+                                }
+                                tr.appendChild(tdDep);
+
+                                // 4. Assigned Artist
                                 const tdArtist = document.createElement('td');
-                                tdArtist.style.padding = '6px 8px';
+                                tdArtist.style.padding = '8px 10px';
                                 tdArtist.textContent = step.artist_name ? (step.artist_name + " (@" + step.artist_username + ")") : '-';
                                 tr.appendChild(tdArtist);
                                 
+                                // 5. Start Date
                                 const tdStart = document.createElement('td');
-                                tdStart.style.padding = '6px 8px';
+                                tdStart.style.padding = '8px 10px';
                                 tdStart.textContent = formatDDMMYYYY(step.start_date);
                                 tr.appendChild(tdStart);
                                 
+                                // 6. End Date
                                 const tdEnd = document.createElement('td');
-                                tdEnd.style.padding = '6px 8px';
-                                if (step.submitted_at) {
-                                    tdEnd.innerHTML = `<div>${formatDDMMYYYY(step.end_date)}</div><div style="font-size:9px; color:var(--color-green); font-weight:700;">🕒 ${step.submitted_at}</div>`;
-                                } else {
-                                    tdEnd.textContent = formatDDMMYYYY(step.end_date);
-                                }
+                                tdEnd.style.padding = '8px 10px';
+                                tdEnd.textContent = formatDDMMYYYY(step.end_date);
                                 tr.appendChild(tdEnd);
+
+                                // 7. Direct Status Pill (Clean display, no inline edit form)
+                                const tdStatus = document.createElement('td');
+                                tdStatus.style.padding = '8px 10px';
+                                
+                                const statusSpan = document.createElement('span');
+                                statusSpan.className = 'status-pill';
+                                let displayStatus = 'Yts';
+                                if (step.status === 'Done' || step.status === 'Approved') {
+                                    displayStatus = 'Done';
+                                    statusSpan.classList.add('status-done');
+                                } else if (step.status === 'In Progress' || step.status === 'WIP' || step.status === 'Wip' || step.status === 'Open') {
+                                    displayStatus = 'Wip';
+                                    statusSpan.classList.add('status-progress');
+                                } else if (step.status === 'Review') {
+                                    displayStatus = 'Review';
+                                    statusSpan.classList.add('status-open');
+                                } else if (step.status === 'RTK' || step.status === 'Rework' || step.status === 'Re-take') {
+                                    displayStatus = 'RTK';
+                                    statusSpan.classList.add('status-pending');
+                                } else if (step.status === 'Hold' || step.status === 'ON HOLD' || step.status === 'On Hold') {
+                                    displayStatus = 'Hold';
+                                    statusSpan.style.background = '#ffedd5';
+                                    statusSpan.style.color = '#c2410c';
+                                    statusSpan.style.border = '1px solid #fdba74';
+                                } else {
+                                    statusSpan.classList.add('status-pending');
+                                }
+                                statusSpan.textContent = displayStatus;
+                                statusSpan.style.fontSize = '9.5px';
+                                statusSpan.style.padding = '2px 6px';
+                                statusSpan.style.minWidth = 'auto';
+                                tdStatus.appendChild(statusSpan);
+
+                                if (step.status === 'Hold' || displayStatus === 'Hold') {
+                                    const hReasonDiv = document.createElement('div');
+                                    hReasonDiv.style.fontSize = '9px';
+                                    hReasonDiv.style.color = '#c2410c';
+                                    hReasonDiv.style.fontWeight = '700';
+                                    hReasonDiv.style.marginTop = '2px';
+                                    hReasonDiv.textContent = `🛑 Reason: ${step.hold_reason || step.remarks || 'On Hold'}`;
+                                    tdStatus.appendChild(hReasonDiv);
+                                }
+                                tr.appendChild(tdStatus);
                                 
                                 stepsBody.appendChild(tr);
                             });
                         } else {
                             const tr = document.createElement('tr');
                             const td = document.createElement('td');
-                            td.colSpan = 5;
-                            td.style.padding = '12px';
+                            td.colSpan = 7;
+                            td.style.padding = '14px';
                             td.style.textAlign = 'center';
                             td.style.color = 'var(--text-muted)';
                             td.textContent = 'No pipeline steps found.';
@@ -1847,16 +1948,18 @@
                             data.rtk_history.forEach(item => {
                                 const tr = document.createElement('tr');
                                 tr.style.borderBottom = '1px solid #fed7aa';
+                                const artistDisp = item.assigned_to_name ? (item.assigned_to_name + ' (@' + item.assigned_to_username + ')') : '<span style="color: #b45309; font-weight: 700;">Unassigned (Pending Lead Selection)</span>';
+                                const dateDisp = formatDDMMYYYY(item.created_at);
                                 tr.innerHTML = `
-                                    <td style="padding: 5px 8px; font-weight: 800; color: #c2410c;">Take ${item.take_number}</td>
-                                    <td style="padding: 5px 8px; color: var(--text-secondary);">${item.created_at || '-'}</td>
-                                    <td style="padding: 5px 8px; font-weight: 600;">${item.stage_name} (${item.target_team || '-'})</td>
-                                    <td style="padding: 5px 8px;">${item.assigned_to_name ? (item.assigned_to_name + ' (@' + item.assigned_to_username + ')') : '-'}</td>
-                                    <td style="padding: 5px 8px; font-weight: 700; font-family: monospace; font-size: 10px;">
-                                        <span style="color: #991b1b;">${item.old_file_name}</span> ➔ <span style="color: #15803d;">${item.new_file_name}</span>
+                                    <td style="padding: 6px 8px; font-weight: 800; color: #c2410c;">Take ${item.take_number}</td>
+                                    <td style="padding: 6px 8px; color: var(--text-secondary);">${dateDisp || '-'}</td>
+                                    <td style="padding: 6px 8px; font-weight: 700;">${item.stage_name} (${item.target_team || '-'})</td>
+                                    <td style="padding: 6px 8px;">${artistDisp}</td>
+                                    <td style="padding: 6px 8px; font-weight: 700; font-family: monospace; font-size: 10.5px;">
+                                        <span style="color: #991b1b; background: #fee2e2; padding: 1px 4px; border-radius: 3px;">${item.old_file_name}</span> ➔ <span style="color: #15803d; background: #dcfce7; padding: 1px 4px; border-radius: 3px;">${item.new_file_name}</span>
                                     </td>
-                                    <td style="padding: 5px 8px; color: #b91c1c; font-weight: 600;">${item.reason || '-'}</td>
-                                    <td style="padding: 5px 8px; color: var(--text-secondary);">${item.created_by_name || 'System'}</td>
+                                    <td style="padding: 6px 8px; color: #b91c1c; font-weight: 600;">${item.reason || '-'}</td>
+                                    <td style="padding: 6px 8px; color: var(--text-secondary);">${item.created_by_name || 'System'}</td>
                                 `;
                                 rtkBody.appendChild(tr);
                             });

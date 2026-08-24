@@ -94,14 +94,63 @@
                 <div class="user-team">{{ session['team'] }} Team</div>
             </div>
             
-                                    <ul class="sidebar-menu">
+                                                            <ul class="sidebar-menu">
                 <li class="menu-section-title">Navigation</li>
-                {% if session['role'] in ['Admin', 'Lead', 'Artist'] %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and (sub_tab == 'dashboard' or not sub_tab) %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='dashboard') }}"><span>Dashboard</span></a>
+                {% if session['role'] == 'Admin' %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
                 </li>
-                {% endif %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'assets' %}active{% endif %}">
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
+                    <a href="{{ url_for('system_approvals_page') }}">
+                        <span>Leave Approvals{% if pending_approvals_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ pending_approvals_count }}</span>{% endif %}</span>
+                    </a>
+                </li>
+                {% elif session['role'] == 'HR' %}
+                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
+                </li>
+                <li class="menu-section-title" style="margin-top: 15px;">HR Management</li>
+                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
+                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
+                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
+                </li>
+                {% elif session['role'] == 'Lead' %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
                     <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
                 <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
@@ -113,22 +162,23 @@
                 <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
                     <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
-                {% if session['role'] in ['Admin', 'Lead', 'HR'] %}
                 <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('team_approvals_page') }}"><span>Team Approvals</span></a>
+                    <a href="{{ url_for('team_approvals_page') }}">
+                        <span>Team Approvals{% if pending_approvals_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ pending_approvals_count }}</span>{% endif %}</span>
+                    </a>
                 </li>
-                {% endif %}
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}"><span>System Approvals</span></a>
+                {% else %}
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
                 </li>
-                {% endif %}
-                {% if session['role'] in ['Admin', 'HR'] %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Admin Reports</span></a>
+                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
                 </li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
+                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
+                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
+                </li>
+                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
+                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
                 </li>
                 {% endif %}
             </ul>
@@ -175,7 +225,7 @@
                     <!-- Leave Balance Panel -->
                     <div class="card" style="margin: 0;">
                         <h3 class="card-title">Leave Balance Pool</h3>
-                        <div class="attendance-stats-summary" style="margin-top: 10px; background-color: transparent; border: none; padding: 0;">
+                        <div class="attendance-stats-summary" style="margin-top: 10px; background-color: transparent; border: none; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
                             <div class="stat-box">
                                 <div class="stat-box-num" style="color: var(--color-blue);">{{ "%.1f"|format(allowed_leaves) }}</div>
                                 <div class="stat-box-lbl">Total Pool (18 + CF)</div>
@@ -188,11 +238,15 @@
                                 <div class="stat-box-num" style="color: var(--color-green);">{{ "%.1f"|format(remaining_balance) }}</div>
                                 <div class="stat-box-lbl">Remaining</div>
                             </div>
+                            <div class="stat-box" style="border-left: 2px solid #e9d5ff; background: #faf5ff;">
+                                <div class="stat-box-num" style="color: #9333ea;">{{ "%.1f"|format(user['comp_off_balance'] or 0.0) }}</div>
+                                <div class="stat-box-lbl" style="color: #7e22ce; font-weight: 700;">Comp-Off Balance</div>
+                            </div>
                         </div>
                         
                         <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border-color); font-size: 12.5px; color: var(--text-secondary); line-height: 1.6;">
-                            <strong>Carry Forward (CF):</strong> +{{ user['carry_forward'] or 0.0 }} days<br>
-                            <strong>Policy Rule:</strong> Max 2 approved leave days per calendar month. Spanned dates allocate days to respective months. Single type-free pool.
+                            <strong>Carry Forward (CF):</strong> +{{ user['carry_forward'] or 0.0 }} days | <strong>Comp-Off Available:</strong> +{{ user['comp_off_balance'] or 0.0 }} days<br>
+                            <strong>Policy Rule:</strong> Annual leave max 2 days/month. Comp-Off leaves deduct from earned Comp-Off Balance.
                         </div>
                     </div>
 
@@ -200,6 +254,19 @@
                     <div class="card" style="margin: 0;">
                         <h3 class="card-title">Request Time-Off</h3>
                         <form action="{{ url_for('leaves_page') }}" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Leave Type</label>
+                                <select name="leave_type" id="leave_type_select" class="reason-input" style="background-color: #ffffff; width: 100%; font-weight: 600;" onchange="toggleCompOffNotice(this.value)">
+                                    <option value="General">🏢 General Annual Leave (Pool Balance: {{ "%.1f"|format(remaining_balance) }} days)</option>
+                                    <option value="Comp Off">⚡ Comp-Off Leave (Available Comp-Off: {{ "%.1f"|format(user['comp_off_balance'] or 0.0) }} days)</option>
+                                    <option value="Casual">🌴 Casual Leave</option>
+                                    <option value="Sick">🤒 Sick Leave</option>
+                                </select>
+                                <div id="comp_off_notice" style="display: none; font-size: 11px; color: #7e22ce; background: #faf5ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e9d5ff; margin-top: 6px; font-weight: 600;">
+                                    ℹ️ Comp-Off Leave will deduct from your earned Comp-Off Balance (Available: {{ "%.1f"|format(user['comp_off_balance'] or 0.0) }} days).
+                                </div>
+                            </div>
+                            
                             <div>
                                 <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Start Date</label>
                                 <input type="date" name="start_date" class="reason-input" style="background-color: #ffffff;" required value="{{ today_str }}">
@@ -212,13 +279,22 @@
                             
                             <div>
                                 <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 4px;">Reason / Remarks</label>
-                                <input type="text" name="reason" class="reason-input" style="background-color: #ffffff;" placeholder="e.g. Personal emergency, family function" required>
+                                <input type="text" name="reason" class="reason-input" style="background-color: #ffffff;" placeholder="e.g. Personal emergency, family function, comp-off usage" required>
                             </div>
                             
                             <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 6px; padding: 10px;">Submit Request</button>
                         </form>
                     </div>
                 </div>
+
+                <script>
+                    function toggleCompOffNotice(val) {
+                        var box = document.getElementById('comp_off_notice');
+                        if (box) {
+                            box.style.display = (val === 'Comp Off') ? 'block' : 'none';
+                        }
+                    }
+                </script>
 
                 <!-- Reusable Actionable Pending Approvals Box (Lead/Admin/HR) -->
                 {% if session['role'] not in ['Lead', 'HR'] and my_pending_approvals %}
