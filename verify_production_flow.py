@@ -124,15 +124,16 @@ def run_tests() -> None:
         ws = wb.active
         assert ws.protection.sheet is True, "Template header protection should be enabled"
 
-        # Add new file in row 2 marked Done (should hand off to Modeling!)
+        # Add new file in row 2 marked Approved (should hand off to Modeling as Yet to Start!)
         ws.cell(row=2, column=1, value="Promo Videos / Promo Videos Main Chapter")
         ws.cell(row=2, column=2, value="EV_Hero_Car_v01")
-        ws.cell(row=2, column=3, value="High")
+        ws.cell(row=2, column=3, value="High Complexity")
         ws.cell(row=2, column=4, value=50)
         ws.cell(row=2, column=5, value=4.5)
         ws.cell(row=2, column=6, value="Prabhas")
-        ws.cell(row=2, column=7, value="Done")
-        ws.cell(row=2, column=8, value="Content approved and ready for Modeling")
+        ws.cell(row=2, column=7, value="Approved")
+        ws.cell(row=2, column=8, value="")
+        ws.cell(row=2, column=9, value="Content approved and ready for Modeling")
 
         buf_a = io.BytesIO()
         wb.save(buf_a)
@@ -164,7 +165,7 @@ def run_tests() -> None:
         assert r_conf.status_code == 200
         assert b"Upload committed for Content" in r_conf.data
 
-        # Verify Modeling now has EV_Hero_Car_v01 in Open status
+        # Verify Modeling now has EV_Hero_Car_v01 in Yet to Start status
         conn = open_encrypted_connection(_TEST_DB)
         fp_mdl = conn.execute(
             """
@@ -173,11 +174,11 @@ def run_tests() -> None:
             WHERE f.name = 'EV_Hero_Car_v01' AND fp.step_name = 'Modeling'
             """
         ).fetchone()
-        assert fp_mdl is not None and fp_mdl["status"] == "Open", f"Expected Modeling Open, got {fp_mdl}"
+        assert fp_mdl is not None and fp_mdl["status"] == "Yet to Start", f"Expected Modeling Yet to Start, got {fp_mdl}"
         conn.close()
         print("[PASS] 4. Team A download -> dry-run preview -> atomic commit -> sequential handoff to Team B verified.")
 
-        # 5. Team B (Modeling: amit) downloads template (pre-filled with EV_Hero_Car_v01), marks Rework -> sends back to Content
+        # 5. Team B (Modeling: amit) downloads template (pre-filled with EV_Hero_Car_v01), marks Retake (Take 1) -> sends back to Content & renames file to _Take_1
         client_b = app.test_client()
         _login(client_b, "amit")
         r_dl_b = client_b.get("/team/template/download")
@@ -186,9 +187,24 @@ def run_tests() -> None:
         ws_b = wb_b.active
         assert ws_b.cell(row=2, column=2).value == "EV_Hero_Car_v01", "Pre-filled Modeling queue missing EV_Hero_Car_v01"
 
+        # First verify Retake WITHOUT Take Version is blocked
         ws_b.cell(row=2, column=6, value="Raveendra. K")
-        ws_b.cell(row=2, column=7, value="Rework")
-        ws_b.cell(row=2, column=8, value="Missing wheel blueprint dimensions")
+        ws_b.cell(row=2, column=7, value="Retake")
+        ws_b.cell(row=2, column=8, value="")
+        ws_b.cell(row=2, column=9, value="Missing wheel blueprint dimensions")
+        buf_no_take = io.BytesIO()
+        wb_b.save(buf_no_take)
+        buf_no_take.seek(0)
+        csrf_b0 = _extract_csrf(client_b.get("/team/upload").data)
+        r_no_take = client_b.post(
+            "/team/upload",
+            data={"csrf_token": csrf_b0, "action": "preview", "excel_file": (buf_no_take, "no_take.xlsx")},
+            content_type="multipart/form-data",
+        )
+        assert b"Take Version (Take 1, Take 2, or Take 3) is compulsory" in r_no_take.data
+
+        # Now set Take 1 properly
+        ws_b.cell(row=2, column=8, value="Take 1")
         buf_b = io.BytesIO()
         wb_b.save(buf_b)
         buf_b.seek(0)
@@ -196,9 +212,10 @@ def run_tests() -> None:
         csrf_b = _extract_csrf(client_b.get("/team/upload").data)
         r_prev_b = client_b.post(
             "/team/upload",
-            data={"csrf_token": csrf_b, "action": "preview", "excel_file": (buf_b, "modeling_rework.xlsx")},
+            data={"csrf_token": csrf_b, "action": "preview", "excel_file": (buf_b, "modeling_retake.xlsx")},
             content_type="multipart/form-data",
         )
+        assert b"EV_Hero_Car_v01_Take_1" in r_prev_b.data
         assert b"Confirm &amp; Commit Atomically" in r_prev_b.data
         csrf_b2 = _extract_csrf(r_prev_b.data)
         r_conf_b = client_b.post(
@@ -211,22 +228,24 @@ def run_tests() -> None:
         conn = open_encrypted_connection(_TEST_DB)
         fp_cnt = conn.execute(
             """
-            SELECT fp.status, fp.rework_reason FROM file_pipeline fp
+            SELECT fp.status, fp.take_count, fp.rework_reason, f.name AS file_name
+            FROM file_pipeline fp
             JOIN files f ON fp.file_id = f.id
-            WHERE f.name = 'EV_Hero_Car_v01' AND fp.step_name = 'Content'
+            WHERE f.name = 'EV_Hero_Car_v01_Take_1' AND fp.step_name = 'Content'
             """
         ).fetchone()
-        assert fp_cnt["status"] == "Rework"
+        assert fp_cnt is not None and fp_cnt["status"] == "Retake"
+        assert fp_cnt["take_count"] == 1
         assert "Missing wheel blueprint" in fp_cnt["rework_reason"]
         conn.close()
-        print("[PASS] 5. Team B Rework send-back to Team A with reason note verified.")
+        print("[PASS] 5. Team B Retake (Take 1) send-back to Team A with _Take_1 file rename verified.")
 
         # 6. Verify invalid Excel row blocks commit and leaves DB unchanged
         wb_bad = openpyxl.load_workbook(io.BytesIO(client_b.get("/team/template/download").data))
         ws_bad = wb_bad.active
         ws_bad.cell(row=2, column=2, value="Bad_File_Test")
         ws_bad.cell(row=2, column=6, value="NonExistentArtist")
-        ws_bad.cell(row=2, column=7, value="Done")
+        ws_bad.cell(row=2, column=7, value="Approved")
         buf_bad = io.BytesIO()
         wb_bad.save(buf_bad)
         buf_bad.seek(0)

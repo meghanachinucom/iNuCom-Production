@@ -1505,7 +1505,7 @@ def dashboard():
             JOIN chapters c ON f.chapter_id = c.id
             JOIN projects p ON c.project_id = p.id
             LEFT JOIN users u ON fp.assigned_to = u.id
-            WHERE fp.team_name = ? AND fp.status = 'Done'
+            WHERE fp.team_name = ? AND fp.status IN ('Done', 'Approved')
             ORDER BY fp.submitted_at DESC, fp.id DESC
             LIMIT 100
         """, (user_team,))
@@ -2203,46 +2203,64 @@ def update_stage_status(file_id):
         flash("Unauthorized: Only Leads and Admins can update stage status directly.", "error")
         return redirect(request.referrer or url_for('dashboard'))
         
-    if new_status in ['Hold', 'hold', 'ON HOLD']:
-        if not hold_reason:
-            flash("Hold reason is required when placing a stage on Hold.", "error")
-            return redirect(request.referrer or url_for('dashboard'))
-        final_status = 'Hold'
-    elif new_status in ['Yts', 'YTS', 'Pending']:
-        final_status = 'Yts'
-    elif new_status in ['Wip', 'WIP', 'In Progress', 'Open']:
-        final_status = 'Wip'
+    if new_status in ['Yet to Start', 'Yts', 'YTS', 'Pending', 'Open']:
+        final_status = 'Yet to Start'
+    elif new_status in ['Work In Progress', 'Wip', 'WIP', 'In Progress']:
+        final_status = 'Work In Progress'
     elif new_status in ['Review', 'Lead Review']:
         final_status = 'Review'
-    elif new_status in ['RTK', 'Rework', 'Re-take']:
-        final_status = 'RTK'
-    elif new_status in ['Done', 'Approved']:
-        final_status = 'Done'
+    elif new_status in ['Retake', 'RTK', 'Rework', 'Re-take']:
+        final_status = 'Retake'
+    elif new_status in ['Approved', 'Done']:
+        final_status = 'Approved'
     else:
         final_status = new_status
 
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     now_full_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    if final_status == 'Hold':
+    if final_status == 'Retake':
+        from pipeline_excel import apply_take_suffix
+        take_version_raw = request.form.get('take_version', '').strip()
+        cur_file = cursor.execute("SELECT name, COALESCE(take_count, 0) AS take_count FROM files WHERE id = ?", (file_id,)).fetchone()
+        cur_take = cur_file['take_count'] if cur_file else 0
+        if take_version_raw in ['1', '2', '3', 'Take 1', 'Take 2', 'Take 3']:
+            req_take = int(take_version_raw.split()[-1])
+        else:
+            req_take = min(cur_take + 1, 3)
+        expected_take = min(cur_take + 1, 3)
+        if cur_take >= 3:
+            flash("File has already reached Take 3 (maximum retake version).", "error")
+            return redirect(request.referrer or url_for('dashboard'))
+        if req_take != expected_take:
+            flash(f"Next Retake must be Take {expected_take} (current take is {cur_take}).", "error")
+            return redirect(request.referrer or url_for('dashboard'))
+        updated_name = apply_take_suffix(cur_file['name'], req_take) if cur_file else pipeline_step['file_name']
+        reason_txt = hold_reason or request.form.get('rework_reason', '').strip() or f"Retake Take {req_take}"
+        cursor.execute(
+            "UPDATE files SET name = ?, take_count = ?, status = 'Retake', rework_reason = ? WHERE id = ?",
+            (updated_name, req_take, reason_txt, file_id),
+        )
+        cursor.execute(
+            "UPDATE file_pipeline SET status = 'Retake', take_count = ?, rework_reason = ?, remarks = ? WHERE file_id = ? AND step_name = ?",
+            (req_take, reason_txt, reason_txt, file_id, step_name),
+        )
+    elif final_status == 'Approved':
         cursor.execute("""
             UPDATE file_pipeline 
-            SET status = 'Hold', hold_reason = ?, remarks = COALESCE(remarks, ?)
-            WHERE file_id = ? AND step_name = ?
-        """, (hold_reason, f"On Hold: {hold_reason}", file_id, step_name))
-        cursor.execute("UPDATE files SET hold_reason = ? WHERE id = ?", (hold_reason, file_id))
-    elif final_status == 'RTK':
-        record_rtk_event(db, file_id, step_name, hold_reason or "Rework Requested")
-    elif final_status == 'Done':
-        cursor.execute("""
-            UPDATE file_pipeline 
-            SET status = 'Done', start_date = COALESCE(start_date, ?), end_date = COALESCE(end_date, ?), submitted_at = ?
+            SET status = 'Approved', start_date = COALESCE(start_date, ?), end_date = COALESCE(end_date, ?), submitted_at = ?
             WHERE file_id = ? AND step_name = ?
         """, (today_str, today_str, now_full_str, file_id, step_name))
-    elif final_status == 'Wip':
+        next_st = cursor.execute(
+            "SELECT id FROM file_pipeline WHERE file_id = ? AND stage_order > (SELECT stage_order FROM file_pipeline WHERE file_id = ? AND step_name = ?) ORDER BY stage_order ASC LIMIT 1",
+            (file_id, file_id, step_name),
+        ).fetchone()
+        if next_st:
+            cursor.execute("UPDATE file_pipeline SET status = 'Yet to Start' WHERE id = ? AND status = 'Locked'", (next_st['id'],))
+    elif final_status == 'Work In Progress':
         cursor.execute("""
             UPDATE file_pipeline 
-            SET status = 'Wip', start_date = COALESCE(start_date, ?)
+            SET status = 'Work In Progress', start_date = COALESCE(start_date, ?)
             WHERE file_id = ? AND step_name = ?
         """, (today_str, file_id, step_name))
     else:

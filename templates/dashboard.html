@@ -417,12 +417,11 @@
                                                                                         <input type="hidden" name="step_name" value="{{ stage }}">
                                                                                         <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
                                                                                         <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9px; height:20px; padding:0 2px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
-                                                                                            <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
-                                                                                            <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                            <option value="Yet to Start" {% if norm_st == 'Yts' %}selected{% endif %}>Yet to Start</option>
+                                                                                            <option value="Work In Progress" {% if norm_st == 'Wip' %}selected{% endif %}>Work In Progress</option>
                                                                                             <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
-                                                                                            <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
-                                                                                            <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
-                                                                                            <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                            <option value="Retake" {% if norm_st == 'RTK' %}selected{% endif %}>Retake</option>
+                                                                                            <option value="Approved" {% if norm_st == 'Done' %}selected{% endif %}>Approved</option>
                                                                                         </select>
                                                                                     </form>
                                                                                 </div>
@@ -431,12 +430,11 @@
                                                                                     <input type="hidden" name="step_name" value="{{ stage }}">
                                                                                     <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
                                                                                     <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9px; height:20px; padding:0 2px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
-                                                                                        <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
-                                                                                        <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                        <option value="Yet to Start" {% if norm_st == 'Yts' %}selected{% endif %}>Yet to Start</option>
+                                                                                        <option value="Work In Progress" {% if norm_st == 'Wip' %}selected{% endif %}>Work In Progress</option>
                                                                                         <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
-                                                                                        <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
-                                                                                        <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
-                                                                                        <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                        <option value="Retake" {% if norm_st == 'RTK' %}selected{% endif %}>Retake</option>
+                                                                                        <option value="Approved" {% if norm_st == 'Done' %}selected{% endif %}>Approved</option>
                                                                                     </select>
                                                                                 </form>
                                                                             {% else %}
@@ -490,12 +488,11 @@
                                                                                     <input type="hidden" name="step_name" value="{{ stage }}">
                                                                                     <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
                                                                                     <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9.5px; height:22px; padding:0 3px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
-                                                                                        <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
-                                                                                        <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                        <option value="Yet to Start" {% if norm_st == 'Yts' %}selected{% endif %}>Yet to Start</option>
+                                                                                        <option value="Work In Progress" {% if norm_st == 'Wip' %}selected{% endif %}>Work In Progress</option>
                                                                                         <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
-                                                                                        <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
-                                                                                        <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
-                                                                                        <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                        <option value="Retake" {% if norm_st == 'RTK' %}selected{% endif %}>Retake</option>
+                                                                                        <option value="Approved" {% if norm_st == 'Done' %}selected{% endif %}>Approved</option>
                                                                                     </select>
                                                                                 </form>
                                                                             </div>
@@ -504,12 +501,11 @@
                                                                                 <input type="hidden" name="step_name" value="{{ stage }}">
                                                                                 <input type="hidden" name="hold_reason" value="{{ cell['hold_reason'] or cell['remarks'] or '' }}">
                                                                                 <select name="status" class="select-input sheet-status-select sheet-status-{{ norm_st }}" style="font-size:9.5px; height:22px; padding:0 3px;" onchange="handleSheetStatusChange(this, '{{ norm_st }}')">
-                                                                                    <option value="Yts" {% if norm_st == 'Yts' %}selected{% endif %}>Yts</option>
-                                                                                    <option value="Wip" {% if norm_st == 'Wip' %}selected{% endif %}>Wip</option>
+                                                                                    <option value="Yet to Start" {% if norm_st == 'Yts' %}selected{% endif %}>Yet to Start</option>
+                                                                                    <option value="Work In Progress" {% if norm_st == 'Wip' %}selected{% endif %}>Work In Progress</option>
                                                                                     <option value="Review" {% if norm_st == 'Review' %}selected{% endif %}>Review</option>
-                                                                                    <option value="RTK" {% if norm_st == 'RTK' %}selected{% endif %}>RTK</option>
-                                                                                    <option value="Done" {% if norm_st == 'Done' %}selected{% endif %}>Done</option>
-                                                                                    <option value="Hold" {% if norm_st == 'Hold' %}selected{% endif %}>Hold</option>
+                                                                                    <option value="Retake" {% if norm_st == 'RTK' %}selected{% endif %}>Retake</option>
+                                                                                    <option value="Approved" {% if norm_st == 'Done' %}selected{% endif %}>Approved</option>
                                                                                 </select>
                                                                             </form>
                                                                         {% else %}
@@ -2059,14 +2055,28 @@
             const val = selectEl.value;
             const form = selectEl.closest('form');
             const holdInp = form.querySelector('input[name="hold_reason"]');
-            if (val === 'Hold') {
-                const reason = prompt("Mandatory Hold Reason (Required to set stage to Hold):", holdInp ? holdInp.value : "");
-                if (!reason || !reason.trim()) {
-                    alert("Hold reason is required when placing a stage on Hold.");
-                    selectEl.value = currentStatus || 'Yts';
+            if (val === 'Retake') {
+                const takeRaw = prompt("Compulsory Take Version (enter 1, 2, or 3 for Take 1, Take 2, Take 3):", "1");
+                if (!takeRaw || !['1', '2', '3', 'Take 1', 'Take 2', 'Take 3'].includes(takeRaw.trim())) {
+                    alert("Take Version (1, 2, or 3) is compulsory when selecting Retake.");
+                    selectEl.value = currentStatus || 'Yet to Start';
                     return false;
                 }
-                holdInp.value = reason.trim();
+                const reason = prompt("Mandatory Retake Reason:", holdInp ? holdInp.value : "");
+                if (!reason || !reason.trim()) {
+                    alert("Retake reason is required.");
+                    selectEl.value = currentStatus || 'Yet to Start';
+                    return false;
+                }
+                let takeInp = form.querySelector('input[name="take_version"]');
+                if (!takeInp) {
+                    takeInp = document.createElement('input');
+                    takeInp.type = 'hidden';
+                    takeInp.name = 'take_version';
+                    form.appendChild(takeInp);
+                }
+                takeInp.value = takeRaw.trim();
+                if (holdInp) holdInp.value = reason.trim();
             }
             try {
                 sessionStorage.setItem('dashboardScrollPos', window.scrollY);
@@ -2189,10 +2199,11 @@
                 <div>
                     <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; display:block; margin-bottom:4px;">Today's Work Status:</label>
                     <select name="status" class="select-input" style="width:100%; padding:8px 10px; font-size:12px;" required>
-                        <option value="Wip">Wip (Work In Progress)</option>
-                        <option value="Review">Review (Submitted for Review)</option>
-                        <option value="Done">Done (Completed)</option>
-                        <option value="Hold">Hold (On Hold)</option>
+                        <option value="Yet to Start">Yet to Start</option>
+                        <option value="Work In Progress">Work In Progress</option>
+                        <option value="Review">Review</option>
+                        <option value="Retake">Retake</option>
+                        <option value="Approved">Approved</option>
                     </select>
                 </div>
                 <div>

@@ -73,8 +73,8 @@
                     <div style="font-size:12px; color:var(--text-secondary);">Handoffs to Next Team</div>
                 </div>
                 <div class="card" style="padding:12px; text-align:center;">
-                    <div style="font-size:22px; font-weight:700; color:var(--color-red);">{{ preview.summary.reworks }}</div>
-                    <div style="font-size:12px; color:var(--text-secondary);">Rework Send-Backs</div>
+                    <div style="font-size:22px; font-weight:700; color:var(--color-red);">{{ preview.summary.retakes }}</div>
+                    <div style="font-size:12px; color:var(--text-secondary);">Retakes (Take 1/2/3)</div>
                 </div>
             </div>
 
@@ -100,6 +100,7 @@
                                 <th>Hours</th>
                                 <th>Artist</th>
                                 <th>Status</th>
+                                <th>Take Version</th>
                                 <th>Notes</th>
                             </tr>
                         </thead>
@@ -114,6 +115,7 @@
                                 <td>{{ r.hours }}</td>
                                 <td>{{ r.artist_name or '—' }}</td>
                                 <td>{{ r.status }}</td>
+                                <td>{{ r.take_version or '—' }}</td>
                                 <td>{{ r.notes or '—' }}</td>
                             </tr>
                             {% endfor %}
@@ -138,14 +140,15 @@
             {% if open_queue %}
             <div style="overflow-x:auto;">
                 <table class="data-table" style="width:100%;">
-                    <thead>
+                        <thead>
                         <tr>
                             <th>Project / Chapter</th>
                             <th>File Name</th>
                             <th>Stage</th>
                             <th>Status</th>
+                            <th>Take</th>
                             <th>Artist</th>
-                            <th>Notes / Rework Reason</th>
+                            <th>Notes / Retake Reason</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -155,6 +158,7 @@
                             <td><strong>{{ item.file_name }}</strong></td>
                             <td>{{ item.step_name }}</td>
                             <td>{{ item.status }}</td>
+                            <td>{% if item.take_count in [1, 2, 3] %}Take {{ item.take_count }}{% else %}—{% endif %}</td>
                             <td>{{ item.artist_name or 'Unassigned' }}</td>
                             <td>{{ item.rework_reason or item.remarks or '—' }}</td>
                         </tr>

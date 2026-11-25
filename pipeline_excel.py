@@ -1,9 +1,10 @@
 """
 Per-team Excel template generation, dry-run validation, atomic commit,
-and sequential pipeline handoff / rework send-back logic.
+and sequential pipeline handoff / Retake (Take 1, Take 2, Take 3) logic.
 """
 import datetime
 import io
+import re
 from typing import Any
 
 import openpyxl
@@ -20,11 +21,25 @@ TEMPLATE_HEADERS = [
     "Time Worked (Hrs)",
     "Artist Name",
     "Status",
-    "Notes / Rework Reason",
+    "Take Version",
+    "Notes / Retake Reason",
 ]
 
-VALID_COMPLEXITIES = ["Low", "Medium", "High", "Very High"]
-VALID_STATUSES = ["Open", "In Progress", "Done", "Rework"]
+VALID_COMPLEXITIES = ["Easy", "Medium", "Hard", "High Complexity"]
+VALID_STATUSES = ["Yet to Start", "Work In Progress", "Review", "Retake", "Approved"]
+VALID_TAKES = ["Take 1", "Take 2", "Take 3"]
+OPEN_QUEUE_STATUSES = ("Yet to Start", "Work In Progress", "Review", "Retake", "Open", "In Progress", "Rework")
+
+
+def strip_take_suffix(file_name: str) -> str:
+    """Remove any trailing _Take_1 / _Take_2 / _Take_3 suffix from a file name."""
+    return re.sub(r"_Take_[123]$", "", file_name.strip(), flags=re.IGNORECASE)
+
+
+def apply_take_suffix(file_name: str, take_num: int) -> str:
+    """Append _Take_<N> cleanly to the base file name."""
+    base = strip_take_suffix(file_name)
+    return f"{base}_Take_{take_num}"
 
 
 def get_team_stages(db, team_name: str) -> list[dict]:
@@ -46,7 +61,7 @@ def get_team_members(db, team_name: str) -> list[dict]:
 
 
 def get_team_open_queue(db, team_name: str) -> list[dict]:
-    """Return all file_pipeline rows in Open, In Progress, or Rework for team_name."""
+    """Return all file_pipeline rows currently active for team_name."""
     rows = db.execute(
         """
         SELECT
@@ -58,6 +73,7 @@ def get_team_open_queue(db, team_name: str) -> list[dict]:
             fp.complexity,
             fp.points,
             fp.time_worked,
+            COALESCE(fp.take_count, 0) AS take_count,
             fp.rework_reason,
             fp.remarks,
             f.name AS file_name,
@@ -70,9 +86,14 @@ def get_team_open_queue(db, team_name: str) -> list[dict]:
         JOIN projects p ON c.project_id = p.id
         LEFT JOIN users u ON fp.assigned_to = u.id
         WHERE fp.team_name = ?
-          AND fp.status IN ('Open', 'In Progress', 'Rework')
+          AND fp.status IN ('Yet to Start', 'Work In Progress', 'Review', 'Retake', 'Open', 'In Progress', 'Rework')
         ORDER BY
-            CASE fp.status WHEN 'Rework' THEN 0 WHEN 'In Progress' THEN 1 ELSE 2 END,
+            CASE fp.status
+                WHEN 'Retake' THEN 0
+                WHEN 'Review' THEN 1
+                WHEN 'Work In Progress' THEN 2
+                ELSE 3
+            END,
             p.name ASC, c.name ASC, f.name ASC, fp.stage_order ASC
         """,
         (team_name,),
@@ -82,15 +103,13 @@ def get_team_open_queue(db, team_name: str) -> list[dict]:
 
 def generate_team_excel_template(db, team_name: str) -> bytes:
     """
-    Generate an .xlsx workbook pre-filled with Open/In Progress/Rework files
-    for team_name, plus 25 blank rows for adding new files, with protected headers
-    and Excel dropdown validations.
+    Generate an .xlsx workbook pre-filled with active queue files for team_name,
+    plus 25 blank rows for adding new files, with protected headers and dropdown validations.
     """
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = f"{team_name[:25]} Queue"
 
-    # Hidden sheet for long dropdown lists (project/chapters, artists)
     ref_ws = wb.create_sheet(title="_Lists")
     ref_ws.sheet_state = "hidden"
 
@@ -108,14 +127,13 @@ def generate_team_excel_template(db, team_name: str) -> bytes:
         ORDER BY p.name, c.name
         """
     ).fetchall()
-    pc_labels = [r["label"] for r in proj_chaps] or ["Default Project / Main Chapter"]
+    pc_labels = [r["label"] for r in proj_chaps] or ["Promo Videos / Promo Videos Main Chapter"]
     for idx, label in enumerate(pc_labels, start=1):
         ref_ws.cell(row=idx, column=2, value=label)
 
-    # Header styling & protection
-    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    header_fill = PatternFill(start_color="232325", end_color="232325", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=11)
-    rework_fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
+    retake_fill = PatternFill(start_color="FBEEEE", end_color="FBEEEE", fill_type="solid")
 
     for col_idx, heading in enumerate(TEMPLATE_HEADERS, start=1):
         cell = ws.cell(row=1, column=col_idx, value=heading)
@@ -131,68 +149,58 @@ def generate_team_excel_template(db, team_name: str) -> bytes:
     row_idx = 2
     for item in queue:
         proj_chap = f"{item['project_name']} / {item['chapter_name']}"
-        note = item["rework_reason"] if item["status"] == "Rework" and item["rework_reason"] else (item["remarks"] or "")
+        is_retake = item["status"] in ("Retake", "Rework")
+        note = item["rework_reason"] if is_retake and item["rework_reason"] else (item["remarks"] or "")
+        take_str = f"Take {item['take_count']}" if (item.get("take_count") or 0) in (1, 2, 3) else ""
+        comp = item["complexity"] if item["complexity"] in VALID_COMPLEXITIES else "Medium"
+        st_display = "Retake" if is_retake else (
+            "Yet to Start" if item["status"] == "Open" else (
+                "Work In Progress" if item["status"] == "In Progress" else item["status"]
+            )
+        )
         values = [
             proj_chap,
             item["file_name"],
-            item["complexity"] or "Medium",
+            comp,
             item["points"] or 0,
             item["time_worked"] or 0.0,
             item["artist_name"] or "",
-            item["status"],
+            st_display,
+            take_str,
             note,
         ]
         for col_idx, val in enumerate(values, start=1):
             c = ws.cell(row=row_idx, column=col_idx, value=val)
             c.protection = Protection(locked=False)
-            if item["status"] == "Rework":
-                c.fill = rework_fill
+            if is_retake:
+                c.fill = retake_fill
         row_idx += 1
 
-    # Add 25 blank rows for new files
     total_rows = max(row_idx + 25, 30)
     for r in range(row_idx, total_rows + 1):
         for col_idx in range(1, len(TEMPLATE_HEADERS) + 1):
             c = ws.cell(row=r, column=col_idx, value="")
             c.protection = Protection(locked=False)
 
-    # Data validations
-    dv_pc = DataValidation(
-        type="list",
-        formula1=f"=_Lists!$B$1:$B${len(pc_labels)}",
-        allow_blank=True,
-    )
-    dv_complexity = DataValidation(
-        type="list",
-        formula1=f'"{",".join(VALID_COMPLEXITIES)}"',
-        allow_blank=True,
-    )
-    dv_artist = DataValidation(
-        type="list",
-        formula1=f"=_Lists!$A$1:$A${len(member_names)}",
-        allow_blank=True,
-    )
-    dv_status = DataValidation(
-        type="list",
-        formula1=f'"{",".join(VALID_STATUSES)}"',
-        allow_blank=False,
-    )
+    dv_pc = DataValidation(type="list", formula1=f"=_Lists!$B$1:$B${len(pc_labels)}", allow_blank=True)
+    dv_complexity = DataValidation(type="list", formula1=f'"{",".join(VALID_COMPLEXITIES)}"', allow_blank=True)
+    dv_artist = DataValidation(type="list", formula1=f"=_Lists!$A$1:$A${len(member_names)}", allow_blank=True)
+    dv_status = DataValidation(type="list", formula1=f'"{",".join(VALID_STATUSES)}"', allow_blank=False)
+    dv_take = DataValidation(type="list", formula1=f'"{",".join(VALID_TAKES)}"', allow_blank=True)
 
-    ws.add_data_validation(dv_pc)
-    ws.add_data_validation(dv_complexity)
-    ws.add_data_validation(dv_artist)
-    ws.add_data_validation(dv_status)
+    for dv in (dv_pc, dv_complexity, dv_artist, dv_status, dv_take):
+        ws.add_data_validation(dv)
 
     dv_pc.add(f"A2:A{total_rows}")
     dv_complexity.add(f"C2:C{total_rows}")
     dv_artist.add(f"F2:F{total_rows}")
     dv_status.add(f"G2:G{total_rows}")
+    dv_take.add(f"H2:H{total_rows}")
 
-    col_widths = [28, 30, 14, 10, 18, 22, 15, 36]
+    col_widths = [28, 32, 18, 10, 18, 22, 18, 15, 36]
     for i, w in enumerate(col_widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
-    # Protect sheet structure & header row, allow editing data cells
     ws.protection.sheet = True
     ws.protection.enable()
 
@@ -201,10 +209,23 @@ def generate_team_excel_template(db, team_name: str) -> bytes:
     return buf.getvalue()
 
 
+def _find_existing_file(db, file_name: str):
+    """Find file by exact name or base name (ignoring _Take_N suffix)."""
+    row = db.execute("SELECT id, name, COALESCE(take_count, 0) AS take_count FROM files WHERE LOWER(name) = LOWER(?)", (file_name,)).fetchone()
+    if row:
+        return row
+    base = strip_take_suffix(file_name)
+    return db.execute(
+        "SELECT id, name, COALESCE(take_count, 0) AS take_count FROM files WHERE LOWER(name) = LOWER(?) OR LOWER(name) LIKE LOWER(?)",
+        (base, f"{base}_Take_%"),
+    ).fetchone()
+
+
 def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str, Any]:
     """
     Dry-run parse & validate an uploaded .xlsx workbook for team_name.
-    Returns summary dict with valid_rows, errors, and counts.
+    Enforces Status, Complexity, compulsory Take Version (1->2->3 progression) on Retake,
+    and updates the file name with _Take_N when Retake is selected.
     """
     errors: list[str] = []
     valid_rows: list[dict[str, Any]] = []
@@ -216,7 +237,7 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
             "ok": False,
             "errors": [f"Could not read Excel file: {exc}"],
             "rows": [],
-            "summary": {"to_update": 0, "to_create": 0, "handoffs": 0, "reworks": 0},
+            "summary": {"to_update": 0, "to_create": 0, "handoffs": 0, "retakes": 0},
         }
 
     ws = wb.active
@@ -224,11 +245,9 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
     if headers != TEMPLATE_HEADERS:
         return {
             "ok": False,
-            "errors": [
-                f"Invalid template headers. Expected {TEMPLATE_HEADERS}, got {headers}."
-            ],
+            "errors": [f"Invalid template headers. Expected {TEMPLATE_HEADERS}, got {headers}."],
             "rows": [],
-            "summary": {"to_update": 0, "to_create": 0, "handoffs": 0, "reworks": 0},
+            "summary": {"to_update": 0, "to_create": 0, "handoffs": 0, "retakes": 0},
         }
 
     members = get_team_members(db, team_name)
@@ -241,13 +260,13 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
             "ok": False,
             "errors": [f"No pipeline stages configured for team '{team_name}'."],
             "rows": [],
-            "summary": {"to_update": 0, "to_create": 0, "handoffs": 0, "reworks": 0},
+            "summary": {"to_update": 0, "to_create": 0, "handoffs": 0, "retakes": 0},
         }
 
     to_update = 0
     to_create = 0
     handoffs = 0
-    reworks = 0
+    retakes = 0
 
     for row_num in range(2, ws.max_row + 1):
         vals = [ws.cell(row=row_num, column=c).value for c in range(1, len(TEMPLATE_HEADERS) + 1)]
@@ -260,8 +279,9 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
         points_raw = vals[3]
         hours_raw = vals[4]
         artist_raw = str(vals[5] or "").strip()
-        status = str(vals[6] or "Open").strip()
-        notes = str(vals[7] or "").strip()
+        status = str(vals[6] or "Yet to Start").strip()
+        take_raw = str(vals[7] or "").strip()
+        notes = str(vals[8] or "").strip()
 
         row_errs = []
         if not file_name:
@@ -294,29 +314,41 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
             artist = member_by_name.get(artist_raw.lower()) or member_by_user.get(artist_raw.lower())
             if not artist:
                 row_errs.append(f"Artist '{artist_raw}' is not an active member of team '{team_name}'")
-        elif status in ("In Progress", "Done"):
+        elif status in ("Work In Progress", "Review", "Approved"):
             row_errs.append(f"Artist Name is required when Status is '{status}'")
 
-        if status == "Rework" and not notes:
-            row_errs.append("Notes / Rework Reason is required when Status is 'Rework'")
+        existing_file = _find_existing_file(db, file_name) if file_name else None
+        current_take = existing_file["take_count"] if existing_file else 0
+        final_file_name = file_name
+        take_num = current_take
 
-        # Check if file exists in DB and has an active stage for this team
-        existing_file = None
-        if file_name:
-            existing_file = db.execute(
-                "SELECT id, name FROM files WHERE LOWER(name) = LOWER(?)",
-                (file_name,),
-            ).fetchone()
+        if status == "Retake":
+            if take_raw not in VALID_TAKES:
+                row_errs.append("Take Version (Take 1, Take 2, or Take 3) is compulsory when Status is 'Retake'")
+            else:
+                requested_take = int(take_raw.split()[-1])
+                expected_take = min(current_take + 1, 3)
+                if current_take >= 3:
+                    row_errs.append("File has already reached Take 3 (maximum retake version)")
+                elif requested_take != expected_take:
+                    row_errs.append(
+                        f"Invalid Take progression: current take is {current_take or 'Review/0'}, so next Retake must be 'Take {expected_take}'"
+                    )
+                else:
+                    take_num = requested_take
+                    final_file_name = apply_take_suffix(file_name, take_num)
+            if not notes:
+                row_errs.append("Notes / Retake Reason is required when Status is 'Retake'")
 
         if existing_file:
             to_update += 1
         else:
             to_create += 1
 
-        if status == "Done":
+        if status == "Approved":
             handoffs += 1
-        elif status == "Rework":
-            reworks += 1
+        elif status == "Retake":
+            retakes += 1
 
         if row_errs:
             errors.append(f"Row {row_num} ({file_name or 'blank'}): " + "; ".join(row_errs))
@@ -325,13 +357,16 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
                 {
                     "row_num": row_num,
                     "proj_chap": proj_chap,
-                    "file_name": file_name,
+                    "file_name": final_file_name,
+                    "raw_file_name": file_name,
                     "complexity": complexity,
                     "points": points,
                     "hours": hours,
                     "artist_id": artist["id"] if artist else None,
                     "artist_name": artist["name"] if artist else "",
                     "status": status,
+                    "take_version": f"Take {take_num}" if take_num in (1, 2, 3) else "",
+                    "take_num": take_num,
                     "notes": notes,
                     "action": "Update" if existing_file else "Create",
                 }
@@ -348,19 +383,18 @@ def parse_and_validate_upload(db, team_name: str, file_bytes: bytes) -> dict[str
             "to_update": to_update,
             "to_create": to_create,
             "handoffs": handoffs,
-            "reworks": reworks,
+            "retakes": retakes,
         },
     }
 
 
 def _resolve_chapter_id(db, proj_chap: str) -> int:
-    """Find or create project/chapter from 'Project / Chapter' string."""
     if "/" in proj_chap:
         p_name, c_name = [part.strip() for part in proj_chap.split("/", 1)]
     elif proj_chap:
         p_name, c_name = proj_chap, "Main Chapter"
     else:
-        p_name, c_name = "Default Project", "Main Chapter"
+        p_name, c_name = "Promo Videos", "Promo Videos Main Chapter"
 
     proj = db.execute("SELECT id FROM projects WHERE LOWER(name) = LOWER(?)", (p_name,)).fetchone()
     if proj:
@@ -387,7 +421,6 @@ def _resolve_chapter_id(db, proj_chap: str) -> int:
 
 
 def _ensure_file_pipeline_stages(db, file_id: int, initial_open_team: str | None = None) -> None:
-    """Ensure all ordered pipeline_stages exist in file_pipeline for file_id."""
     stages = db.execute("SELECT * FROM pipeline_stages ORDER BY stage_order ASC").fetchall()
     existing = {
         r["step_name"]
@@ -399,14 +432,14 @@ def _ensure_file_pipeline_stages(db, file_id: int, initial_open_team: str | None
             continue
         status = "Locked"
         if initial_open_team and st["team_name"] == initial_open_team and not first_for_team_opened:
-            status = "Open"
+            status = "Yet to Start"
             first_for_team_opened = True
         elif not initial_open_team and st["stage_order"] == 1:
-            status = "Open"
+            status = "Yet to Start"
         db.execute(
             """
-            INSERT INTO file_pipeline (file_id, step_name, stage_order, team_name, status)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO file_pipeline (file_id, step_name, stage_order, team_name, status, take_count)
+            VALUES (?, ?, ?, ?, ?, 0)
             """,
             (file_id, st["stage_name"], st["stage_order"], st["team_name"], status),
         )
@@ -437,8 +470,9 @@ def commit_team_upload(
 ) -> dict[str, int]:
     """
     Atomically commit validated Excel rows in a BEGIN IMMEDIATE transaction.
-    Handles file creation, stage updates, idempotent daily_assignments + points,
-    sequential handoff on 'Done', rework send-back on 'Rework', and daily_upload_logs.
+    - 'Approved': marks current stage Approved & opens next stage as 'Yet to Start'.
+    - 'Retake': appends _Take_N to file name, sets take_count = N, and reopens previous
+      stage (or keeps current stage if first) as 'Retake' with reason note.
     """
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     now_str = datetime.datetime.now().strftime("%H:%M:%S")
@@ -452,15 +486,12 @@ def commit_team_upload(
     files_updated = 0
     files_added = 0
     files_handed_off = 0
-    files_rework = 0
+    files_retake = 0
 
     db.execute("BEGIN IMMEDIATE;")
     try:
         for r in rows:
-            file_row = db.execute(
-                "SELECT id FROM files WHERE LOWER(name) = LOWER(?)",
-                (r["file_name"],),
-            ).fetchone()
+            file_row = _find_existing_file(db, r["raw_file_name"])
 
             if file_row:
                 file_id = file_row["id"]
@@ -469,10 +500,10 @@ def commit_team_upload(
                 chapter_id = _resolve_chapter_id(db, r["proj_chap"])
                 cur = db.execute(
                     """
-                    INSERT INTO files (chapter_id, name, complexity, status, assigned_to, start_date)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO files (chapter_id, name, complexity, status, assigned_to, take_count, start_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (chapter_id, r["file_name"], r["complexity"], r["status"], r["artist_id"], today_str),
+                    (chapter_id, r["file_name"], r["complexity"], r["status"], r["artist_id"], r["take_num"], today_str),
                 )
                 file_id = cur.lastrowid
                 _ensure_file_pipeline_stages(db, file_id, initial_open_team=team_name)
@@ -480,13 +511,21 @@ def commit_team_upload(
 
             _ensure_file_pipeline_stages(db, file_id, initial_open_team=team_name)
 
-            # Find active stage for this team (prefer Open/In Progress/Rework, else first stage of team)
             stage_row = db.execute(
                 """
                 SELECT * FROM file_pipeline
                 WHERE file_id = ? AND team_name = ?
                 ORDER BY
-                    CASE status WHEN 'Rework' THEN 0 WHEN 'In Progress' THEN 1 WHEN 'Open' THEN 2 ELSE 3 END,
+                    CASE status
+                        WHEN 'Retake' THEN 0
+                        WHEN 'Rework' THEN 0
+                        WHEN 'Review' THEN 1
+                        WHEN 'Work In Progress' THEN 2
+                        WHEN 'In Progress' THEN 2
+                        WHEN 'Yet to Start' THEN 3
+                        WHEN 'Open' THEN 3
+                        ELSE 4
+                    END,
                     stage_order ASC
                 LIMIT 1
                 """,
@@ -500,11 +539,11 @@ def commit_team_upload(
             stage_order = stage_row["stage_order"]
             new_status = r["status"]
 
-            if new_status == "Done":
+            if new_status == "Approved":
                 db.execute(
                     """
                     UPDATE file_pipeline
-                    SET status = 'Done',
+                    SET status = 'Approved',
                         assigned_to = COALESCE(?, assigned_to),
                         complexity = ?,
                         points = ?,
@@ -527,79 +566,68 @@ def commit_team_upload(
                         stage_row["id"],
                     ),
                 )
-                # Sequential handoff to next stage
                 next_stage = db.execute(
-                    """
-                    SELECT * FROM file_pipeline
-                    WHERE file_id = ? AND stage_order > ?
-                    ORDER BY stage_order ASC
-                    LIMIT 1
-                    """,
+                    "SELECT * FROM file_pipeline WHERE file_id = ? AND stage_order > ? ORDER BY stage_order ASC LIMIT 1",
                     (file_id, stage_order),
                 ).fetchone()
                 if next_stage:
                     db.execute(
-                        "UPDATE file_pipeline SET status = 'Open' WHERE id = ? AND status = 'Locked'",
+                        "UPDATE file_pipeline SET status = 'Yet to Start' WHERE id = ? AND status = 'Locked'",
                         (next_stage["id"],),
                     )
                     _notify_team_lead(
                         db,
                         next_stage["team_name"],
                         "Incoming File Ready",
-                        f"{r['file_name']} completed {step_name} and is now Open for {next_stage['team_name']}.",
+                        f"{r['file_name']} is Approved in {step_name} and is now Yet to Start for {next_stage['team_name']}.",
                     )
                 files_handed_off += 1
 
-            elif new_status == "Rework":
-                # Lock current stage and send back to previous stage as Rework
-                db.execute(
-                    """
-                    UPDATE file_pipeline
-                    SET status = 'Locked',
-                        rework_reason = ?,
-                        remarks = ?
-                    WHERE id = ?
-                    """,
-                    (r["notes"], r["notes"], stage_row["id"]),
-                )
+            elif new_status == "Retake":
+                take_num = r["take_num"]
                 prev_stage = db.execute(
-                    """
-                    SELECT * FROM file_pipeline
-                    WHERE file_id = ? AND stage_order < ?
-                    ORDER BY stage_order DESC
-                    LIMIT 1
-                    """,
+                    "SELECT * FROM file_pipeline WHERE file_id = ? AND stage_order < ? ORDER BY stage_order DESC LIMIT 1",
                     (file_id, stage_order),
                 ).fetchone()
                 if prev_stage:
                     db.execute(
+                        "UPDATE file_pipeline SET status = 'Locked', rework_reason = ?, remarks = ? WHERE id = ?",
+                        (r["notes"], r["notes"], stage_row["id"]),
+                    )
+                    db.execute(
                         """
                         UPDATE file_pipeline
-                        SET status = 'Rework',
+                        SET status = 'Retake',
                             rework_reason = ?,
                             rework_target_team = ?,
-                            take_count = COALESCE(take_count, 1) + 1
+                            take_count = ?
                         WHERE id = ?
                         """,
-                        (r["notes"], team_name, prev_stage["id"]),
+                        (r["notes"], team_name, take_num, prev_stage["id"]),
                     )
                     _notify_team_lead(
                         db,
                         prev_stage["team_name"],
-                        "Rework Requested",
-                        f"{r['file_name']} was sent back from {step_name}: {r['notes']}",
+                        f"Retake (Take {take_num}) Requested",
+                        f"{r['file_name']} sent back from {step_name} as Take {take_num}: {r['notes']}",
                         ntype="rework",
                     )
                 else:
-                    # First stage cannot go further back; keep as Rework on itself
                     db.execute(
-                        "UPDATE file_pipeline SET status = 'Rework', rework_reason = ? WHERE id = ?",
-                        (r["notes"], stage_row["id"]),
+                        """
+                        UPDATE file_pipeline
+                        SET status = 'Retake',
+                            rework_reason = ?,
+                            take_count = ?,
+                            remarks = ?
+                        WHERE id = ?
+                        """,
+                        (r["notes"], take_num, r["notes"], stage_row["id"]),
                     )
-                files_rework += 1
+                files_retake += 1
 
             else:
-                # Open or In Progress
+                # Yet to Start, Work In Progress, Review
                 db.execute(
                     """
                     UPDATE file_pipeline
@@ -624,28 +652,30 @@ def commit_team_upload(
                     ),
                 )
 
-            # Update parent files summary status
+            # Update parent files record (including _Take_N rename and take_count)
             db.execute(
-                "UPDATE files SET complexity = ?, status = ?, assigned_to = COALESCE(?, assigned_to) WHERE id = ?",
-                (r["complexity"], new_status, r["artist_id"], file_id),
+                """
+                UPDATE files
+                SET name = ?,
+                    complexity = ?,
+                    status = ?,
+                    take_count = ?,
+                    assigned_to = COALESCE(?, assigned_to),
+                    rework_reason = CASE WHEN ? = 'Retake' THEN ? ELSE rework_reason END
+                WHERE id = ?
+                """,
+                (r["file_name"], r["complexity"], new_status, r["take_num"], r["artist_id"], new_status, r["notes"], file_id),
             )
 
             # Idempotent daily_assignments + points per (user_id, date, file_id, stage_name)
             if r["artist_id"]:
                 existing_da = db.execute(
-                    """
-                    SELECT id FROM daily_assignments
-                    WHERE user_id = ? AND date = ? AND file_id = ? AND stage_name = ?
-                    """,
+                    "SELECT id FROM daily_assignments WHERE user_id = ? AND date = ? AND file_id = ? AND stage_name = ?",
                     (r["artist_id"], today_str, file_id, step_name),
                 ).fetchone()
                 if existing_da:
                     db.execute(
-                        """
-                        UPDATE daily_assignments
-                        SET points = ?, time_worked = ?, status = ?, remarks = ?, submit_time = ?
-                        WHERE id = ?
-                        """,
+                        "UPDATE daily_assignments SET points = ?, time_worked = ?, status = ?, remarks = ?, submit_time = ? WHERE id = ?",
                         (r["points"], r["hours"], new_status, r["notes"], now_str, existing_da["id"]),
                     )
                 else:
@@ -671,10 +701,7 @@ def commit_team_upload(
 
                 if r["points"] > 0:
                     existing_pts = db.execute(
-                        """
-                        SELECT id FROM points
-                        WHERE user_id = ? AND date = ? AND file_id = ? AND stage_name = ?
-                        """,
+                        "SELECT id FROM points WHERE user_id = ? AND date = ? AND file_id = ? AND stage_name = ?",
                         (r["artist_id"], today_str, file_id, step_name),
                     ).fetchone()
                     reason = f"Excel Upload: {r['file_name']} ({step_name})"
@@ -685,10 +712,7 @@ def commit_team_upload(
                         )
                     else:
                         db.execute(
-                            """
-                            INSERT INTO points (user_id, date, file_id, stage_name, points, reason, awarded_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                            """,
+                            "INSERT INTO points (user_id, date, file_id, stage_name, points, reason, awarded_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
                             (r["artist_id"], today_str, file_id, step_name, r["points"], reason, uploaded_by_user_id),
                         )
 
@@ -706,7 +730,7 @@ def commit_team_upload(
                 files_updated,
                 files_added,
                 files_handed_off,
-                files_rework,
+                files_retake,
                 filename,
             ),
         )
@@ -714,7 +738,7 @@ def commit_team_upload(
             "INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Team Excel Upload', ?)",
             (
                 uploaded_by_user_id,
-                f"Team {team_name}: {files_updated} updated, {files_added} added, {files_handed_off} handed off, {files_rework} rework.",
+                f"Team {team_name}: {files_updated} updated, {files_added} added, {files_handed_off} approved/handed off, {files_retake} retakes.",
             ),
         )
         db.commit()
@@ -726,5 +750,5 @@ def commit_team_upload(
         "files_updated": files_updated,
         "files_added": files_added,
         "files_handed_off": files_handed_off,
-        "files_rework": files_rework,
+        "files_rework": files_retake,
     }
