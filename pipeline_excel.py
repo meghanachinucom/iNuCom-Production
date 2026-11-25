@@ -421,20 +421,37 @@ def _resolve_chapter_id(db, proj_chap: str) -> int:
 
 
 def _ensure_file_pipeline_stages(db, file_id: int, initial_open_team: str | None = None) -> None:
-    stages = db.execute("SELECT * FROM pipeline_stages ORDER BY stage_order ASC").fetchall()
+    proj_row = db.execute(
+        """
+        SELECT p.project_type FROM files f
+        JOIN chapters c ON f.chapter_id = c.id
+        JOIN projects p ON c.project_id = p.id
+        WHERE f.id = ?
+        """,
+        (file_id,),
+    ).fetchone()
+    is_comp_only = bool(proj_row and proj_row["project_type"] == "Comp Only")
+
+    if is_comp_only:
+        stages = db.execute(
+            "SELECT * FROM pipeline_stages WHERE team_name = '3D Comp & Motion Graphics' ORDER BY stage_order ASC"
+        ).fetchall()
+    else:
+        stages = db.execute("SELECT * FROM pipeline_stages ORDER BY stage_order ASC").fetchall()
+
     existing = {
         r["step_name"]
         for r in db.execute("SELECT step_name FROM file_pipeline WHERE file_id = ?", (file_id,)).fetchall()
     }
     first_for_team_opened = False
-    for st in stages:
+    for idx, st in enumerate(stages):
         if st["stage_name"] in existing:
             continue
         status = "Locked"
         if initial_open_team and st["team_name"] == initial_open_team and not first_for_team_opened:
             status = "Yet to Start"
             first_for_team_opened = True
-        elif not initial_open_team and st["stage_order"] == 1:
+        elif not initial_open_team and idx == 0:
             status = "Yet to Start"
         db.execute(
             """

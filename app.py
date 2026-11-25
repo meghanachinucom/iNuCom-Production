@@ -609,6 +609,9 @@ def init_db():
             )
 
         conn.commit()
+
+        from seed_welding_metallurgy import seed_welding_metallurgy
+        seed_welding_metallurgy(conn)
     finally:
         conn.close()
 
