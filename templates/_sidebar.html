@@ -1,0 +1,102 @@
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
+    </div>
+
+    <div class="sidebar-user">
+        <div class="user-name">{{ session['name'] }}</div>
+        <div class="user-designation">{{ session['role'] }}</div>
+        <div class="user-team">{{ session['team'] }} Team</div>
+    </div>
+
+    <ul class="sidebar-menu">
+        <li class="menu-section-title">Navigation</li>
+        {% if session['role'] == 'Admin' %}
+        <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
+            <a href="{{ url_for('reports_page') }}"><span>Reports &amp; Compliance</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+            <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>Asset Pipeline</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+            <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>Scene Pipeline</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
+            <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'team_upload' %}active{% endif %}">
+            <a href="{{ url_for('team_upload') }}"><span>Team Excel Upload</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
+            <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
+            <a href="{{ url_for('permissions_page') }}"><span>Users &amp; Roles</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+            <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
+        </li>
+        {% elif session['role'] == 'Lead' %}
+        <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+            <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>Team Queue &amp; Pipeline</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+            <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>Scene Pipeline</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'team_upload' %}active{% endif %}">
+            <a href="{{ url_for('team_upload') }}"><span>Excel Template &amp; Upload</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
+            <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+        </li>
+        {% else %}
+        <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
+            <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>My Tasks &amp; Pipeline</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
+            <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>Scene Pipeline</span></a>
+        </li>
+        <li class="menu-item {% if request.endpoint == 'points_page' %}active{% endif %}">
+            <a href="{{ url_for('points_page') }}"><span>Points &amp; Targets</span></a>
+        </li>
+        {% endif %}
+
+        <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+            <a href="{{ url_for('notifications_page') }}">
+                <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+            </a>
+        </li>
+        <li class="menu-item" style="margin-top: 24px;">
+            <a href="{{ url_for('logout') }}"><span>Sign Out</span></a>
+        </li>
+    </ul>
+</aside>
+<script>
+(function() {
+    var token = "{{ csrf_token() }}";
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = 'csrf_token';
+                inp.value = token;
+                form.appendChild(inp);
+            }
+        });
+    });
+    var origFetch = window.fetch;
+    window.fetch = function(url, opts) {
+        opts = opts || {};
+        if (opts.method && opts.method.toUpperCase() !== 'GET') {
+            opts.headers = opts.headers || {};
+            if (opts.headers instanceof Headers) {
+                if (!opts.headers.has('X-CSRFToken')) opts.headers.set('X-CSRFToken', token);
+            } else if (!opts.headers['X-CSRFToken']) {
+                opts.headers['X-CSRFToken'] = token;
+            }
+        }
+        return origFetch(url, opts);
+    };
+})();
+</script>

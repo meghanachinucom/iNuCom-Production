@@ -4,14 +4,23 @@ venv/
 env/
 ENV/
 
+# Environment secrets
+.env
+.env.*
+!.env.example
+
 # Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Databases
+# Databases & WAL files
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
+*.sqlite3
+*.bak
 
 # Backups folder
 /backups/

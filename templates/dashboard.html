@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - iNuCom Production Tracker</title>
@@ -22,122 +23,7 @@
 <body>
     <div class="dashboard-layout">
                                                                                         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <h2><span class="blue">iNuCom</span> <span class="red">Tracker</span></h2>
-            </div>
-            
-            <div class="sidebar-user">
-                <div class="user-name">{{ session['name'] }}</div>
-                <div class="user-designation">
-                    {% if session['role'] == 'Admin' %}
-                        Admin
-                    {% elif session['role'] == 'HR' %}
-                        HR
-                    {% elif session['role'] == 'Lead' %}
-                        Lead
-                    {% else %}
-                        Artist
-                    {% endif %}
-                </div>
-                <div class="user-team">{{ session['team'] }} Team</div>
-            </div>
-            
-                                                            <ul class="sidebar-menu">
-                <li class="menu-section-title">Navigation</li>
-                {% if session['role'] == 'Admin' %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
-                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'system_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('system_approvals_page') }}">
-                        <span>Leave Approvals{% if pending_approvals_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ pending_approvals_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-                {% elif session['role'] == 'HR' %}
-                <li class="menu-item {% if request.endpoint == 'reports_page' %}active{% endif %}">
-                    <a href="{{ url_for('reports_page') }}"><span>Reports</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint in ['work_reports_page', 'points_page'] %}active{% endif %}">
-                    <a href="{{ url_for('work_reports_page') }}"><span>Points &amp; Work Reports</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
-                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
-                </li>
-                <li class="menu-section-title" style="margin-top: 15px;">HR Management</li>
-                <li class="menu-item {% if request.endpoint == 'holidays_page' %}active{% endif %}">
-                    <a href="{{ url_for('holidays_page') }}"><span>Holidays</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'upload_project_page' %}active{% endif %}">
-                    <a href="{{ url_for('upload_project_page') }}"><span>Upload Project</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'comp_off_management_page' %}active{% endif %}">
-                    <a href="{{ url_for('comp_off_management_page') }}"><span>Comp-Off &amp; Working Days</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <a href="{{ url_for('activity_log_page') }}"><span>Activity Log</span></a>
-                </li>
-                {% elif session['role'] == 'Lead' %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
-                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'team_approvals_page' %}active{% endif %}">
-                    <a href="{{ url_for('team_approvals_page') }}">
-                        <span>Team Approvals{% if pending_approvals_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ pending_approvals_count }}</span>{% endif %}</span>
-                    </a>
-                </li>
-                {% else %}
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab != 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='assets') }}"><span>📦 Asset Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'dashboard' and sub_tab == 'scenes' %}active{% endif %}">
-                    <a href="{{ url_for('dashboard', sub_tab='scenes') }}"><span>🎬 Scene Pipeline</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint == 'attendance_page' %}active{% endif %}">
-                    <a href="{{ url_for('attendance_page') }}"><span>Attendance Tracker</span></a>
-                </li>
-                <li class="menu-item {% if request.endpoint in ['leaves_page', 'permissions_page'] %}active{% endif %}">
-                    <a href="{{ url_for('leaves_page') }}"><span>Leaves and Permissions</span></a>
-                </li>
-                {% endif %}
-            </ul>
-            
-            <div class="sidebar-footer">
-                <a href="{{ url_for('logout') }}" class="btn-logout">
-                    <span>Sign Out</span>
-                </a>
-            </div>
-        </aside>
+        {% include '_sidebar.html' %}
         
         <!-- Main Dashboard View -->
         <main class="main-content">
@@ -146,28 +32,15 @@
                     <h1>Welcome, {{ session['name'] }}!</h1>
                 </div>
                 
-                <div class="header-actions-wrapper">
-
-                    <!-- Quick-Clock Widget -->
-                    {% if session['role'] != 'Admin' %}
-                    <div class="quick-clock-widget">
-                        {% if not attendance_today %}
-                            <form action="{{ url_for('clock_in') }}" method="POST" class="clock-form">
-                                <span class="clock-status-dot offline"></span> Not Checked In
-                                <button type="submit" class="btn btn-sm btn-primary ml-3">Check In</button>
-                            </form>
-                        {% elif not attendance_today['clock_out'] %}
-                            <form action="{{ url_for('clock_out') }}" method="POST" class="clock-form">
-                                <span class="clock-status-dot online"></span> Checked In: <strong class="ml-1">{{ attendance_today['clock_in']|time12 }}</strong>
-                                <button type="submit" class="btn btn-sm btn-danger ml-3">Check Out</button>
-                            </form>
+                <div class="header-actions-wrapper" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    {% if session['role'] in ['Lead', 'Admin'] %}
+                        <a href="{{ url_for('download_team_template') }}" class="btn btn-sm btn-primary" style="text-decoration:none;">Download Excel Template</a>
+                        <a href="{{ url_for('team_upload') }}" class="btn btn-sm" style="background:#16a34a; color:#fff; text-decoration:none;">Upload Daily Excel</a>
+                        {% if today_upload_log %}
+                            <span class="att-badge present" style="padding:4px 10px; border-radius:12px; font-size:11px;">Uploaded today at {{ today_upload_log['uploaded_at']|time12 }}</span>
                         {% else %}
-                            <div class="clock-form">
-                                <span class="clock-status-dot completed"></span> Clocked Out: <strong class="ml-1">{{ attendance_today['clock_out']|time12 }}</strong>
-                                <span class="att-badge {% if attendance_today['status'] == 'Present' %}present{% elif attendance_today['status'] == 'Late' %}late{% else %}half{% endif %} ml-3" style="padding: 4px 10px; border-radius: 12px; font-size: 11px;">{{ attendance_today['status'] }}</span>
-                            </div>
+                            <span class="att-badge late" style="padding:4px 10px; border-radius:12px; font-size:11px;">Today's Upload Pending</span>
                         {% endif %}
-                    </div>
                     {% endif %}
                 </div>
             </header>
@@ -743,28 +616,84 @@
                     </div>
                     <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
                         <div>
-                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Pending Approvals</div>
-                            <div style="font-size: 28px; font-weight: 800; color: #d97706; margin-top: 4px;">{{ pending_approvals_count }}</div>
-                        </div>
-                        <span style="font-size: 28px;">⏳</span>
-                    </div>
-                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
-                        <div>
                             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Total Reworks / Retakes</div>
                             <div style="font-size: 28px; font-weight: 800; color: #c2410c; margin-top: 4px;">{{ total_reworks_count or 0 }}</div>
                         </div>
                         <span style="font-size: 28px;">🛠️</span>
                     </div>
-                    {% if session['role'] not in ['Artist', 'Lead'] %}
-                    <div class="card" style="display: flex; align-items: center; justify-content: space-between; padding: 20px;">
-                        <div>
-                            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Present Today</div>
-                            <div style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin-top: 10px;">{{ attendance_ratio }}</div>
-                        </div>
-                        <span style="font-size: 28px;">👥</span>
-                    </div>
-                    {% endif %}
                 </div>
+
+                {% if session['role'] in ['Lead', 'Artist'] %}
+                <div class="card" style="margin-bottom: 24px; padding: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+                        <h3 class="card-title" style="margin:0;">{{ session['team'] }} Team — File Queue</h3>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('tab-open-queue').style.display='block'; document.getElementById('tab-done-queue').style.display='none';">Incoming / Open ({{ team_open_queue|length }})</button>
+                            <button type="button" class="btn btn-sm" onclick="document.getElementById('tab-open-queue').style.display='none'; document.getElementById('tab-done-queue').style.display='block';">Completed / Handed Off ({{ team_completed_queue|length }})</button>
+                        </div>
+                    </div>
+                    <div id="tab-open-queue" style="overflow-x:auto;">
+                        {% if team_open_queue %}
+                        <table class="matrix-table" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>Project / Chapter</th>
+                                    <th>File Name</th>
+                                    <th>Stage</th>
+                                    <th>Status</th>
+                                    <th>Artist</th>
+                                    <th>Notes / Rework Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in team_open_queue %}
+                                <tr>
+                                    <td>{{ item.project_name }} / {{ item.chapter_name }}</td>
+                                    <td><strong>{{ item.file_name }}</strong></td>
+                                    <td>{{ item.step_name }}</td>
+                                    <td><span class="att-badge {% if item.status == 'Rework' %}late{% elif item.status == 'In Progress' %}half{% else %}present{% endif %}">{{ item.status }}</span></td>
+                                    <td>{{ item.artist_name or 'Unassigned' }}</td>
+                                    <td>{{ item.rework_reason or item.remarks or '—' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p style="color:var(--text-muted); margin:0;">No Open, In Progress, or Rework files in {{ session['team'] }}'s queue.</p>
+                        {% endif %}
+                    </div>
+                    <div id="tab-done-queue" style="overflow-x:auto; display:none;">
+                        {% if team_completed_queue %}
+                        <table class="matrix-table" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>Project / Chapter</th>
+                                    <th>File Name</th>
+                                    <th>Stage</th>
+                                    <th>Artist</th>
+                                    <th>Points</th>
+                                    <th>Completed Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in team_completed_queue %}
+                                <tr>
+                                    <td>{{ item.project_name }} / {{ item.chapter_name }}</td>
+                                    <td><strong>{{ item.file_name }}</strong></td>
+                                    <td>{{ item.step_name }}</td>
+                                    <td>{{ item.artist_name or '—' }}</td>
+                                    <td>{{ item.points or 0 }}</td>
+                                    <td>{{ item.end_date or '—' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p style="color:var(--text-muted); margin:0;">No completed files recorded yet for {{ session['team'] }}.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
                 
                 <!-- ROLE SPECIFIC ACTION QUEUES (FIRST BEFORE CHARTS - Dashboard Tab Only) -->
                 {% if session['role'] in ['Lead', 'Admin'] and sub_tab not in ['assets', 'scenes'] %}
@@ -1197,28 +1126,6 @@
                             </div>
                         </div>
 
-                        <!-- Artist Attendance Summary -->
-                        <div class="card">
-                            <h3 class="card-title">My Attendance This Month</h3>
-                            <div class="attendance-stats-summary" style="margin-top: 0; padding: 12px;">
-                                <div class="stat-box">
-                                    <div class="stat-box-num">{{ artist_att_stats['present_days'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Present</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-box-num" style="color:var(--color-red);">{{ artist_att_stats['late_days'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Late</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-box-num" style="color:#d97706;">{{ artist_att_stats['half_days'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Half Day</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-box-num" style="color:var(--text-muted);">{{ artist_att_stats['absent_days'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Absent</div>
-                                </div>
-                            </div>
-                        </div>
                     {% endif %}
                     
                     {% if session['role'] == 'Lead' %}
@@ -1322,45 +1229,6 @@
                                         {% endif %}
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    {% endif %}
-
-                    {% if session['role'] == 'HR' %}
-                        <!-- HR statistics and leaves summary -->
-                        <div class="card">
-                            <h3 class="card-title">Today's Attendance Overview</h3>
-                            <div class="attendance-stats-summary" style="margin-top: 0; padding: 12px;">
-                                <div class="stat-box">
-                                    <div class="stat-box-num">{{ hr_attendance_stats['present'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Present</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-box-num" style="color:var(--color-red);">{{ hr_attendance_stats['late'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Late</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-box-num" style="color:#d97706;">{{ hr_attendance_stats['half'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Half Day</div>
-                                </div>
-                                <div class="stat-box">
-                                    <div class="stat-box-num" style="color:var(--text-muted);">{{ hr_attendance_stats['absent'] or 0 }}</div>
-                                    <div class="stat-box-lbl">Absent</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="card">
-                            <h3 class="card-title">Leaves Summary</h3>
-                            <div style="display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
-                                    <span style="font-size: 13px; font-weight: 600;">Pending Approval Chain Requests</span>
-                                    <span class="badge" style="background-color: var(--color-red-light); color: var(--color-red); padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px;">{{ hr_leave_summary['pending'] }}</span>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
-                                    <span style="font-size: 13px; font-weight: 600;">Employees On Leave Today</span>
-                                    <span class="badge" style="background-color: var(--color-blue-light); color: var(--color-blue); padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px;">{{ hr_leave_summary['active_today'] }}</span>
-                                </div>
                             </div>
                         </div>
                     {% endif %}
