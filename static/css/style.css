@@ -306,12 +306,12 @@ body.modal-open {
     box-sizing: border-box;
 }
 
-/* Sidebar Navigation - Soft Light Slate Theme for All Accounts */
+/* Sidebar Navigation - Dark Neutral Charcoal Theme for All Accounts */
 .sidebar {
     width: 248px;
-    background: var(--bg-sidebar);
-    color: var(--text-primary);
-    border-right: 1px solid var(--border-color);
+    background: #232325;
+    color: #e5e5e5;
+    border-right: 1px solid #343438;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -319,43 +319,43 @@ body.modal-open {
     left: 0;
     top: 0;
     z-index: 10;
-    box-shadow: 1px 0 6px rgba(15, 23, 42, 0.03);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.08);
     animation: slideIn var(--transition-normal);
 }
 
 .sidebar-brand {
     padding: 20px 22px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid #343438;
     display: flex;
     align-items: center;
-    background: #ffffff;
+    background: #1d1d1f;
 }
 
 .sidebar-brand h2 {
     font-size: 17.5px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: #f4f4f5;
     letter-spacing: -0.01em;
 }
 
 .sidebar-brand h2 span.blue {
-    color: var(--color-blue);
+    color: #93b4e8;
 }
 
 .sidebar-brand h2 span.red {
-    color: var(--color-red);
+    color: #e5989b;
 }
 
 .sidebar-user {
     padding: 14px 20px;
-    border-bottom: 1px solid var(--border-color);
-    background-color: rgba(255, 255, 255, 0.65);
+    border-bottom: 1px solid #343438;
+    background-color: #29292c;
 }
 
 .sidebar-user .user-name {
     font-size: 13.5px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: #ffffff;
 }
 
 .sidebar-user .user-role-badge {
@@ -370,14 +370,14 @@ body.modal-open {
 }
 
 /* Role Badges color styles */
-.badge-admin { background-color: var(--color-red-light); color: var(--color-red); border: 1px solid #f3d4d4; }
-.badge-lead { background-color: var(--color-blue-light); color: var(--color-blue); border: 1px solid #d5e2f2; }
-.badge-artist { background-color: var(--color-green-light); color: var(--color-green); border: 1px solid #cce5d7; }
+.badge-admin { background-color: rgba(229, 152, 155, 0.16); color: #f5b7b9; border: 1px solid rgba(229, 152, 155, 0.3); }
+.badge-lead { background-color: rgba(147, 180, 232, 0.16); color: #bfd6f6; border: 1px solid rgba(147, 180, 232, 0.3); }
+.badge-artist { background-color: rgba(134, 200, 165, 0.16); color: #b7e4c7; border: 1px solid rgba(134, 200, 165, 0.3); }
 
 .sidebar-user .user-designation {
     font-size: 10.5px;
     font-weight: 700;
-    color: var(--color-blue);
+    color: #a1a1aa;
     margin-top: 3px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -386,7 +386,7 @@ body.modal-open {
 .sidebar-user .user-team {
     font-size: 11.5px;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: #d4d4d8;
     margin-top: 2px;
 }
 
@@ -404,7 +404,7 @@ body.modal-open {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--text-muted);
+    color: #8e8e96;
     margin: 10px 10px 6px 10px;
 }
 
@@ -415,7 +415,7 @@ body.modal-open {
     padding: 9px 13px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: #d4d4d8;
     text-decoration: none;
     border-radius: 8px;
     transition: all 0.16s ease;
@@ -424,23 +424,23 @@ body.modal-open {
 }
 
 .menu-item a:hover {
-    background-color: #dfdfd9;
-    color: var(--text-primary);
+    background-color: #323236;
+    color: #ffffff;
 }
 
 .menu-item.active a {
-    background: #ffffff;
-    color: var(--color-blue);
+    background: #38383d;
+    color: #ffffff;
     font-weight: 700;
-    border: 1px solid var(--border-color);
-    border-left: 3px solid var(--color-blue);
-    box-shadow: var(--shadow-sm);
+    border: 1px solid #48484f;
+    border-left: 3px solid #6b93d6;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
 .sidebar-footer {
     padding: 12px 14px;
-    border-top: 1px solid var(--border-color);
-    background: #ffffff;
+    border-top: 1px solid #343438;
+    background: #1d1d1f;
 }
 
 .btn-logout {
@@ -451,9 +451,9 @@ body.modal-open {
     padding: 9px 12px;
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--color-red);
-    background-color: var(--color-red-light);
-    border: 1px solid #f3d4d4;
+    color: #f3b8b8;
+    background-color: rgba(180, 67, 67, 0.16);
+    border: 1px solid rgba(180, 67, 67, 0.35);
     border-radius: var(--radius-sm);
     text-decoration: none;
     transition: all var(--transition-fast);
