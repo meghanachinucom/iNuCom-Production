@@ -65,15 +65,15 @@
                     <div style="font-size:12px;">Files to Update</div>
                 </div>
                 <div class="card" style="padding:12px; text-align:center;">
-                    <div style="font-size:22px; font-weight:800; color:#059669;">{{ preview.summary.to_create }}</div>
+                    <div style="font-size:22px; font-weight:800; color:var(--color-green);">{{ preview.summary.to_create }}</div>
                     <div style="font-size:12px;">New Files to Register</div>
                 </div>
                 <div class="card" style="padding:12px; text-align:center;">
-                    <div style="font-size:22px; font-weight:800; color:#2563eb;">{{ preview.summary.handoffs }}</div>
+                    <div style="font-size:22px; font-weight:800; color:var(--color-blue);">{{ preview.summary.handoffs }}</div>
                     <div style="font-size:12px;">Handoffs to Next Team</div>
                 </div>
                 <div class="card" style="padding:12px; text-align:center;">
-                    <div style="font-size:22px; font-weight:800; color:#dc2626;">{{ preview.summary.reworks }}</div>
+                    <div style="font-size:22px; font-weight:800; color:var(--color-red);">{{ preview.summary.reworks }}</div>
                     <div style="font-size:12px;">Rework Send-Backs</div>
                 </div>
             </div>
@@ -125,7 +125,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="team" value="{{ target_team }}">
                     <input type="hidden" name="action" value="confirm">
-                    <button type="submit" class="btn btn-primary" style="background:#16a34a;">
+                    <button type="submit" class="btn btn-primary" style="background:var(--color-green); border-color:var(--color-green);">
                         Confirm &amp; Commit Atomically
                     </button>
                 </form>

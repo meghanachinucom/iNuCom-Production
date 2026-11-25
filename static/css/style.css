@@ -1,29 +1,29 @@
 /* Import Google Font Ubuntu */
-@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=ABeeZee:ital@0;1&display=swap');
 @import url('/static/fonts/fonts.css');
 
 /* CSS Variables for Clean Design System */
 :root {
-    --font-primary: 'Ubuntu', sans-serif;
+    --font-primary: 'ABeeZee', 'Inter', sans-serif;
     
     /* Elegant Clean Color Palette (White/Light Theme with Blue/Red Accents) */
-    --bg-main: #f8fafc;
+    --bg-main: #f6f8fb;
     --bg-card: #ffffff;
-    --bg-sidebar: #ffffff;
+    --bg-sidebar: #eef2f6;
     --bg-input: #f1f5f9;
     
     --border-color: #e2e8f0;
-    --border-focus: #3b82f6;
+    --border-focus: #6484a4;
     
-    --text-primary: #0f172a;
+    --text-primary: #1e293b;
     --text-secondary: #475569;
     --text-muted: #94a3b8;
     
-    --color-blue: #1d4ed8;       /* Primary Accent */
-    --color-blue-light: #eff6ff; /* Soft Blue Highlight */
-    --color-red: #dc2626;        /* Secondary/Destructive Accent */
+    --color-blue: #4a6b8a;       /* Primary Accent */
+    --color-blue-light: #edf3f8; /* Soft Blue Highlight */
+    --color-red: #b55a5a;        /* Secondary/Destructive Accent */
     --color-red-light: #fef2f2;  /* Soft Red Highlight */
-    --color-green: #16a34a;      /* Success */
+    --color-green: #3d7a5a;      /* Success */
     --color-green-light: #f0fdf4;
     
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -56,8 +56,8 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 14.5px;
+    font-weight: 400;
 }
 
 body.modal-open {
@@ -271,12 +271,12 @@ body.modal-open {
     box-sizing: border-box;
 }
 
-/* Sidebar Navigation - Distinct Standout Styling */
+/* Sidebar Navigation - Soft Light Slate/Mist Theme for All Accounts */
 .sidebar {
     width: 260px;
-    background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
-    color: #f8fafc;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, #eef2f6 0%, #e5ebf3 100%);
+    color: var(--text-primary);
+    border-right: 1px solid #d6dfe9;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -284,49 +284,49 @@ body.modal-open {
     left: 0;
     top: 0;
     z-index: 10;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 2px 0 12px rgba(15, 23, 42, 0.04);
     animation: slideIn var(--transition-normal);
 }
 
 .sidebar-brand {
-    padding: 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 22px 24px;
+    border-bottom: 1px solid #d6dfe9;
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.55);
 }
 
 .sidebar-brand h2 {
     font-size: 19px;
-    font-weight: 800;
-    color: #ffffff;
+    font-weight: 700;
+    color: var(--text-primary);
     letter-spacing: -0.01em;
 }
 
 .sidebar-brand h2 span.blue {
-    color: #38bdf8;
+    color: var(--color-blue);
 }
 
 .sidebar-brand h2 span.red {
-    color: #f43f5e;
+    color: var(--color-red);
 }
 
 .sidebar-user {
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    background-color: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid #d6dfe9;
+    background-color: rgba(255, 255, 255, 0.4);
 }
 
 .sidebar-user .user-name {
-    font-size: 14px;
+    font-size: 14.5px;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--text-primary);
 }
 
 .sidebar-user .user-role-badge {
     display: inline-block;
     font-size: 10.5px;
-    font-weight: 800;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 3px 10px;
@@ -335,73 +335,75 @@ body.modal-open {
 }
 
 /* Role Badges color styles */
-.badge-admin { background-color: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
-.badge-hr { background-color: rgba(236, 72, 153, 0.25); color: #fbcfe8; border: 1px solid rgba(236, 72, 153, 0.4); }
-.badge-lead { background-color: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
-.badge-artist { background-color: rgba(20, 184, 166, 0.25); color: #99f6e4; border: 1px solid rgba(20, 184, 166, 0.4); }
+.badge-admin { background-color: #fceaea; color: #9f4444; border: 1px solid #f5d0d0; }
+.badge-hr { background-color: #fdf2f8; color: #9d4a74; border: 1px solid #f5d0e6; }
+.badge-lead { background-color: #e6eff8; color: #3a5a78; border: 1px solid #cbdceb; }
+.badge-artist { background-color: #e8f5ee; color: #356b50; border: 1px solid #c6e4d3; }
 
 .sidebar-user .user-designation {
     font-size: 11px;
     font-weight: 600;
-    color: #94a3b8;
+    color: var(--text-secondary);
     margin-top: 4px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 
 .sidebar-user .user-team {
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
-    color: #38bdf8;
+    color: var(--color-blue);
     margin-top: 2px;
 }
 
 .sidebar-menu {
     list-style: none;
-    padding: 20px 14px;
+    padding: 18px 14px;
     flex-grow: 1;
     overflow-y: auto;
 }
 
 .menu-section-title {
     font-size: 10.5px;
-    font-weight: 800;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #64748b;
-    margin: 18px 10px 8px 10px;
+    margin: 14px 10px 8px 10px;
 }
 
 .menu-item a {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 10px 14px;
     font-size: 13.5px;
-    font-weight: 600;
-    color: #cbd5e1;
+    font-weight: 500;
+    color: #334155;
     text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.2s ease;
+    border-radius: 9px;
+    transition: all 0.18s ease;
     margin-bottom: 4px;
 }
 
 .menu-item a:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.78);
+    color: var(--text-primary);
     transform: translateX(2px);
 }
 
 .menu-item.active a {
-    background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
-    color: #ffffff;
+    background: #ffffff;
+    color: var(--color-blue);
     font-weight: 700;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    border: 1px solid #cfdbe8;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
 }
 
 .sidebar-footer {
     padding: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid #d6dfe9;
+    background: rgba(255, 255, 255, 0.35);
 }
 
 .btn-logout {
@@ -1827,4 +1829,73 @@ table.table td, table.data-table td {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-top: 4px;
+}
+
+
+/* ── Global UI Polish, Alignment & Soft Table Styling ── */
+.main-content {
+    padding: 28px 32px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table,
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+.data-table th,
+.matrix-table th {
+    background-color: #f1f5f9;
+    color: #334155;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 11px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.data-table td,
+.matrix-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #eef2f6;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.data-table tbody tr:hover,
+.matrix-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.btn {
+    font-family: var(--font-primary);
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.btn-primary {
+    background-color: var(--color-blue);
+    border-color: var(--color-blue);
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background-color: #3d5b77;
+    border-color: #3d5b77;
 }
