@@ -63,13 +63,14 @@
 
         <li class="menu-item {% if request.endpoint == 'notifications_page' %}active{% endif %}">
             <a href="{{ url_for('notifications_page') }}">
-                <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
+                <span>Notifications{% if unread_notif_count > 0 %} <span style="background:var(--color-red); color:#fff; font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px; margin-left:4px;">{{ unread_notif_count }}</span>{% endif %}</span>
             </a>
         </li>
-        <li class="menu-item" style="margin-top: 24px;">
-            <a href="{{ url_for('logout') }}"><span>Sign Out</span></a>
-        </li>
     </ul>
+
+    <div class="sidebar-footer">
+        <a href="{{ url_for('logout') }}" class="btn-logout">Sign Out</a>
+    </div>
 </aside>
 <script>
 (function() {

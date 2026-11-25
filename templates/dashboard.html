@@ -34,8 +34,8 @@
                 
                 <div class="header-actions-wrapper" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     {% if session['role'] in ['Lead', 'Admin'] %}
-                        <a href="{{ url_for('download_team_template') }}" class="btn btn-sm btn-primary" style="text-decoration:none;">Download Excel Template</a>
-                        <a href="{{ url_for('team_upload') }}" class="btn btn-sm" style="background:var(--color-green); color:#fff; text-decoration:none;">Upload Daily Excel</a>
+                        <a href="{{ url_for('download_team_template') }}" class="btn btn-sm btn-primary">Download Excel Template</a>
+                        <a href="{{ url_for('team_upload') }}" class="btn btn-sm btn-success">Upload Daily Excel</a>
                         {% if today_upload_log %}
                             <span class="att-badge present" style="padding:4px 10px; border-radius:12px; font-size:11px;">Uploaded today at {{ today_upload_log['uploaded_at']|time12 }}</span>
                         {% else %}
