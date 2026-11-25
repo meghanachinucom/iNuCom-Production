@@ -220,7 +220,6 @@ def close_connection(exception):
 
 
 def recalculate_file_metadata(db, file_id):
-    db.row_factory = sqlite3.Row
     cursor = db.cursor()
     
     # 1. Fetch file's current review statuses
@@ -3530,7 +3529,7 @@ def team_upload():
 def upload_project_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] != 'HR':
+    if session['role'] != 'Admin':
         flash("Unauthorized to access Project Upload.", "error")
         return redirect(url_for('dashboard'))
 
@@ -4349,8 +4348,8 @@ def mark_notification_read():
 def activity_log_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] != 'HR':
-        flash("Activity log is HR-only.", "error")
+    if session['role'] != 'Admin':
+        flash("Activity log is Admin-only.", "error")
         return redirect(url_for('dashboard'))
 
     db = get_db()
