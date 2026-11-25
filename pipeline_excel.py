@@ -685,6 +685,7 @@ def commit_team_upload(
             )
 
             # Idempotent daily_assignments + points per (user_id, date, file_id, stage_name)
+            # (Linked to upload_log_id below for full Excel evidence tracking)
             if r["artist_id"]:
                 existing_da = db.execute(
                     "SELECT id FROM daily_assignments WHERE user_id = ? AND date = ? AND file_id = ? AND stage_name = ?",
@@ -692,21 +693,27 @@ def commit_team_upload(
                 ).fetchone()
                 if existing_da:
                     db.execute(
-                        "UPDATE daily_assignments SET points = ?, time_worked = ?, status = ?, remarks = ?, submit_time = ? WHERE id = ?",
-                        (r["points"], r["hours"], new_status, r["notes"], now_str, existing_da["id"]),
+                        """
+                        UPDATE daily_assignments
+                        SET team_name = ?, complexity = ?, points = ?, time_worked = ?, status = ?, remarks = ?, submit_time = ?
+                        WHERE id = ?
+                        """,
+                        (team_name, r["complexity"], r["points"], r["hours"], new_status, r["notes"], now_str, existing_da["id"]),
                     )
                 else:
                     db.execute(
                         """
                         INSERT INTO daily_assignments
-                            (user_id, date, file_id, stage_name, task_description, points, time_worked, status, remarks, submit_time)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            (user_id, date, file_id, stage_name, team_name, complexity, task_description, points, time_worked, status, remarks, submit_time)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             r["artist_id"],
                             today_str,
                             file_id,
                             step_name,
+                            team_name,
+                            r["complexity"],
                             f"{r['file_name']} ({step_name})",
                             r["points"],
                             r["hours"],
@@ -733,7 +740,7 @@ def commit_team_upload(
                             (r["artist_id"], today_str, file_id, step_name, r["points"], reason, uploaded_by_user_id),
                         )
 
-        db.execute(
+        cur_log = db.execute(
             """
             INSERT INTO daily_upload_logs
                 (team_id, uploaded_by, upload_date, uploaded_at, files_updated, files_added, files_handed_off, files_rework, filename)
@@ -751,6 +758,17 @@ def commit_team_upload(
                 filename,
             ),
         )
+        upload_log_id = cur_log.lastrowid
+
+        # Attach upload_log_id evidence to today's assignments for the uploaded files
+        for r in rows:
+            if r["artist_id"]:
+                f_row = _find_existing_file(db, r["file_name"])
+                if f_row:
+                    db.execute(
+                        "UPDATE daily_assignments SET upload_log_id = ? WHERE user_id = ? AND date = ? AND file_id = ?",
+                        (upload_log_id, r["artist_id"], today_str, f_row["id"]),
+                    )
         db.execute(
             "INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Team Excel Upload', ?)",
             (
@@ -769,3 +787,163 @@ def commit_team_upload(
         "files_handed_off": files_handed_off,
         "files_rework": files_retake,
     }
+
+
+ASSET_SCENE_HEADERS = ["Project Name", "Type", "Chapter", "File Name"]
+
+
+def generate_assets_scenes_template(db) -> bytes:
+    """
+    Generate the 'Upload Assets & Scene Names' .xlsx template for HR, Content Lead, and Admin.
+    Columns: Project Name (dropdown), Type (Asset/Scene dropdown), Chapter (optional), File Name (required).
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Assets & Scenes"
+
+    ref_ws = wb.create_sheet(title="_Projects")
+    ref_ws.sheet_state = "hidden"
+
+    projects = db.execute("SELECT name FROM projects WHERE status = 'Active' ORDER BY name ASC").fetchall()
+    proj_names = [r["name"] for r in projects] or ["Promo Videos"]
+    for idx, p_name in enumerate(proj_names, start=1):
+        ref_ws.cell(row=idx, column=1, value=p_name)
+
+    header_fill = PatternFill(start_color="232325", end_color="232325", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    for col_idx, heading in enumerate(ASSET_SCENE_HEADERS, start=1):
+        c = ws.cell(row=1, column=col_idx, value=heading)
+        c.fill = header_fill
+        c.font = header_font
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.protection = Protection(locked=True)
+
+    ws.row_dimensions[1].height = 26
+    ws.freeze_panes = "A2"
+
+    for r in range(2, 102):
+        for c_idx in range(1, 5):
+            cell = ws.cell(row=r, column=c_idx, value="")
+            cell.protection = Protection(locked=False)
+
+    dv_proj = DataValidation(type="list", formula1=f"=_Projects!$A$1:$A${len(proj_names)}", allow_blank=False)
+    dv_type = DataValidation(type="list", formula1='"Asset,Scene"', allow_blank=False)
+    ws.add_data_validation(dv_proj)
+    ws.add_data_validation(dv_type)
+    dv_proj.add("A2:A101")
+    dv_type.add("B2:B101")
+
+    for i, w in enumerate([28, 14, 28, 36], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.protection.sheet = True
+    ws.protection.enable()
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def import_assets_scenes_excel(db, file_bytes: bytes, uploaded_by_user_id: int) -> dict[str, Any]:
+    """
+    Validate and atomically import Assets & Scene Names from the simple 4-column template
+    into `files` and `file_pipeline` (initializing first stage as 'Yet to Start' and rest 'Locked').
+    """
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+    except Exception as exc:
+        return {"ok": False, "errors": [f"Could not read Excel file: {exc}"], "created": 0, "skipped": 0}
+
+    ws = wb.active
+    headers = [str(ws.cell(row=1, column=c).value or "").strip() for c in range(1, 5)]
+    if headers != ASSET_SCENE_HEADERS:
+        return {
+            "ok": False,
+            "errors": [f"Invalid headers. Expected {ASSET_SCENE_HEADERS}, got {headers}."],
+            "created": 0,
+            "skipped": 0,
+        }
+
+    errors = []
+    parsed = []
+    for row_num in range(2, ws.max_row + 1):
+        vals = [ws.cell(row=row_num, column=c).value for c in range(1, 5)]
+        if all(v is None or str(v).strip() == "" for v in vals):
+            continue
+        p_name = str(vals[0] or "").strip()
+        f_type = str(vals[1] or "").strip()
+        c_name = str(vals[2] or "").strip() or "Main Chapter"
+        f_name = str(vals[3] or "").strip()
+
+        row_errs = []
+        if not p_name:
+            row_errs.append("Project Name is required")
+        if f_type not in ("Asset", "Scene"):
+            row_errs.append("Type must be 'Asset' or 'Scene'")
+        if not f_name:
+            row_errs.append("File Name is required")
+
+        if row_errs:
+            errors.append(f"Row {row_num}: " + "; ".join(row_errs))
+        else:
+            parsed.append({"project_name": p_name, "file_type": f_type, "chapter_name": c_name, "file_name": f_name})
+
+    if errors:
+        return {"ok": False, "errors": errors, "created": 0, "skipped": 0}
+    if not parsed:
+        return {"ok": False, "errors": ["No data rows found in the uploaded Excel sheet."], "created": 0, "skipped": 0}
+
+    created = 0
+    skipped = 0
+    db.execute("BEGIN IMMEDIATE;")
+    try:
+        for r in parsed:
+            proj = db.execute("SELECT id FROM projects WHERE LOWER(name) = LOWER(?)", (r["project_name"],)).fetchone()
+            if proj:
+                pid = proj["id"]
+            else:
+                pid = db.execute(
+                    "INSERT INTO projects (name, description, status) VALUES (?, 'Created via Assets & Scenes Upload', 'Active')",
+                    (r["project_name"],),
+                ).lastrowid
+
+            chap = db.execute(
+                "SELECT id FROM chapters WHERE project_id = ? AND LOWER(name) = LOWER(?)",
+                (pid, r["chapter_name"]),
+            ).fetchone()
+            if chap:
+                cid = chap["id"]
+            else:
+                cid = db.execute(
+                    "INSERT INTO chapters (project_id, name, description, status) VALUES (?, ?, 'Chapter', 'Active')",
+                    (pid, r["chapter_name"]),
+                ).lastrowid
+
+            existing = db.execute(
+                "SELECT id FROM files WHERE chapter_id = ? AND LOWER(name) = LOWER(?)",
+                (cid, r["file_name"]),
+            ).fetchone()
+            if existing:
+                skipped += 1
+                continue
+
+            file_id = db.execute(
+                """
+                INSERT INTO files (chapter_id, name, file_type, complexity, status, take_count)
+                VALUES (?, ?, ?, 'Medium', 'Yet to Start', 0)
+                """,
+                (cid, r["file_name"], r["file_type"]),
+            ).lastrowid
+            _ensure_file_pipeline_stages(db, file_id)
+            created += 1
+
+        db.execute(
+            "INSERT INTO activity_log (user_id, action, details) VALUES (?, 'Upload Assets & Scenes', ?)",
+            (uploaded_by_user_id, f"Registered {created} new file(s), skipped {skipped} duplicate(s)."),
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return {"ok": True, "errors": [], "created": created, "skipped": skipped}

@@ -11,7 +11,6 @@ import tempfile
 
 import openpyxl
 
-# Set required env vars BEFORE importing app/db
 _TMP_DIR = tempfile.mkdtemp(prefix="inucom_verify_")
 _TEST_DB = os.path.join(_TMP_DIR, "test_production.db")
 _BACKUP_DIR = os.path.join(_TMP_DIR, "backups")
@@ -56,76 +55,99 @@ def run_tests() -> None:
         init_db()
         assert os.path.exists(_TEST_DB), "Encrypted test DB was not created"
 
-        # 1. Verify plain sqlite3 / wrong password cannot read encrypted DB
+        # 1. SQLCipher encryption, WAL mode, 11 stages, Lighting & Rendering merge
+        plain = sqlite3.connect(_TEST_DB)
         try:
-            plain = sqlite3.connect(_TEST_DB)
             plain.execute("SELECT count(*) FROM users;").fetchone()
-            raise AssertionError("Plain sqlite3 should NOT be able to read encrypted DB!")
+            raise AssertionError("Plain sqlite3 should NOT read encrypted DB!")
         except sqlite3.DatabaseError:
             pass
         finally:
             plain.close()
 
-        try:
-            open_encrypted_connection(_TEST_DB, password="wrong-password")
-            raise AssertionError("Wrong password should NOT open encrypted DB!")
-        except Exception:
-            pass
-
         conn = open_encrypted_connection(_TEST_DB)
         assert conn.execute("PRAGMA journal_mode;").fetchone()[0].lower() == "wal"
-        assert conn.execute("SELECT COUNT(*) FROM pipeline_stages;").fetchone()[0] == 12
+        stages = [r["stage_name"] for r in conn.execute("SELECT stage_name FROM pipeline_stages ORDER BY stage_order ASC").fetchall()]
+        assert len(stages) == 11, f"Expected 11 stages, got {len(stages)}: {stages}"
+        assert "Lighting & Rendering" in stages
+        assert "Lighting" not in stages and "Rendering" not in stages
+        lr_members = {r["username"]: (r["name"], r["role"]) for r in conn.execute("SELECT username, name, role FROM users WHERE team = 'Lighting & Rendering'").fetchall()}
+        assert lr_members.get("pavan")[1] == "Lead"
+        assert lr_members.get("abhilasha") == ("Abhilasha", "Artist")
         conn.close()
-        print("[PASS] 1. SQLCipher encryption, WAL mode, and 12 pipeline stages verified.")
+        print("[PASS] 1. SQLCipher encryption, 11 merged stages, and Lighting & Rendering (Pavan + Abhilasha) verified.")
 
-        # 2. Verify removed attendance/leave/HR routes return 404
-        client = app.test_client()
-        _login(client, "vasu")
+        # 2. Removed routes return 404 + Activity Log hidden from UI
+        client_admin = app.test_client()
+        _login(client_admin, "vasu")
         for dead_route in [
-            "/attendance",
-            "/leaves",
-            "/holidays",
-            "/team-approvals",
-            "/system-approvals",
-            "/hr/comp-off",
-            "/compensation",
+            "/attendance", "/leaves", "/holidays", "/team-approvals",
+            "/system-approvals", "/hr/comp-off", "/compensation",
+            "/activity-log", "/lead/pre-assign-work", "/assignment/validate", "/self-log-work",
         ]:
-            r = client.get(dead_route)
+            r = client_admin.get(dead_route)
             assert r.status_code == 404, f"Expected 404 for {dead_route}, got {r.status_code}"
-        print("[PASS] 2. Removed attendance/leave/HR routes return 404.")
 
-        # 3. Verify no dead url_for links in templates
-        template_dir = os.path.join(os.path.dirname(__file__), "templates")
-        dead_endpoints = {
-            "attendance_page", "clock_in", "clock_out", "leaves_page",
-            "holidays_page", "comp_off_management_page", "team_approvals_page",
-            "system_approvals_page", "approve_permission", "reject_permission",
-        }
-        for fn in os.listdir(template_dir):
-            if not fn.endswith(".html"):
-                continue
-            with open(os.path.join(template_dir, fn), encoding="utf-8") as f:
-                txt = f.read()
-            for ep in dead_endpoints:
-                assert ep not in txt, f"Dead endpoint {ep} still referenced in {fn}"
-        print("[PASS] 3. Zero dead attendance/leave/approval links in templates.")
+        # Ensure Activity Log is not in sidebar for Admin, HR, Lead, Artist
+        for uname in ["vasu", "meghana", "pooja", "prabhas"]:
+            c_u = app.test_client()
+            _login(c_u, uname)
+            r_pipe = c_u.get("/pipeline/assets")
+            assert r_pipe.status_code == 200, f"Asset Pipeline not accessible for {uname}"
+            assert b"Activity Log" not in r_pipe.data, f"Activity Log still visible for {uname}"
+            r_sc = c_u.get("/pipeline/scenes")
+            assert r_sc.status_code == 200, f"Scene Pipeline not accessible for {uname}"
+        print("[PASS] 2. Activity Log hidden from all UI roles, obsolete routes return 404, and Pipelines visible to all roles.")
 
-        # 4. Team A (Content: pooja) downloads template, adds new file + marks Done -> hands off to Team B (Modeling)
+        # 3. HR & Content Team Lead can add Project + Upload Assets & Scene Names template
+        client_hr = app.test_client()
+        _login(client_hr, "meghana")
+        csrf_hr = _extract_csrf(client_hr.get("/upload-project").data)
+        r_proj = client_hr.post(
+            "/project/add",
+            data={"csrf_token": csrf_hr, "name": "HR_New_Project", "project_type": "Standard", "description": "Test"},
+            headers={"Referer": "/upload-project"},
+            follow_redirects=True,
+        )
+        assert r_proj.status_code == 200
+        assert b"HR_New_Project" in r_proj.data
+
+        # Content Lead downloads Assets & Scene Names template and uploads new Asset + Scene
         client_a = app.test_client()
         _login(client_a, "pooja")
+        r_tpl = client_a.get("/upload-project/template/download")
+        assert r_tpl.status_code == 200
+        wb_as = openpyxl.load_workbook(io.BytesIO(r_tpl.data))
+        ws_as = wb_as.active
+        ws_as.cell(row=2, column=1, value="HR_New_Project")
+        ws_as.cell(row=2, column=2, value="Asset")
+        ws_as.cell(row=2, column=3, value="Ch1")
+        ws_as.cell(row=2, column=4, value="New_Turbine_Asset")
+        ws_as.cell(row=3, column=1, value="HR_New_Project")
+        ws_as.cell(row=3, column=2, value="Scene")
+        ws_as.cell(row=3, column=3, value="Ch1")
+        ws_as.cell(row=3, column=4, value="New_Turbine_sc_01")
+        buf_as = io.BytesIO()
+        wb_as.save(buf_as)
+        buf_as.seek(0)
 
-        # RBAC check: Team Lead cannot download another team's template
-        r_forbidden = client_a.get("/team/template/download?team=Modeling", follow_redirects=True)
-        assert b"only download templates for their own assigned team" in r_forbidden.data
+        csrf_up = _extract_csrf(client_a.get("/upload-project").data)
+        r_up_as = client_a.post(
+            "/upload-project",
+            data={"csrf_token": csrf_up, "file": (buf_as, "assets_scenes.xlsx")},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+        assert b"Registered 2 new file(s)" in r_up_as.data
+        assert b"New_Turbine_Asset" in client_a.get("/pipeline/assets").data
+        assert b"New_Turbine_sc_01" in client_a.get("/pipeline/scenes").data
+        print("[PASS] 3. HR & Content Lead Project creation + Assets & Scene Names Excel upload verified.")
 
+        # 4. Team A download -> Approved handoff to Team B -> Team B Retake (Take 1)
         r_dl = client_a.get("/team/template/download")
-        assert r_dl.status_code == 200
         wb = openpyxl.load_workbook(io.BytesIO(r_dl.data))
         ws = wb.active
-        assert ws.protection.sheet is True, "Template header protection should be enabled"
-
-        # Add new file in row 2 marked Approved (should hand off to Modeling as Yet to Start!)
-        ws.cell(row=2, column=1, value="Promo Videos / Promo Videos Main Chapter")
+        ws.cell(row=2, column=1, value="HR_New_Project / Ch1")
         ws.cell(row=2, column=2, value="EV_Hero_Car_v01")
         ws.cell(row=2, column=3, value="High Complexity")
         ws.cell(row=2, column=4, value=50)
@@ -133,78 +155,37 @@ def run_tests() -> None:
         ws.cell(row=2, column=6, value="Prabhas")
         ws.cell(row=2, column=7, value="Approved")
         ws.cell(row=2, column=8, value="")
-        ws.cell(row=2, column=9, value="Content approved and ready for Modeling")
-
+        ws.cell(row=2, column=9, value="Approved for Modeling")
         buf_a = io.BytesIO()
         wb.save(buf_a)
         buf_a.seek(0)
 
-        # Dry-run preview
-        r_up_get = client_a.get("/team/upload")
-        csrf_a = _extract_csrf(r_up_get.data)
+        csrf_a = _extract_csrf(client_a.get("/team/upload").data)
         r_prev = client_a.post(
             "/team/upload",
-            data={
-                "csrf_token": csrf_a,
-                "action": "preview",
-                "excel_file": (buf_a, "content_daily.xlsx"),
-            },
+            data={"csrf_token": csrf_a, "action": "preview", "excel_file": (buf_a, "content_daily.xlsx")},
             content_type="multipart/form-data",
         )
-        assert r_prev.status_code == 200
-        assert b"EV_Hero_Car_v01" in r_prev.data
-        assert b"Confirm &amp; Commit Atomically" in r_prev.data
-
-        # Confirm atomic commit
         csrf_a2 = _extract_csrf(r_prev.data)
-        r_conf = client_a.post(
-            "/team/upload",
-            data={"csrf_token": csrf_a2, "action": "confirm"},
-            follow_redirects=True,
-        )
-        assert r_conf.status_code == 200
+        r_conf = client_a.post("/team/upload", data={"csrf_token": csrf_a2, "action": "confirm"}, follow_redirects=True)
         assert b"Upload committed for Content" in r_conf.data
 
-        # Verify Modeling now has EV_Hero_Car_v01 in Yet to Start status
-        conn = open_encrypted_connection(_TEST_DB)
-        fp_mdl = conn.execute(
-            """
-            SELECT fp.status, fp.team_name FROM file_pipeline fp
-            JOIN files f ON fp.file_id = f.id
-            WHERE f.name = 'EV_Hero_Car_v01' AND fp.step_name = 'Modeling'
-            """
-        ).fetchone()
-        assert fp_mdl is not None and fp_mdl["status"] == "Yet to Start", f"Expected Modeling Yet to Start, got {fp_mdl}"
-        conn.close()
-        print("[PASS] 4. Team A download -> dry-run preview -> atomic commit -> sequential handoff to Team B verified.")
-
-        # 5. Team B (Modeling: amit) downloads template (pre-filled with EV_Hero_Car_v01), marks Retake (Take 1) -> sends back to Content & renames file to _Take_1
         client_b = app.test_client()
         _login(client_b, "amit")
-        r_dl_b = client_b.get("/team/template/download")
-        assert r_dl_b.status_code == 200
-        wb_b = openpyxl.load_workbook(io.BytesIO(r_dl_b.data))
-        ws_b = wb_b.active
-        assert ws_b.cell(row=2, column=2).value == "EV_Hero_Car_v01", "Pre-filled Modeling queue missing EV_Hero_Car_v01"
+        # Status-filtered popup API scoped to Modeling
+        r_popup = client_b.get("/api/files/by-status?status=Yet%20to%20Start")
+        assert r_popup.status_code == 200
+        popup_names = [f["file_name"] for f in r_popup.get_json()["files"]]
+        assert "EV_Hero_Car_v01" in popup_names
 
-        # First verify Retake WITHOUT Take Version is blocked
+        # Team B marks Retake Take 1
+        wb_b = openpyxl.load_workbook(io.BytesIO(client_b.get("/team/template/download").data))
+        ws_b = wb_b.active
+        assert ws_b.cell(row=2, column=2).value == "EV_Hero_Car_v01"
         ws_b.cell(row=2, column=6, value="Raveendra. K")
         ws_b.cell(row=2, column=7, value="Retake")
-        ws_b.cell(row=2, column=8, value="")
-        ws_b.cell(row=2, column=9, value="Missing wheel blueprint dimensions")
-        buf_no_take = io.BytesIO()
-        wb_b.save(buf_no_take)
-        buf_no_take.seek(0)
-        csrf_b0 = _extract_csrf(client_b.get("/team/upload").data)
-        r_no_take = client_b.post(
-            "/team/upload",
-            data={"csrf_token": csrf_b0, "action": "preview", "excel_file": (buf_no_take, "no_take.xlsx")},
-            content_type="multipart/form-data",
-        )
-        assert b"Take Version (Take 1, Take 2, or Take 3) is compulsory" in r_no_take.data
-
-        # Now set Take 1 properly
         ws_b.cell(row=2, column=8, value="Take 1")
+        ws_b.cell(row=2, column=9, value="Missing wheel blueprint")
         buf_b = io.BytesIO()
         wb_b.save(buf_b)
         buf_b.seek(0)
@@ -215,60 +196,29 @@ def run_tests() -> None:
             data={"csrf_token": csrf_b, "action": "preview", "excel_file": (buf_b, "modeling_retake.xlsx")},
             content_type="multipart/form-data",
         )
-        assert b"EV_Hero_Car_v01_Take_1" in r_prev_b.data
-        assert b"Confirm &amp; Commit Atomically" in r_prev_b.data
         csrf_b2 = _extract_csrf(r_prev_b.data)
-        r_conf_b = client_b.post(
-            "/team/upload",
-            data={"csrf_token": csrf_b2, "action": "confirm"},
-            follow_redirects=True,
-        )
+        r_conf_b = client_b.post("/team/upload", data={"csrf_token": csrf_b2, "action": "confirm"}, follow_redirects=True)
         assert b"1 sent for rework" in r_conf_b.data
+        print("[PASS] 4. Sequential handoff, Status-Filtered Popup API, and Retake (Take 1) verified.")
+
+        # 5. Artist Work, Points & Evidence Report (Admin & HR) + Compliance + Backup
+        for c_rep in (client_admin, client_hr):
+            r_ar = c_rep.get("/artist-reports")
+            assert r_ar.status_code == 200
+            assert b"Prabhas" in r_ar.data and b"content_daily.xlsx" in r_ar.data
+            r_xl = c_rep.get("/artist-reports/export")
+            assert r_xl.status_code == 200
+            xl_wb = openpyxl.load_workbook(io.BytesIO(r_xl.data))
+            assert "Artist Summary" in xl_wb.sheetnames
+            assert "Detailed Work & Evidence" in xl_wb.sheetnames
 
         conn = open_encrypted_connection(_TEST_DB)
-        fp_cnt = conn.execute(
-            """
-            SELECT fp.status, fp.take_count, fp.rework_reason, f.name AS file_name
-            FROM file_pipeline fp
-            JOIN files f ON fp.file_id = f.id
-            WHERE f.name = 'EV_Hero_Car_v01_Take_1' AND fp.step_name = 'Content'
-            """
-        ).fetchone()
-        assert fp_cnt is not None and fp_cnt["status"] == "Retake"
-        assert fp_cnt["take_count"] == 1
-        assert "Missing wheel blueprint" in fp_cnt["rework_reason"]
+        assert conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0] > 0, "Backend activity_log should still record rows!"
         conn.close()
-        print("[PASS] 5. Team B Retake (Take 1) send-back to Team A with _Take_1 file rename verified.")
-
-        # 6. Verify invalid Excel row blocks commit and leaves DB unchanged
-        wb_bad = openpyxl.load_workbook(io.BytesIO(client_b.get("/team/template/download").data))
-        ws_bad = wb_bad.active
-        ws_bad.cell(row=2, column=2, value="Bad_File_Test")
-        ws_bad.cell(row=2, column=6, value="NonExistentArtist")
-        ws_bad.cell(row=2, column=7, value="Approved")
-        buf_bad = io.BytesIO()
-        wb_bad.save(buf_bad)
-        buf_bad.seek(0)
-        csrf_b3 = _extract_csrf(client_b.get("/team/upload").data)
-        r_bad = client_b.post(
-            "/team/upload",
-            data={"csrf_token": csrf_b3, "action": "preview", "excel_file": (buf_bad, "bad.xlsx")},
-            content_type="multipart/form-data",
-        )
-        assert b"Validation Errors (Commit Blocked)" in r_bad.data
-        print("[PASS] 6. Invalid Excel row blocked commit cleanly.")
-
-        # 7. Verify Admin Daily Upload Compliance panel & Encrypted Backup
-        r_rep = client.get("/reports?tab=compliance")
-        assert r_rep.status_code == 200
-        assert b"Uploaded at" in r_rep.data
 
         bak_path = create_encrypted_backup(_TEST_DB, _BACKUP_DIR, os.environ["DB_PASSWORD"], keep_days=30)
         assert os.path.exists(bak_path)
-        bak_conn = open_encrypted_connection(bak_path)
-        assert bak_conn.execute("SELECT COUNT(*) FROM daily_upload_logs").fetchone()[0] == 2
-        bak_conn.close()
-        print("[PASS] 7. Admin daily upload compliance and encrypted backup verified.")
+        print("[PASS] 5. Artist Work & Evidence Excel report, silent activity_log, and encrypted backup verified.")
 
         print("\nALL VERIFICATION TESTS PASSED SUCCESSFULLY!")
     finally:

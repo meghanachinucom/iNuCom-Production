@@ -104,16 +104,20 @@ CREATE TABLE IF NOT EXISTS daily_assignments (
     date TEXT NOT NULL,
     file_id INTEGER,
     stage_name TEXT,
+    team_name TEXT,
+    complexity TEXT DEFAULT 'Medium',
     task_description TEXT NOT NULL,
     points INTEGER DEFAULT 0,
     time_worked REAL DEFAULT 0.0,
-    status TEXT DEFAULT 'Pending',
+    status TEXT DEFAULT 'Yet to Start',
     remarks TEXT,
     submit_time TEXT,
     submitted_at TEXT,
+    upload_log_id INTEGER,
     deadline_days INTEGER,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE SET NULL
+    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE SET NULL,
+    FOREIGN KEY (upload_log_id) REFERENCES daily_upload_logs(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS eod_validations (

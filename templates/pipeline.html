@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ file_type }} Pipeline - iNuCom Production Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .pipeline-scroll-box {
+            max-height: 68vh;
+            overflow: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+        }
+        .pipeline-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 12.5px;
+        }
+        .pipeline-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background: #f3f4f6;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            text-align: left;
+        }
+        .pipeline-table th.sticky-col,
+        .pipeline-table td.sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #ffffff;
+            border-right: 1px solid var(--border-color);
+        }
+        .pipeline-table thead th.sticky-col {
+            z-index: 4;
+            background: #f3f4f6;
+        }
+        .pipeline-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        .pipeline-table tbody tr:hover td {
+            background: #f8fafc;
+        }
+        .stage-pills-row {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .stg-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            padding: 3px 5px;
+            border-radius: 5px;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px solid transparent;
+            cursor: default;
+        }
+        .stg-Approved { background: var(--color-green-light); color: var(--color-green); border-color: #bfe0cd; }
+        .stg-Review { background: var(--color-blue-light); color: var(--color-blue); border-color: #c7d8ee; }
+        .stg-Work-In-Progress { background: #fef7ec; color: #9a6b2f; border-color: #f3dfb8; }
+        .stg-Yet-to-Start { background: #f1f5f9; color: #334155; border-color: #cbd5e1; }
+        .stg-Retake { background: var(--color-red-light); color: var(--color-red); border-color: #efcaca; }
+        .stg-Locked { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+        .stg-NA { background: transparent; color: #cbd5e1; border-color: transparent; }
+
+        .status-chip-btn {
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            text-align: left;
+            transition: all 0.15s ease;
+        }
+        .status-chip-btn:hover {
+            border-color: var(--color-blue);
+            box-shadow: var(--shadow-sm);
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+    {% include '_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="page-header">
+            <div>
+                <h1>{{ file_type }} Pipeline</h1>
+                <p>Showing {{ items|length }} of {{ total_files }} {{ file_type|lower }}(s) across 11 ordered stages.</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a href="{{ url_for('pipeline_assets') }}" class="btn btn-sm {% if file_type == 'Asset' %}btn-primary{% endif %}">Asset Pipeline</a>
+                <a href="{{ url_for('pipeline_scenes') }}" class="btn btn-sm {% if file_type == 'Scene' %}btn-primary{% endif %}">Scene Pipeline</a>
+            </div>
+        </div>
+
+        <!-- Clickable Status Summary Cards (Lead / HR / Admin open popup modal) -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:18px;">
+            {% for st_name, st_count in status_summary.items() %}
+                {% if session['role'] in ['Lead', 'HR', 'Admin'] %}
+                <button type="button" class="status-chip-btn" onclick="openStatusFilesModal('{{ st_name }}', '{{ file_type }}')">
+                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">{{ st_name }}</div>
+                    <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:2px;">{{ st_count }}</div>
+                </button>
+                {% else %}
+                <div class="status-chip-btn" style="cursor:default;">
+                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">{{ st_name }}</div>
+                    <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:2px;">{{ st_count }}</div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Compact Filter Bar -->
+        <form method="GET" class="card" style="padding:14px 16px; margin-bottom:18px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Project</label>
+                    <select name="project_id" class="form-input" style="padding:7px 10px; min-width:170px;" onchange="this.form.submit()">
+                        <option value="">All Projects</option>
+                        {% for p in projects %}
+                            <option value="{{ p.id }}" {% if project_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if chapters %}
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Chapter</label>
+                    <select name="chapter_id" class="form-input" style="padding:7px 10px; min-width:170px;" onchange="this.form.submit()">
+                        <option value="">All Chapters</option>
+                        {% for ch in chapters %}
+                            <option value="{{ ch.id }}" {% if chapter_id == ch.id %}selected{% endif %}>{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Active Team</label>
+                    <select name="team" class="form-input" style="padding:7px 10px; min-width:170px;">
+                        <option value="">All Teams</option>
+                        {% for t in production_teams %}
+                            <option value="{{ t }}" {% if team_filter == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Status</label>
+                    <select name="status" class="form-input" style="padding:7px 10px; min-width:150px;">
+                        <option value="All" {% if not status_filter or status_filter == 'All' %}selected{% endif %}>All</option>
+                        {% for st in ['Yet to Start', 'Work In Progress', 'Review', 'Retake', 'Approved', 'Locked'] %}
+                            <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">File Name Search</label>
+                    <input type="text" name="q" value="{{ q }}" placeholder="Search file name..." class="form-input" style="padding:7px 10px; min-width:190px;">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                <a href="{{ url_for('pipeline_assets' if file_type == 'Asset' else 'pipeline_scenes') }}" class="btn btn-sm">Reset</a>
+            </div>
+        </form>
+
+        <!-- Compact Sticky Pipeline Table -->
+        <div class="pipeline-scroll-box">
+            <table class="pipeline-table">
+                <thead>
+                    <tr>
+                        <th class="sticky-col">File Name</th>
+                        <th>Project / Chapter</th>
+                        <th>Active Team</th>
+                        <th>Progress</th>
+                        <th>Stage Flow (Hover for Details)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="sticky-col">
+                            <strong>{{ item.file_name }}</strong>
+                            <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">{{ item.complexity }}</span>
+                        </td>
+                        <td style="color:var(--text-secondary);">{{ item.project_name }} / {{ item.chapter_name }}</td>
+                        <td><span style="font-weight:600; color:var(--color-blue);">{{ item.active_team }}</span></td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <div style="width:54px; height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                                    <div style="width:{{ item.progress_pct }}%; height:100%; background:var(--color-green);"></div>
+                                </div>
+                                <span style="font-size:11px; font-weight:700;">{{ item.progress_pct }}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stage-pills-row">
+                                {% for p in item.pills %}
+                                    {% set css_cls = 'stg-' + p.status|replace(' ', '-')|replace('/', '') %}
+                                    <span class="stg-pill {{ css_cls }}"
+                                          title="{{ p.name }} ({{ p.team }}): {{ p.status }} — Artist: {{ p.artist }}{% if p.rework_reason %} | Note: {{ p.rework_reason }}{% endif %}">
+                                        {{ p.short }}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:32px; color:var(--text-muted);">
+                            No {{ file_type|lower }} files match the selected filters.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+            <span style="font-size:12.5px; color:var(--text-secondary);">Page {{ page }} of {{ total_pages }} ({{ total_files }} total)</span>
+            <div style="display:flex; gap:8px;">
+                {% if page > 1 %}
+                <a class="btn btn-sm" href="{{ url_for('pipeline_assets' if file_type == 'Asset' else 'pipeline_scenes', project_id=project_id, chapter_id=chapter_id, team=team_filter, status=status_filter, q=q, page=page-1) }}">Previous</a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a class="btn btn-sm btn-primary" href="{{ url_for('pipeline_assets' if file_type == 'Asset' else 'pipeline_scenes', project_id=project_id, chapter_id=chapter_id, team=team_filter, status=status_filter, q=q, page=page+1) }}">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </main>
+</div>
+
+<!-- Status-Filtered File Name Popup Modal (Lead, HR, Admin) -->
+<div id="statusFilesModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div class="card" style="width:100%; max-width:900px; max-height:85vh; display:flex; flex-direction:column; padding:22px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:12px;">
+            <h2 id="statusModalTitle" style="margin:0; font-size:17px;">Files</h2>
+            <div style="display:flex; gap:8px;">
+                <button type="button" class="btn btn-sm btn-primary" onclick="copyModalFileNames()">Copy File Names</button>
+                <button type="button" class="btn btn-sm" onclick="closeStatusFilesModal()">Close</button>
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+            <input type="text" id="statusModalSearch" placeholder="Filter file names in this list..." class="form-input" style="padding:8px 12px;" oninput="filterStatusModalRows()">
+        </div>
+        <div style="overflow:auto; flex:1;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Project</th>
+                        <th>Type</th>
+                        <th>Stage / Team</th>
+                        <th>Artist</th>
+                        <th>Last Updated</th>
+                    </tr>
+                </thead>
+                <tbody id="statusModalBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let _modalFilesCache = [];
+function openStatusFilesModal(statusName, fileType, teamName) {
+    const modal = document.getElementById('statusFilesModal');
+    document.getElementById('statusModalTitle').textContent = statusName + ' Files';
+    document.getElementById('statusModalSearch').value = '';
+    document.getElementById('statusModalBody').innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+    modal.style.display = 'flex';
+    const params = new URLSearchParams({ status: statusName });
+    if (fileType) params.set('file_type', fileType);
+    if (teamName) params.set('team', teamName);
+    fetch('/api/files/by-status?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            _modalFilesCache = data.files || [];
+            renderStatusModalRows(_modalFilesCache);
+        })
+        .catch(() => {
+            document.getElementById('statusModalBody').innerHTML = '<tr><td colspan="6">Error loading files.</td></tr>';
+        });
+}
+function renderStatusModalRows(rows) {
+    const tbody = document.getElementById('statusModalBody');
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No files in this status.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = rows.map(r => `
+        <tr>
+            <td><strong>${r.file_name}</strong></td>
+            <td>${r.project_name}</td>
+            <td>${r.file_type}</td>
+            <td>${r.step_name} (${r.team_name})</td>
+            <td>${r.artist_name}</td>
+            <td>${r.last_updated || '—'}</td>
+        </tr>
+    `).join('');
+}
+function filterStatusModalRows() {
+    const q = (document.getElementById('statusModalSearch').value || '').toLowerCase();
+    const filtered = _modalFilesCache.filter(r =>
+        (r.file_name || '').toLowerCase().includes(q) ||
+        (r.project_name || '').toLowerCase().includes(q)
+    );
+    renderStatusModalRows(filtered);
+}
+function copyModalFileNames() {
+    const q = (document.getElementById('statusModalSearch').value || '').toLowerCase();
+    const names = _modalFilesCache
+        .filter(r => (r.file_name || '').toLowerCase().includes(q))
+        .map(r => r.file_name)
+        .join('\n');
+    if (navigator.clipboard && names) {
+        navigator.clipboard.writeText(names);
+        alert('Copied ' + _modalFilesCache.length + ' file name(s) to clipboard.');
+    }
+}
+function closeStatusFilesModal() {
+    document.getElementById('statusFilesModal').style.display = 'none';
+}
+</script>
+</body>
+</html>

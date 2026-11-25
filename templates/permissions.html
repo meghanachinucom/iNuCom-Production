@@ -37,6 +37,7 @@
                 <select name="role" class="form-input" style="max-width:130px;">
                     <option value="Artist">Artist</option>
                     <option value="Lead">Lead</option>
+                    <option value="HR">HR</option>
                     <option value="Admin">Admin</option>
                 </select>
                 <select name="team" class="form-input" style="max-width:220px;">
@@ -72,7 +73,7 @@
                                     <input type="hidden" name="action" value="update_user">
                                     <input type="hidden" name="user_id" value="{{ u.id }}">
                                     <select name="role" class="form-input" style="padding:4px 8px;">
-                                        {% for r in ['Admin', 'Lead', 'Artist'] %}
+                                        {% for r in ['Admin', 'HR', 'Lead', 'Artist'] %}
                                             <option value="{{ r }}" {% if u.role == r %}selected{% endif %}>{{ r }}</option>
                                         {% endfor %}
                                     </select>

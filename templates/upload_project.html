@@ -1,206 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Project - iNuCom Production Tracker</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Projects &amp; Upload Assets/Scenes - iNuCom Production Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}">
-    <style>
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            background: var(--bg-card);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            margin-bottom: 24px;
-        }
-        .upload-area:hover {
-            border-color: var(--color-blue);
-            background: var(--color-blue-light);
-        }
-        .upload-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            display: inline-block;
-        }
-        .upload-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-        }
-        .upload-subtitle {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 24px;
-        }
-        .guidelines-card {
-            background: #f8fafc;
-            border-left: 4px solid var(--color-blue);
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 24px;
-        }
-        .guidelines-title {
-            font-weight: 700;
-            font-size: 14px;
-            margin-bottom: 12px;
-            color: var(--color-blue);
-        }
-        .guidelines-list {
-            margin: 0;
-            padding-left: 20px;
-            font-size: 13px;
-            line-height: 1.8;
-            color: var(--text-secondary);
-        }
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-        }
-        .file-input {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-    </style>
 </head>
 <body>
-    <div class="dashboard-layout">
-        <!-- Sidebar -->
-        {% include '_sidebar.html' %}
-        
-        <!-- Main Panel -->
-        <main class="main-content">
-            <header class="page-header">
+<div class="dashboard-layout">
+    {% include '_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="page-header">
+            <div>
+                <h1>Projects &amp; Upload Assets / Scene Names</h1>
+                <p>Add new projects and batch-register Asset or Scene file names directly into the production pipeline.</p>
+            </div>
+            <a href="{{ url_for('download_assets_scenes_template') }}" class="btn btn-primary">
+                Download Assets &amp; Scene Names Template (.xlsx)
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, msg in messages %}
+                    <div class="alert alert-{{ 'error' if cat == 'error' else 'success' }}" style="margin-bottom:16px;">
+                        <span>{{ msg }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card" style="padding:20px; margin-bottom:24px;">
+            <h2 style="margin-top:0; font-size:16px;">1. Add Project Name</h2>
+            <form method="POST" action="{{ url_for('add_project') }}" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div>
-                    <h1>Upload Project Spreadsheet</h1>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Project Name</label>
+                    <input type="text" name="name" placeholder="e.g. Electric Vehicle Module 2" required class="form-input" style="min-width:240px; padding:8px 12px;">
                 </div>
-            </header>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Pipeline Type</label>
+                    <select name="project_type" class="form-input" style="min-width:180px; padding:8px 12px;">
+                        <option value="Standard">Full 11-Stage Pipeline</option>
+                        <option value="Comp Only">Comp &amp; Motion Graphics Only</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Description (Optional)</label>
+                    <input type="text" name="description" placeholder="Short description" class="form-input" style="min-width:220px; padding:8px 12px;">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Project</button>
+            </form>
+        </div>
 
-            <!-- Alerts Block -->
-            {% with messages = get_flashed_messages(category_filter=["error"]) %}
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-error" style="margin-bottom: 20px;">
-                            <span>{{ message }}</span>
-                        </div>
+        <div class="card" style="padding:20px; margin-bottom:24px;">
+            <h2 style="margin-top:0; font-size:16px;">2. Upload Assets &amp; Scene Names (.xlsx)</h2>
+            <p style="color:var(--text-secondary); margin-bottom:12px;">
+                Columns: <strong>Project Name</strong> (dropdown), <strong>Type</strong> (<code>Asset</code> or <code>Scene</code>), <strong>Chapter</strong> (optional), <strong>File Name</strong> (required).
+                Uploaded files immediately initialize the first stage as <strong>Yet to Start</strong> and appear in the Asset/Scene Pipelines and Content Team's queue.
+            </p>
+            <form method="POST" action="{{ url_for('upload_project_page') }}" enctype="multipart/form-data" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="file" name="file" accept=".xlsx" required class="form-input" style="max-width:360px;">
+                <button type="submit" class="btn btn-success">Upload &amp; Register Files</button>
+            </form>
+        </div>
+
+        <div class="card" style="padding:20px;">
+            <h2 style="margin-top:0; font-size:16px;">Active Projects ({{ projects_list|length }})</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Project Name</th>
+                        <th>Pipeline Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projects_list %}
+                    <tr>
+                        <td><strong>{{ p.name }}</strong></td>
+                        <td>{{ p.project_type or 'Standard' }}</td>
+                    </tr>
                     {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            {% with messages = get_flashed_messages(category_filter=["success"]) %}
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-success" style="margin-bottom: 20px;">
-                            <span>{{ message }}</span>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-                <!-- Card 1: Asset Pipeline Project Spreadsheet Uploader -->
-                <div class="card" style="margin: 0; border-top: 4px solid var(--color-blue);">
-                    <h3 class="card-title" style="color: var(--color-blue); display: flex; align-items: center; gap: 8px;">
-                        📦 Import Asset Project Spreadsheet
-                    </h3>
-                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-                        Imports asset files into the <strong>Asset Pipeline</strong>. Initialized with Asset stages (Reference, Explanation, Modeling, Texturing, Rig).
-                    </p>
-                    
-                    <form action="{{ url_for('upload_project_page') }}" method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="pipeline_type" value="assets">
-                        <div class="upload-area" style="padding: 24px;" onclick="document.getElementById('asset_excel_file').click()">
-                            <span class="upload-icon" style="font-size: 36px;">📦</span>
-                            <div class="upload-title" id="asset-file-title" style="font-size: 14px;">Select Asset Project Excel file</div>
-                            <div class="upload-subtitle" style="margin-bottom: 16px;">Supports .xlsx and .xls formats</div>
-                            
-                            <div class="file-input-wrapper">
-                                <button type="button" class="btn btn-secondary btn-sm">Choose File</button>
-                                <input type="file" name="file" id="asset_excel_file" class="file-input" accept=".xlsx, .xls" required onchange="updateAssetFileName(this)">
-                            </div>
-                        </div>
-                        
-                        <div style="text-align: right;">
-                            <button type="submit" class="btn btn-primary" style="width: 100%;">Upload &amp; Initialize Asset Project</button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Card 2: Scene Pipeline Project Spreadsheet Uploader -->
-                <div class="card" style="margin: 0; border-top: 4px solid #7c3aed;">
-                    <h3 class="card-title" style="color: #7c3aed; display: flex; align-items: center; gap: 8px;">
-                        🎬 Import Scene Project Spreadsheet
-                    </h3>
-                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-                        Imports scene files into the <strong>Scene Pipeline</strong>. Initialized with Scene stages (Voice Over, Storyboards, Animation, VFX, Rendering, 3D Comp).
-                    </p>
-                    
-                    <form action="{{ url_for('upload_project_page') }}" method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="pipeline_type" value="scenes">
-                        <div class="upload-area" style="padding: 24px;" onclick="document.getElementById('scene_excel_file').click()">
-                            <span class="upload-icon" style="font-size: 36px;">🎬</span>
-                            <div class="upload-title" id="scene-file-title" style="font-size: 14px;">Select Scene Project Excel file</div>
-                            <div class="upload-subtitle" style="margin-bottom: 16px;">Supports .xlsx and .xls formats</div>
-                            
-                            <div class="file-input-wrapper">
-                                <button type="button" class="btn btn-secondary btn-sm" style="background: #ede9fe; color: #6d28d9;">Choose File</button>
-                                <input type="file" name="file" id="scene_excel_file" class="file-input" accept=".xlsx, .xls" required onchange="updateSceneFileName(this)">
-                            </div>
-                        </div>
-                        
-                        <div style="text-align: right;">
-                            <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); border-color: #6d28d9; width: 100%;">Upload &amp; Initialize Scene Project</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="guidelines-card" style="margin-top: 0;">
-                    <div class="guidelines-title">Spreadsheet Format Guidelines</div>
-                    <ul class="guidelines-list">
-                        <li>The Excel sheet should contain the following columns from left to right:
-                            <br><strong>Column A:</strong> Project Name &nbsp;|&nbsp; 
-                            <strong>Column B:</strong> Chapter Name &nbsp;|&nbsp; 
-                            <strong>Column C:</strong> File Name &nbsp;|&nbsp; 
-                            <strong>Column D:</strong> Description (Optional)
-                        </li>
-                        <li>The first row is automatically treated as a header and skipped if it contains terms like "Project" or "File".</li>
-                        <li>Existing projects and chapters will be matched automatically by name. New projects/chapters will be created if they do not exist.</li>
-                        <li>Asset project uploads populate the 📦 <strong>Asset Pipeline Sheet</strong>. Scene project uploads populate the 🎬 <strong>Scene Pipeline Sheet</strong>.</li>
-                    </ul>
-                </div>
-            </div>
-        </main>
-    </div>
-    
-    <script>
-        function updateAssetFileName(input) {
-            const label = document.getElementById('asset-file-title');
-            if (input.files && input.files.length > 0) {
-                label.innerHTML = "Selected file: <strong>" + input.files[0].name + "</strong>";
-            } else {
-                label.innerHTML = "Select Asset Project Excel file";
-            }
-        }
-        function updateSceneFileName(input) {
-            const label = document.getElementById('scene-file-title');
-            if (input.files && input.files.length > 0) {
-                label.innerHTML = "Selected file: <strong>" + input.files[0].name + "</strong>";
-            } else {
-                label.innerHTML = "Select Scene Project Excel file";
-            }
-        }
-    </script>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
 </body>
 </html>
