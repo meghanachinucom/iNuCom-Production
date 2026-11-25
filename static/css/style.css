@@ -1,10 +1,10 @@
 /* Import Google Font Ubuntu */
-@import url('https://fonts.googleapis.com/css2?family=ABeeZee:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&display=swap');
 @import url('/static/fonts/fonts.css');
 
 /* CSS Variables for Clean Design System */
 :root {
-    --font-primary: 'ABeeZee', 'Inter', sans-serif;
+    --font-primary: 'Bai Jamjuree', 'Inter', sans-serif;
     
     /* Elegant Clean Color Palette (White/Light Theme with Blue/Red Accents) */
     --bg-main: #f6f8fb;
@@ -56,7 +56,7 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    font-size: 14.5px;
+    font-size: 13.5px;
     font-weight: 400;
 }
 
@@ -271,12 +271,12 @@ body.modal-open {
     box-sizing: border-box;
 }
 
-/* Sidebar Navigation - Soft Light Slate/Mist Theme for All Accounts */
+/* Sidebar Navigation - Soft Muted Dark Slate Theme for All Accounts */
 .sidebar {
-    width: 260px;
-    background: linear-gradient(180deg, #eef2f6 0%, #e5ebf3 100%);
-    color: var(--text-primary);
-    border-right: 1px solid #d6dfe9;
+    width: 248px;
+    background: linear-gradient(180deg, #273444 0%, #1e293b 100%);
+    color: #e2e8f0;
+    border-right: 1px solid #334155;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -284,126 +284,126 @@ body.modal-open {
     left: 0;
     top: 0;
     z-index: 10;
-    box-shadow: 2px 0 12px rgba(15, 23, 42, 0.04);
+    box-shadow: 2px 0 12px rgba(15, 23, 42, 0.08);
     animation: slideIn var(--transition-normal);
 }
 
 .sidebar-brand {
-    padding: 22px 24px;
-    border-bottom: 1px solid #d6dfe9;
+    padding: 20px 22px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.55);
+    background: rgba(15, 23, 42, 0.22);
 }
 
 .sidebar-brand h2 {
-    font-size: 19px;
+    font-size: 17.5px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: #f8fafc;
     letter-spacing: -0.01em;
 }
 
 .sidebar-brand h2 span.blue {
-    color: var(--color-blue);
+    color: #93c5fd;
 }
 
 .sidebar-brand h2 span.red {
-    color: var(--color-red);
+    color: #fda4af;
 }
 
 .sidebar-user {
-    padding: 16px 20px;
-    border-bottom: 1px solid #d6dfe9;
-    background-color: rgba(255, 255, 255, 0.4);
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.03);
 }
 
 .sidebar-user .user-name {
-    font-size: 14.5px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #f8fafc;
 }
 
 .sidebar-user .user-role-badge {
     display: inline-block;
-    font-size: 10.5px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 3px 10px;
-    border-radius: 12px;
+    padding: 2px 9px;
+    border-radius: 10px;
     margin-top: 4px;
 }
 
 /* Role Badges color styles */
-.badge-admin { background-color: #fceaea; color: #9f4444; border: 1px solid #f5d0d0; }
-.badge-hr { background-color: #fdf2f8; color: #9d4a74; border: 1px solid #f5d0e6; }
-.badge-lead { background-color: #e6eff8; color: #3a5a78; border: 1px solid #cbdceb; }
-.badge-artist { background-color: #e8f5ee; color: #356b50; border: 1px solid #c6e4d3; }
+.badge-admin { background-color: rgba(244, 63, 94, 0.16); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.28); }
+.badge-hr { background-color: rgba(236, 72, 153, 0.16); color: #f9a8d4; border: 1px solid rgba(236, 72, 153, 0.28); }
+.badge-lead { background-color: rgba(147, 197, 253, 0.16); color: #bfdbfe; border: 1px solid rgba(147, 197, 253, 0.28); }
+.badge-artist { background-color: rgba(110, 231, 183, 0.16); color: #a7f3d0; border: 1px solid rgba(110, 231, 183, 0.28); }
 
 .sidebar-user .user-designation {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 600;
-    color: var(--text-secondary);
-    margin-top: 4px;
+    color: #94a3b8;
+    margin-top: 3px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
 }
 
 .sidebar-user .user-team {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--color-blue);
+    font-size: 11px;
+    font-weight: 500;
+    color: #93c5fd;
     margin-top: 2px;
 }
 
 .sidebar-menu {
     list-style: none;
-    padding: 18px 14px;
+    padding: 16px 12px;
     flex-grow: 1;
     overflow-y: auto;
 }
 
 .menu-section-title {
-    font-size: 10.5px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #64748b;
-    margin: 14px 10px 8px 10px;
+    color: #94a3b8;
+    margin: 12px 10px 6px 10px;
 }
 
 .menu-item a {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
-    font-size: 13.5px;
+    padding: 9px 13px;
+    font-size: 13px;
     font-weight: 500;
-    color: #334155;
+    color: #cbd5e1;
     text-decoration: none;
-    border-radius: 9px;
+    border-radius: 8px;
     transition: all 0.18s ease;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .menu-item a:hover {
-    background-color: rgba(255, 255, 255, 0.78);
-    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
     transform: translateX(2px);
 }
 
 .menu-item.active a {
-    background: #ffffff;
-    color: var(--color-blue);
-    font-weight: 700;
-    border: 1px solid #cfdbe8;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+    background: #3b526b;
+    color: #ffffff;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
 
 .sidebar-footer {
-    padding: 16px;
-    border-top: 1px solid #d6dfe9;
-    background: rgba(255, 255, 255, 0.35);
+    padding: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.22);
 }
 
 .btn-logout {
@@ -430,9 +430,9 @@ body.modal-open {
 /* Main Dashboard Panel */
 .main-content {
     flex-grow: 1;
-    margin-left: 260px; /* Offset for fixed sidebar */
-    width: calc(100% - 260px);
-    max-width: calc(100% - 260px);
+    margin-left: 248px; /* Offset for fixed sidebar */
+    width: calc(100% - 248px);
+    max-width: calc(100% - 248px);
     padding: 30px 24px;
     min-height: 100vh;
     box-sizing: border-box;
@@ -448,7 +448,7 @@ body.modal-open {
 }
 
 .page-header h1 {
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 700;
     letter-spacing: -0.025em;
     color: var(--text-primary);
@@ -485,7 +485,7 @@ body.modal-open {
 }
 
 .card-title {
-    font-size: 16px;
+    font-size: 14.5px;
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 16px;
@@ -1852,7 +1852,7 @@ table.table td, table.data-table td {
 .matrix-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13.5px;
+    font-size: 12.5px;
 }
 
 .data-table th,
@@ -1860,10 +1860,10 @@ table.table td, table.data-table td {
     background-color: #f1f5f9;
     color: #334155;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    padding: 11px 14px;
+    padding: 9px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
@@ -1871,7 +1871,7 @@ table.table td, table.data-table td {
 
 .data-table td,
 .matrix-table td {
-    padding: 11px 14px;
+    padding: 9px 12px;
     border-bottom: 1px solid #eef2f6;
     color: var(--text-primary);
     vertical-align: middle;
