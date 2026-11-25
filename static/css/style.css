@@ -6,25 +6,25 @@
 :root {
     --font-primary: 'Ubuntu', sans-serif;
     
-    /* Soft, Light, Low-Glare Color Palette */
-    --bg-main: #f8fafc;
+    /* Clean Neutral Surfaces with Balanced, Crisp Accents */
+    --bg-main: #f6f6f5;
     --bg-card: #ffffff;
-    --bg-sidebar: #f1f5f9;
-    --bg-input: #f8fafc;
+    --bg-sidebar: #eaeae8;
+    --bg-input: #f7f7f6;
 
-    --border-color: #e2e8f0;
-    --border-focus: #6b8cae;
+    --border-color: #dedede;
+    --border-focus: #2f5597;
 
-    --text-primary: #1e293b;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
+    --text-primary: #1f2328;
+    --text-secondary: #525860;
+    --text-muted: #767d87;
 
-    --color-blue: #4a6fa5;       /* Soft Steel Blue */
-    --color-blue-light: #eef3f9; /* Very Soft Blue Tint */
-    --color-red: #a85555;        /* Muted Rose-Terracotta */
-    --color-red-light: #fdf2f2;  /* Soft Rose Tint */
-    --color-green: #3f7d5e;      /* Muted Sage Green */
-    --color-green-light: #eef7f2;
+    --color-blue: #2f5597;       /* Balanced Rich Blue (stronger contrast) */
+    --color-blue-light: #e8eef7; /* Subtle Blue Tint */
+    --color-red: #b44343;        /* Balanced Rose-Red */
+    --color-red-light: #fbeeee;  /* Soft Red Tint */
+    --color-green: #2f6f4e;      /* Balanced Forest Green */
+    --color-green-light: #eaf4ee;
 
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
     --shadow-md: 0 4px 10px -2px rgba(15, 23, 42, 0.05);
@@ -245,8 +245,8 @@ body.modal-open {
 }
 
 .btn-primary:hover {
-    background-color: #3d5d8c;
-    border-color: #3d5d8c;
+    background-color: #24437a;
+    border-color: #24437a;
     transform: translateY(-1px);
 }
 
@@ -424,7 +424,7 @@ body.modal-open {
 }
 
 .menu-item a:hover {
-    background-color: #e6ecf4;
+    background-color: #dfdfd9;
     color: var(--text-primary);
 }
 
