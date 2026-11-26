@@ -619,7 +619,7 @@ def init_db():
             ("Admin", "view_all_teams", 1),
             ("Admin", "view_compliance", 1),
             ("Admin", "upload_excel", 1),
-            ("HR", "manage_users", 0),
+            ("HR", "manage_users", 1),
             ("HR", "view_all_teams", 1),
             ("HR", "view_compliance", 1),
             ("HR", "upload_excel", 1),
@@ -676,7 +676,7 @@ def enforce_auth_and_password_change():
 @app.route('/')
 def index():
     if 'user_id' in session:
-        if session.get('role') == 'Admin':
+        if session.get('role') in ('Admin', 'HR'):
             return redirect(url_for('reports_page'))
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
@@ -719,7 +719,7 @@ def login():
 
         if user['must_change_password'] == 1:
             return redirect(url_for('change_password'))
-        elif user['role'] == 'Admin':
+        elif user['role'] in ('Admin', 'HR'):
             return redirect(url_for('reports_page'))
         return redirect(url_for('dashboard'))
 
@@ -1739,7 +1739,7 @@ def add_file():
 
     if is_promo_project:
         # Restriction 1: Only Lead or Admin (NO Artists)
-        if session['role'] not in ['Admin', 'Lead']:
+        if session['role'] not in ['Admin', 'HR', 'Lead']:
             flash("Only Team Leads and Admins can add files to Promo Videos projects.", "error")
             return redirect(request.referrer or url_for('dashboard'))
             
@@ -2262,7 +2262,7 @@ def update_stage_status(file_id):
         
     target_team = STAGE_TEAMS.get(step_name)
     is_lead = (session['role'] == 'Lead' and session['team'] == target_team)
-    is_admin = (session['role'] == 'Admin')
+    is_admin = (session['role'] in ('Admin', 'HR'))
     
     if not (is_lead or is_admin):
         flash("Unauthorized: Only Leads and Admins can update stage status directly.", "error")
@@ -2409,7 +2409,7 @@ def update_file_details(file_id):
 
         # 1. Respective team lead review
         if lead_review_action:
-            if session['role'] == 'Admin' or (session['role'] == 'Lead' and artist_lead == session['username']):
+            if session['role'] in ('Admin', 'HR') or (session['role'] == 'Lead' and artist_lead == session['username']):
                 if lead_review_action == 'Approve':
                     cursor.execute("UPDATE files SET internal_lead_status = 'Approved' WHERE id = ?", (file_id,))
                 elif lead_review_action == 'Reject':
@@ -2423,7 +2423,7 @@ def update_file_details(file_id):
                 
         # 2. Content lead review
         if content_review_action:
-            if session['role'] == 'Admin' or (session['role'] == 'Lead' and session['username'] == 'pooja'):
+            if session['role'] in ('Admin', 'HR') or (session['role'] == 'Lead' and session['username'] == 'pooja'):
                 if content_review_action == 'Approve':
                     cursor.execute("UPDATE files SET internal_content_status = 'Approved' WHERE id = ?", (file_id,))
                 elif content_review_action == 'Reject':
@@ -2625,7 +2625,7 @@ def update_status():
             is_assigned = True
 
     is_lead = (session['role'] == 'Lead' and session['team'] == target_team)
-    is_admin = (session['role'] == 'Admin')
+    is_admin = (session['role'] in ('Admin', 'HR'))
     
     if not (is_assigned or is_lead or is_admin):
         flash("Unauthorized to update status for this stage.", "error")
@@ -2749,7 +2749,7 @@ def file_rework():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
-    if session['role'] not in ['Admin', 'Lead']:
+    if session['role'] not in ['Admin', 'HR', 'Lead']:
         flash("Unauthorized to issue rework for files.", "error")
         return redirect(request.referrer or url_for('dashboard'))
         
@@ -2853,7 +2853,7 @@ def set_monthly_target():
 def points_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] == 'Admin':
+    if session['role'] in ('Admin', 'HR'):
         return redirect(url_for('work_reports_page', **request.args))
         
     sub_tab = request.args.get('sub_tab', 'assets')
@@ -2911,7 +2911,7 @@ def points_page():
                 'pct': pct
             })
             
-    elif session['role'] == 'Admin':
+    elif session['role'] in ('Admin', 'HR'):
         cursor.execute("SELECT id, name, username, team, role FROM users WHERE role IN ('Artist', 'Lead') ORDER BY team, role, name")
         all_users = cursor.fetchall()
         for u in all_users:
@@ -2933,7 +2933,7 @@ def points_page():
     if session['role'] == 'Lead':
         cursor.execute("SELECT id, name, username FROM users WHERE team = ? AND role = 'Artist'", (session['team'],))
         target_artists = cursor.fetchall()
-    elif session['role'] == 'Admin':
+    elif session['role'] in ('Admin', 'HR'):
         cursor.execute("SELECT id, name, username, team, role FROM users WHERE role IN ('Artist', 'Lead') ORDER BY name")
         target_artists = cursor.fetchall()
         
@@ -2952,7 +2952,7 @@ def points_page():
         selected_month = current_month
         
     selected_employee_id = request.args.get('employee_id', type=int)
-    if session['role'] == 'Admin' and selected_employee_id:
+    if session['role'] in ('Admin', 'HR') and selected_employee_id:
         cursor.execute("SELECT id, name, username, team, role FROM users WHERE id = ? AND role IN ('Artist', 'Lead')", (selected_employee_id,))
         selected_employee = cursor.fetchone()
         if selected_employee:
@@ -3005,7 +3005,7 @@ def points_page():
 
 @app.route('/permissions', methods=['GET', 'POST'])
 @login_required
-@roles_required('Admin')
+@roles_required('Admin', 'HR')
 def permissions_page():
     db = get_db()
     cursor = db.cursor()
@@ -3086,7 +3086,7 @@ def permissions_page():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _resolve_target_team(requested_team: str | None) -> str:
-    if session.get('role') == 'Admin':
+    if session.get('role') in ('Admin', 'HR'):
         if requested_team and requested_team in PRODUCTION_TEAMS:
             return requested_team
         return PRODUCTION_TEAMS[0]
@@ -3095,7 +3095,7 @@ def _resolve_target_team(requested_team: str | None) -> str:
 
 @app.route('/team/template/download', methods=['GET'])
 @login_required
-@roles_required('Lead', 'Admin')
+@roles_required('Lead', 'Admin', 'HR')
 def download_team_template():
     req_team = request.args.get('team', '').strip()
     if session.get('role') == 'Lead' and req_team and req_team != session.get('team'):
@@ -3118,7 +3118,7 @@ def download_team_template():
 
 @app.route('/team/upload', methods=['GET', 'POST'])
 @login_required
-@roles_required('Lead', 'Admin')
+@roles_required('Lead', 'Admin', 'HR')
 def team_upload():
     db = get_db()
     user_info = db.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],)).fetchone()
@@ -3294,6 +3294,11 @@ def _render_pipeline_view(file_type: str):
     chapters = []
     if project_id:
         chapters = cursor.execute("SELECT id, name FROM chapters WHERE project_id = ? AND status = 'Active' ORDER BY id ASC", (project_id,)).fetchall()
+        valid_chap_ids = {c['id'] for c in chapters}
+        if chapter_id and chapter_id not in valid_chap_ids:
+            chapter_id = None
+    else:
+        chapter_id = None
 
     where_clauses = ["f.file_type = ?"]
     params: list = [file_type]
@@ -3312,6 +3317,9 @@ def _render_pipeline_view(file_type: str):
             "EXISTS (SELECT 1 FROM file_pipeline fp WHERE fp.file_id = f.id AND fp.team_name = ? AND fp.status IN ('Yet to Start','Open','Work In Progress','In Progress','Review','Retake','Rework'))"
         )
         params.append(team_filter)
+
+    base_where_sql = " AND ".join(where_clauses)
+    base_params = list(params)
 
     if status_filter and status_filter != 'All':
         # Map filter aliases
@@ -3420,17 +3428,19 @@ def _render_pipeline_view(file_type: str):
         fdict['progress_pct'] = pct
         pipeline_items.append(fdict)
 
-    # Summary counts for clickable status cards
+    # Dynamic Summary Counts for the active Project / Chapter / Team / Search filters (all roles)
     status_summary = {'Yet to Start': 0, 'Work In Progress': 0, 'Review': 0, 'Retake': 0, 'Approved': 0, 'Locked': 0}
     sc_rows = cursor.execute(
-        """
+        f"""
         SELECT fp.status, COUNT(DISTINCT fp.file_id) AS cnt
         FROM file_pipeline fp
         JOIN files f ON fp.file_id = f.id
-        WHERE f.file_type = ?
+        JOIN chapters c ON f.chapter_id = c.id
+        JOIN projects p ON c.project_id = p.id
+        WHERE {base_where_sql}
         GROUP BY fp.status
         """,
-        (file_type,),
+        base_params,
     ).fetchall()
     for sr in sc_rows:
         norm = _normalize_stage_status(sr['status'])
@@ -3484,6 +3494,8 @@ def api_files_by_status():
     req_status = request.args.get('status', '').strip()
     req_team = request.args.get('team', '').strip()
     req_type = request.args.get('file_type', '').strip()
+    req_project_id = request.args.get('project_id', type=int)
+    req_chapter_id = request.args.get('chapter_id', type=int)
 
     if session.get('role') == 'Lead':
         req_team = session.get('team', '')
@@ -3511,6 +3523,12 @@ def api_files_by_status():
     if req_type in ('Asset', 'Scene'):
         where.append("f.file_type = ?")
         params.append(req_type)
+    if req_project_id:
+        where.append("p.id = ?")
+        params.append(req_project_id)
+    if req_chapter_id:
+        where.append("c.id = ?")
+        params.append(req_chapter_id)
 
     rows = db.execute(
         f"""
@@ -3972,7 +3990,7 @@ def reports_page():
 
 @app.route('/reports/export/<tab>')
 def reports_export(tab):
-    if 'user_id' not in session or session['role'] != 'Admin':
+    if 'user_id' not in session or session['role'] not in ('Admin', 'HR'):
         return redirect(url_for('login'))
 
     db = get_db()
@@ -4594,8 +4612,8 @@ def _get_work_reports_data(db, range_type='this_week', custom_start='', custom_e
 def work_reports_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] != 'Admin':
-        flash("Work Reports are Admin-only.", "error")
+    if session['role'] not in ('Admin', 'HR'):
+        flash("Work Reports are Admin/HR-only.", "error")
         return redirect(url_for('dashboard'))
 
     db = get_db()
@@ -4640,7 +4658,7 @@ def work_reports_page():
 def work_reports_export():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if session['role'] != 'Admin':
+    if session['role'] not in ('Admin', 'HR'):
         flash("Unauthorized", "error")
         return redirect(url_for('dashboard'))
 

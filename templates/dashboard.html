@@ -34,9 +34,17 @@
                 <p>{{ session['role'] }} — {{ session['team'] }} Team</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                {% if session['role'] in ['Lead', 'Admin'] %}
+                {% if session['role'] in ['Lead', 'Admin', 'HR'] %}
                     <a href="{{ url_for('download_team_template') }}" class="btn btn-sm btn-primary">Download Excel Template</a>
                     <a href="{{ url_for('team_upload') }}" class="btn btn-sm btn-success">Upload Daily Excel</a>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <select id="dashPopupStateSelect" class="form-input" style="padding:5px 8px; font-size:12px;">
+                            {% for st in ['Yet to Start', 'Work In Progress', 'Review', 'Retake', 'Approved', 'Locked'] %}
+                                <option value="{{ st }}">{{ st }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" class="btn btn-sm" onclick="openStatusFilesModal(document.getElementById('dashPopupStateSelect').value)">View File Names by State</button>
+                    </div>
                     {% if today_upload_log %}
                         <span class="att-badge present" style="padding:4px 10px; border-radius:12px; font-size:11px;">Uploaded today at {{ today_upload_log['uploaded_at']|time12 }}</span>
                     {% else %}
@@ -56,21 +64,13 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Clickable Status Summary Cards (Popup Modal for Lead, HR, Admin) -->
+        <!-- Display-Only Status Summary Cards (Numeric counters do not open popups) -->
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:24px;">
             {% for st_label, st_cnt in status_counts.items() %}
-                {% if session['role'] in ['Lead', 'HR', 'Admin'] %}
-                <button type="button" class="status-card-btn" onclick="openStatusFilesModal('{{ st_label }}')">
-                    <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted);">{{ st_label }}</div>
-                    <div style="font-size:26px; font-weight:700; color:var(--text-primary); margin-top:4px;">{{ st_cnt }}</div>
-                    <div style="font-size:11px; color:var(--color-blue); margin-top:4px;">Click to view files</div>
-                </button>
-                {% else %}
                 <div class="status-card-btn" style="cursor:default;">
                     <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted);">{{ st_label }}</div>
                     <div style="font-size:26px; font-weight:700; color:var(--text-primary); margin-top:4px;">{{ st_cnt }}</div>
                 </div>
-                {% endif %}
             {% endfor %}
         </div>
 

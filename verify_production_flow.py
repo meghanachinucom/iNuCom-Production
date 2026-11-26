@@ -99,9 +99,13 @@ def run_tests() -> None:
             assert r_sc.status_code == 200, f"Scene Pipeline not accessible for {uname}"
         print("[PASS] 2. Activity Log hidden from all UI roles, obsolete routes return 404, and Pipelines visible to all roles.")
 
-        # 3. HR & Content Team Lead can add Project + Upload Assets & Scene Names template
+        # 3. HR has full Admin parity + HR & Content Team Lead can add Project + Upload Assets & Scene Names template
         client_hr = app.test_client()
         _login(client_hr, "meghana")
+        for hr_admin_route in ["/permissions", "/reports", "/artist-reports", "/upload-project", "/team/upload"]:
+            r_hr_adm = client_hr.get(hr_admin_route)
+            assert r_hr_adm.status_code == 200, f"HR should have Admin parity for {hr_admin_route}, got {r_hr_adm.status_code}"
+
         csrf_hr = _extract_csrf(client_hr.get("/upload-project").data)
         r_proj = client_hr.post(
             "/project/add",
@@ -139,9 +143,28 @@ def run_tests() -> None:
             follow_redirects=True,
         )
         assert b"Registered 2 new file(s)" in r_up_as.data
-        assert b"New_Turbine_Asset" in client_a.get("/pipeline/assets").data
-        assert b"New_Turbine_sc_01" in client_a.get("/pipeline/scenes").data
-        print("[PASS] 3. HR & Content Lead Project creation + Assets & Scene Names Excel upload verified.")
+        r_assets_html = client_a.get("/pipeline/assets").data
+        r_scenes_html = client_a.get("/pipeline/scenes").data
+        assert b"New_Turbine_Asset" in r_assets_html
+        assert b"New_Turbine_sc_01" in r_scenes_html
+        # Verify no redundant Project/Chapter table column and numeric KPI cards are display-only
+        assert b"<th>Project / Chapter</th>" not in r_assets_html
+        assert b"View File Names by State" in r_assets_html
+        assert b"View File Names by State" in r_scenes_html
+
+        # Verify dynamic Project & Chapter filtering updates summary counts for all roles
+        conn = open_encrypted_connection(_TEST_DB)
+        hr_proj_id = conn.execute("SELECT id FROM projects WHERE name = 'HR_New_Project'").fetchone()["id"]
+        hr_chap_id = conn.execute("SELECT id FROM chapters WHERE project_id = ? AND name = 'Ch1'", (hr_proj_id,)).fetchone()["id"]
+        conn.close()
+        for uname in ["vasu", "meghana", "pooja", "prabhas"]:
+            cu = app.test_client()
+            _login(cu, uname)
+            r_all_sc = cu.get("/pipeline/scenes").data
+            r_filt_sc = cu.get(f"/pipeline/scenes?project_id={hr_proj_id}&chapter_id={hr_chap_id}").data
+            assert b'id="kpi-total-files"' in r_filt_sc
+            assert b">1<" in r_filt_sc and r_filt_sc != r_all_sc, f"Dynamic counts did not update for {uname}"
+        print("[PASS] 3. HR Admin parity, Project/Assets-Scenes upload, dynamic Project/Chapter counts, and clean pipeline table verified.")
 
         # 4. Team A download -> Approved handoff to Team B -> Team B Retake (Take 1)
         r_dl = client_a.get("/team/template/download")

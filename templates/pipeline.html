@@ -105,26 +105,35 @@
                 <h1>{{ file_type }} Pipeline</h1>
                 <p>Showing {{ items|length }} of {{ total_files }} {{ file_type|lower }}(s) across 11 ordered stages.</p>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <a href="{{ url_for('pipeline_assets') }}" class="btn btn-sm {% if file_type == 'Asset' %}btn-primary{% endif %}">Asset Pipeline</a>
                 <a href="{{ url_for('pipeline_scenes') }}" class="btn btn-sm {% if file_type == 'Scene' %}btn-primary{% endif %}">Scene Pipeline</a>
+                {% if session['role'] in ['Lead', 'HR', 'Admin'] %}
+                <div style="display:flex; gap:6px; align-items:center; margin-left:6px;">
+                    <select id="popupStateSelect" class="form-input" style="padding:6px 10px; font-size:12px;">
+                        {% for st in ['Yet to Start', 'Work In Progress', 'Review', 'Retake', 'Approved', 'Locked'] %}
+                            <option value="{{ st }}">{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="openStatusFilesModal(document.getElementById('popupStateSelect').value, '{{ file_type }}', '{{ team_filter }}', '{{ project_id or '' }}', '{{ chapter_id or '' }}')">
+                        View File Names by State
+                    </button>
+                </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Clickable Status Summary Cards (Lead / HR / Admin open popup modal) -->
+        <!-- Display-Only Dynamic Status Summary Cards (All Roles) -->
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:18px;">
+            <div class="status-chip-btn" style="cursor:default;">
+                <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Filtered</div>
+                <div id="kpi-total-files" style="font-size:20px; font-weight:700; color:var(--color-blue); margin-top:2px;">{{ total_files }}</div>
+            </div>
             {% for st_name, st_count in status_summary.items() %}
-                {% if session['role'] in ['Lead', 'HR', 'Admin'] %}
-                <button type="button" class="status-chip-btn" onclick="openStatusFilesModal('{{ st_name }}', '{{ file_type }}')">
-                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">{{ st_name }}</div>
-                    <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:2px;">{{ st_count }}</div>
-                </button>
-                {% else %}
-                <div class="status-chip-btn" style="cursor:default;">
-                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">{{ st_name }}</div>
-                    <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:2px;">{{ st_count }}</div>
-                </div>
-                {% endif %}
+            <div class="status-chip-btn" style="cursor:default;">
+                <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">{{ st_name }}</div>
+                <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:2px;">{{ st_count }}</div>
+            </div>
             {% endfor %}
         </div>
 
@@ -178,13 +187,12 @@
             </div>
         </form>
 
-        <!-- Compact Sticky Pipeline Table -->
+        <!-- Compact Sticky Pipeline Table (No redundant Project/Chapter columns below) -->
         <div class="pipeline-scroll-box">
             <table class="pipeline-table">
                 <thead>
                     <tr>
                         <th class="sticky-col">File Name</th>
-                        <th>Project / Chapter</th>
                         <th>Active Team</th>
                         <th>Progress</th>
                         <th>Stage Flow (Hover for Details)</th>
@@ -197,7 +205,6 @@
                             <strong>{{ item.file_name }}</strong>
                             <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">{{ item.complexity }}</span>
                         </td>
-                        <td style="color:var(--text-secondary);">{{ item.project_name }} / {{ item.chapter_name }}</td>
                         <td><span style="font-weight:600; color:var(--color-blue);">{{ item.active_team }}</span></td>
                         <td>
                             <div style="display:flex; align-items:center; gap:6px;">
@@ -221,7 +228,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" style="text-align:center; padding:32px; color:var(--text-muted);">
+                        <td colspan="4" style="text-align:center; padding:32px; color:var(--text-muted);">
                             No {{ file_type|lower }} files match the selected filters.
                         </td>
                     </tr>
@@ -280,7 +287,7 @@
 
 <script>
 let _modalFilesCache = [];
-function openStatusFilesModal(statusName, fileType, teamName) {
+function openStatusFilesModal(statusName, fileType, teamName, projectId, chapterId) {
     const modal = document.getElementById('statusFilesModal');
     document.getElementById('statusModalTitle').textContent = statusName + ' Files';
     document.getElementById('statusModalSearch').value = '';
@@ -289,6 +296,8 @@ function openStatusFilesModal(statusName, fileType, teamName) {
     const params = new URLSearchParams({ status: statusName });
     if (fileType) params.set('file_type', fileType);
     if (teamName) params.set('team', teamName);
+    if (projectId) params.set('project_id', projectId);
+    if (chapterId) params.set('chapter_id', chapterId);
     fetch('/api/files/by-status?' + params.toString())
         .then(r => r.json())
         .then(data => {

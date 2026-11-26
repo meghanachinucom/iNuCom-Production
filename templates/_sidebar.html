@@ -34,7 +34,7 @@
             <a href="{{ url_for('pipeline_scenes') }}"><span>Scene Pipeline</span></a>
         </li>
 
-        {% if session['role'] in ['Lead', 'Admin'] %}
+        {% if session['role'] in ['Lead', 'Admin', 'HR'] %}
         <li class="menu-item {% if request.endpoint == 'team_upload' %}active{% endif %}">
             <a href="{{ url_for('team_upload') }}"><span>Team Excel Upload</span></a>
         </li>
@@ -52,7 +52,7 @@
         </li>
         {% endif %}
 
-        {% if session['role'] == 'Admin' %}
+        {% if session['role'] in ['Admin', 'HR'] %}
         <li class="menu-item {% if request.endpoint == 'permissions_page' %}active{% endif %}">
             <a href="{{ url_for('permissions_page') }}"><span>Users &amp; Roles</span></a>
         </li>
